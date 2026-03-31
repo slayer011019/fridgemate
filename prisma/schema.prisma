@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Ingredient {
+  id           String   @id @default(cuid())
+  name         String
+  category     String
+  storageType  String
+  quantity     String
+  purchaseDate String?
+  expiryDate   String?
+  memo         String?
+  consumed     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

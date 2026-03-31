@@ -73,6 +73,9 @@ FridgeMate는
 - JavaScript
 - IndexedDB
 - Tesseract.js
+- Express
+- Prisma
+- PostgreSQL
 
 ## Pages
 
@@ -94,17 +97,40 @@ src/
   pages/
   utils/
 scripts/
+server/
+prisma/
 ```
 
 ## Local Persistence
 
 FridgeMate stores ingredient data in the browser using IndexedDB. Refreshing the page keeps the saved ingredients on the same browser and device.
 
-Because this is a local-first MVP:
+By default, the current MVP still works as a local-first app:
 
 - there is no authentication
-- there is no backend server
+- a backend is optional unless `VITE_API_BASE_URL` is configured
 - data does not sync across devices
+
+## Backend Expansion Path
+
+This project now includes a starter backend structure for moving beyond the local-only MVP:
+
+- `server/` contains an Express API skeleton
+- `prisma/schema.prisma` defines the initial `Ingredient` database model
+- `.env.example` documents the required environment variables
+- the frontend can use the API when `VITE_API_BASE_URL` is set
+- if `VITE_API_BASE_URL` is not set, the app keeps using IndexedDB as a fallback
+
+### Planned API Endpoints
+
+- `GET /api/health`
+- `GET /api/ingredients`
+- `GET /api/ingredients/:id`
+- `POST /api/ingredients`
+- `POST /api/ingredients/bulk`
+- `PATCH /api/ingredients/:id`
+- `DELETE /api/ingredients/:id`
+- `GET /api/recipes/recommendations`
 
 ## OCR Import Flow
 
@@ -141,6 +167,38 @@ npm install
 npm run dev
 ```
 
+### Run the API Server
+
+```bash
+npm run dev:server
+```
+
+## Local PostgreSQL Setup
+
+This machine does not currently have `psql` or Docker installed, so you will need a PostgreSQL server before the API can run end-to-end.
+
+### Option 1: Install PostgreSQL locally
+
+1. Install PostgreSQL on your machine
+2. Create a database named `fridgemate`
+3. Update `.env` with your local database username and password
+4. Run:
+
+```bash
+npm run prisma:migrate
+npm run dev:server
+```
+
+Example `.env` value:
+
+```bash
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/fridgemate?schema=public"
+```
+
+### Option 2: Use a hosted PostgreSQL database
+
+If you do not want to install PostgreSQL locally, you can use a hosted database from services like Supabase, Neon, or Railway and paste that connection string into `.env`.
+
 ### Build for Production
 
 ```bash
@@ -156,8 +214,11 @@ npm run preview
 ## Scripts
 
 - `npm run dev` starts the Vite development server
+- `npm run dev:server` starts the Express API server with `.env`
 - `npm run build` creates the production build
 - `npm run preview` previews the production build locally
+- `npm run prisma:generate` generates the Prisma client
+- `npm run prisma:migrate` runs a local Prisma migration
 
 ## Portfolio Notes
 
@@ -172,10 +233,11 @@ This project is a strong beginner portfolio piece because it shows:
 
 ## Known Limitations
 
-- No user accounts or cloud sync
+- No user accounts or authorization yet
 - Recipe data is local seed data only
 - OCR quality depends heavily on screenshot clarity and layout
 - Import parsing is currently tuned for the existing shopping screenshot format
+- Backend files are scaffolded, but a real PostgreSQL database must be configured before the API can run end-to-end
 
 ## Future Improvements
 

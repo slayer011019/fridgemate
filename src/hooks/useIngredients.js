@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { deleteIngredient, getAllIngredients, getIngredientById, saveIngredient, saveIngredients } from '../db/indexedDB';
+import * as ingredientsApi from '../api/ingredientsApi';
+import * as indexedDb from '../db/indexedDB';
+import { isBackendEnabled } from '../utils/backendConfig';
+
+const ingredientRepository = isBackendEnabled() ? ingredientsApi : indexedDb;
 
 export function useIngredients() {
   const [ingredients, setIngredients] = useState([]);
@@ -9,7 +13,7 @@ export function useIngredients() {
     setLoading(true);
 
     try {
-      const items = await getAllIngredients();
+      const items = await ingredientRepository.getAllIngredients();
       setIngredients(items || []);
     } finally {
       setLoading(false);
@@ -22,17 +26,16 @@ export function useIngredients() {
 
   const addIngredient = async (ingredient) => {
     const nextIngredient = {
-      ...ingredient,
-      id: crypto.randomUUID()
+      ...ingredient
     };
 
-    await saveIngredient(nextIngredient);
+    await ingredientRepository.saveIngredient(nextIngredient);
     await loadIngredients();
     return nextIngredient;
   };
 
   const updateIngredient = async (ingredient) => {
-    await saveIngredient(ingredient);
+    await ingredientRepository.saveIngredient(ingredient);
     await loadIngredients();
     return ingredient;
   };
@@ -40,20 +43,20 @@ export function useIngredients() {
   const addIngredients = async (items) => {
     const nextIngredients = items.map((ingredient) => ({
       ...ingredient,
-      id: ingredient.id || crypto.randomUUID()
+      id: isBackendEnabled() ? undefined : ingredient.id || crypto.randomUUID()
     }));
 
-    await saveIngredients(nextIngredients);
+    await ingredientRepository.saveIngredients(nextIngredients);
     await loadIngredients();
     return nextIngredients;
   };
 
   const removeIngredient = async (id) => {
-    await deleteIngredient(id);
+    await ingredientRepository.deleteIngredient(id);
     await loadIngredients();
   };
 
-  const findIngredient = useCallback((id) => getIngredientById(id), []);
+  const findIngredient = useCallback((id) => ingredientRepository.getIngredientById(id), []);
 
   return {
     ingredients,
