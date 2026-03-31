@@ -19,4 +19,9 @@ model Ingredient {
   consumed     Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([expiryDate])
+  @@index([category])
+  @@index([storageType])
 }

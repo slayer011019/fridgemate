@@ -5,6 +5,24 @@ import { assertValidIngredient, normalizeIngredientInput } from '../lib/ingredie
 
 export const ingredientRoutes = Router();
 
+function normalizeAndValidateIngredient(input) {
+  const ingredient = normalizeIngredientInput(input);
+  assertValidIngredient(ingredient);
+  return ingredient;
+}
+
+async function findIngredientOrThrow(id) {
+  const ingredient = await prisma.ingredient.findUnique({
+    where: { id }
+  });
+
+  if (!ingredient) {
+    throw createHttpError(404, 'Ingredient not found.');
+  }
+
+  return ingredient;
+}
+
 ingredientRoutes.get('/', async (_request, response, next) => {
   try {
     const ingredients = await prisma.ingredient.findMany({
@@ -19,14 +37,7 @@ ingredientRoutes.get('/', async (_request, response, next) => {
 
 ingredientRoutes.get('/:id', async (request, response, next) => {
   try {
-    const ingredient = await prisma.ingredient.findUnique({
-      where: { id: request.params.id }
-    });
-
-    if (!ingredient) {
-      throw createHttpError(404, 'Ingredient not found.');
-    }
-
+    const ingredient = await findIngredientOrThrow(request.params.id);
     response.json(ingredient);
   } catch (error) {
     next(error);
@@ -35,8 +46,7 @@ ingredientRoutes.get('/:id', async (request, response, next) => {
 
 ingredientRoutes.post('/', async (request, response, next) => {
   try {
-    const ingredient = normalizeIngredientInput(request.body);
-    assertValidIngredient(ingredient);
+    const ingredient = normalizeAndValidateIngredient(request.body);
 
     const createdIngredient = await prisma.ingredient.create({
       data: ingredient
@@ -56,11 +66,7 @@ ingredientRoutes.post('/bulk', async (request, response, next) => {
       throw createHttpError(400, 'At least one ingredient is required.');
     }
 
-    const normalizedItems = items.map((item) => {
-      const ingredient = normalizeIngredientInput(item);
-      assertValidIngredient(ingredient);
-      return ingredient;
-    });
+    const normalizedItems = items.map((item) => normalizeAndValidateIngredient(item));
 
     const createdIngredients = await prisma.$transaction(
       normalizedItems.map((ingredient) =>
@@ -78,20 +84,13 @@ ingredientRoutes.post('/bulk', async (request, response, next) => {
 
 ingredientRoutes.patch('/:id', async (request, response, next) => {
   try {
-    const existingIngredient = await prisma.ingredient.findUnique({
-      where: { id: request.params.id }
-    });
+    const existingIngredient = await findIngredientOrThrow(request.params.id);
 
-    if (!existingIngredient) {
-      throw createHttpError(404, 'Ingredient not found.');
-    }
-
-    const ingredient = normalizeIngredientInput({
+    const ingredient = normalizeAndValidateIngredient({
       ...existingIngredient,
       ...request.body,
       id: request.params.id
     });
-    assertValidIngredient(ingredient);
 
     const updatedIngredient = await prisma.ingredient.update({
       where: { id: request.params.id },

@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import IngredientFilters from '../components/IngredientFilters';
 import IngredientList from '../components/IngredientList';
 import PageHeader from '../components/PageHeader';
+import ShoppingListPanel from '../components/ShoppingListPanel';
 import { useIngredients } from '../hooks/useIngredients';
 import { getRemainingDays } from '../utils/date';
 import { ingredientCategories, storageTypes } from '../utils/ingredientOptions';
@@ -41,20 +42,40 @@ function IngredientsPage() {
     return items;
   }, [filters, ingredients]);
 
-  const handleFilterChange = (field, value) => {
-    setFilters((current) => ({ ...current, [field]: value }));
-  };
+  const shoppingListItems = useMemo(
+    () => ingredients.filter((ingredient) => ingredient.consumed),
+    [ingredients]
+  );
 
-  const handleToggleConsumed = async (ingredient) => {
+  const handleFilterChange = useCallback((field, value) => {
+    setFilters((current) => ({ ...current, [field]: value }));
+  }, []);
+
+  const handleToggleConsumed = useCallback(async (ingredient) => {
     await updateIngredient({
       ...ingredient,
       consumed: !ingredient.consumed
     });
-  };
+  }, [updateIngredient]);
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     await removeIngredient(id);
-  };
+  }, [removeIngredient]);
+
+  const handleSaveShoppingListDetails = useCallback(async (ingredient) => {
+    await updateIngredient(ingredient);
+  }, [updateIngredient]);
+
+  const handleRestoreAllShoppingItems = useCallback(async () => {
+    await Promise.all(
+      shoppingListItems.map((ingredient) =>
+        updateIngredient({
+          ...ingredient,
+          consumed: false
+        })
+      )
+    );
+  }, [shoppingListItems, updateIngredient]);
 
   return (
     <div className="space-y-6">
@@ -82,6 +103,15 @@ function IngredientsPage() {
         storageTypes={storageTypes}
         onChange={handleFilterChange}
       />
+
+      {!loading ? (
+        <ShoppingListPanel
+          items={shoppingListItems}
+          onRestore={handleToggleConsumed}
+          onRestoreAll={handleRestoreAllShoppingItems}
+          onSaveDetails={handleSaveShoppingListDetails}
+        />
+      ) : null}
 
       {loading ? <div className="card text-sm muted">{'\uC7AC\uB8CC\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4...'}</div> : null}
 

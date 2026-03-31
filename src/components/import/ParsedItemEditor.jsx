@@ -47,6 +47,17 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
               </div>
             </div>
 
+            <div className="mb-4 grid gap-3 rounded-[20px] bg-slate-50/80 p-3 text-sm text-slate-700 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uAC04\uC18C\uD654\uB41C \uC774\uB984'}</p>
+                <p className="font-medium text-slate-900">{item.displayName || item.normalizedName || item.name || '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uCD94\uCD9C\uB41C \uC218\uB7C9'}</p>
+                <p className="font-medium text-slate-900">{item.specText || item.quantity || '-'}</p>
+              </div>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <label className="space-y-2 text-sm font-medium text-slate-700">
                 {'\uC774\uB984'}

@@ -1,251 +1,314 @@
 # FridgeMate
 
-FridgeMate는 식재료를 등록·관리하고 유통기한을 추적하며,
-보유 재료를 기반으로 레시피를 추천해주는 웹앱입니다.
-주문내역 캡처를 활용한 반자동 식재료 등록 기능도 함께 실험하고 있습니다.
+FridgeMate is a local-first web app for managing fridge and pantry ingredients, tracking expiry dates, and recommending recipes based on what the user already has.
 
-Live Demo:
-`https://fridgemate-ten.vercel.app/`
+This project started as a frontend MVP focused on everyday single-user use cases, and was later extended with an Express + Prisma + PostgreSQL backend path while keeping IndexedDB fallback for local-first usage.
 
-Short GitHub description:
+Live Demo: `https://fridgemate-ten.vercel.app/`
+
+Short GitHub Description:
 `Local-first fridge tracker with expiry alerts, recipe recommendations, and OCR-based ingredient import.`
 
 ## Overview
 
-자취를 하다 보면 냉장고 안에 어떤 재료가 있는지 잊어버리거나,
-유통기한이 지나서 버리게 되는 경우가 많습니다.
-또 남은 재료로 뭘 해먹을지 바로 떠오르지 않아서 음식물 낭비가 생기기도 합니다.
+People living alone often forget what ingredients they already have, miss expiry dates, or struggle to decide what to cook with leftover items.
 
-FridgeMate는 이런 문제를 해결하기 위해 시작한 프로젝트입니다.
-단순한 식재료 메모장이 아니라,
+FridgeMate was built to make that flow simpler:
 
-- 재료를 쉽게 등록하고
-- 유통기한을 관리하고
-- 지금 가진 재료로 만들 수 있는 요리를 추천하고
-- 주문내역 캡처를 통해 입력 부담까지 줄이는 것
+- register and organize ingredients
+- see expiring or expired items clearly
+- get recipe suggestions from owned ingredients
+- reduce input friction with OCR-based screenshot import
 
-을 목표로 하고 있습니다.
+## What Is Implemented
 
-## Main Features
+### Frontend MVP
 
-### Ingredient Management
+- ingredient CRUD
+- consumed state toggle
+- lightweight “buy again” shopping-list style section for consumed items
+- quick quantity and memo editing inside the buy-again section
+- shopping priority toggle and bulk restore action for buy-again items
+- filtering and sorting
+- expiry date tracking with D-day style display
+- recipe recommendations based on current ingredients
+- pantry staple ownership toggle for common seasonings and sauces
+- local persistence with IndexedDB
 
-- 식재료 등록 / 수정 / 삭제
-- 소비 완료 처리
-- 냉장 / 냉동 / 실온 분류
-- 카테고리별 필터링
+### OCR Import Flow
 
-### Expiry Tracking
+- image upload for shopping/order screenshots
+- browser-side OCR with `tesseract.js`
+- rule-based parsing and normalization
+- review-and-confirm import flow
+- learned correction history for repeated import edits
 
-- 유통기한 저장
-- D-day 및 남은 날짜 표시
-- 임박 재료 / 만료 재료 상태 구분
+### Backend Path
 
-### Recipe Recommendation
+- Express API structure
+- Prisma schema for ingredients
+- PostgreSQL-ready server configuration
+- ingredient CRUD API
+- recipe recommendation API
+- frontend API integration with IndexedDB fallback
 
-- 현재 보유 재료 기준 레시피 추천
-- 지금 만들 수 있는 요리 표시
-- 1개만 더 사면 되는 요리 구분
-- 부족한 재료 표시
+## What Is Not Fully Finished Yet
 
-### Grocery Import (Experimental)
-
-- 쇼핑몰 주문내역 캡처 이미지 업로드
-- OCR 기반 상품 후보 추출
-- 사용자 검토 후 일괄 등록
-- 완전 자동 등록이 아닌 review-and-confirm 방식
-
-## Why This Project
-
-기존의 냉장고 관리 앱은 직접 입력해야 하는 번거로움이 크고,
-레시피 추천과 재료 관리가 자연스럽게 이어지지 않는 경우가 많다고 느꼈습니다.
-
-FridgeMate는
-
-- 입력 부담을 줄이는 import 기능
-- 재료 정규화
-- 유통기한 기반 추천 우선순위
-
-를 함께 고려해, 실제 생활에서 더 자주 쓸 수 있는 구조를 목표로 했습니다.
+- authentication or multi-user support
+- shared fridge or sync across devices
+- production database deployment and persistent hosted backend verification
+- AI-based recommendation engine
+- generalized OCR support for many shopping layouts
 
 ## Tech Stack
 
+### Frontend
+
 - React
 - Vite
-- Tailwind CSS
 - JavaScript
+- Tailwind CSS
+
+### Storage and Data
+
 - IndexedDB
-- Tesseract.js
-- Express
-- Prisma
 - PostgreSQL
+- Prisma
 
-## Pages
+### Backend
 
-- `/` dashboard summary
-- `/ingredients` ingredient list and filters
-- `/ingredients/new` add ingredient form
-- `/ingredients/:ingredientId/edit` edit ingredient form
-- `/import` OCR-based screenshot import with review flow
-- `/recipes` recipe recommendations and missing ingredient details
+- Express
+- Node.js
+
+### Experimental Import
+
+- Tesseract.js
+- rule-based parsing and normalization
+
+## Key Features
+
+### 1. Ingredient Management
+
+- add, edit, and delete ingredients
+- mark ingredients as consumed
+- organize by category and storage type
+- sort by expiry date
+
+### 2. Expiry Tracking
+
+- display expiry dates clearly
+- highlight expiring soon ingredients
+- separate expired items from active items
+
+### 3. Recipe Recommendation
+
+- calculate recommendation score from owned ingredients
+- separate fridge ingredients, pantry staples, and shopping intent conceptually
+- distinguish:
+  - recipes that can be cooked now
+  - recipes that need only one more ingredient
+  - other partially matched recipes
+- show missing ingredients explicitly
+- treat pantry staples as lightweight penalties instead of hard blockers
+
+### 4. OCR-Based Import
+
+- upload screenshot image
+- extract text in the browser
+- normalize noisy product names into simpler ingredient names
+- keep review before final save
+
+## Architecture Notes
+
+FridgeMate is intentionally designed as a gradual system instead of a full backend-first application.
+
+### Current Data Strategy
+
+- default philosophy: local-first
+- frontend can run without backend
+- IndexedDB remains the safety net
+
+### API Connection Strategy
+
+- if `VITE_API_BASE_URL` is set, the frontend tries the backend API first
+- if the API is unavailable or returns a server-side failure, ingredient data falls back to IndexedDB
+- recipe recommendations can also use the backend API, but keep local recommendation logic as fallback
+
+This was a deliberate decision to avoid breaking the original MVP while expanding the project toward a more service-like architecture.
+
+## Technical Decisions
+
+### Why local-first first?
+
+This project started as a student-friendly MVP. Using IndexedDB made it possible to finish a usable product quickly without waiting on backend infrastructure.
+
+### Why keep IndexedDB fallback even after adding backend support?
+
+Because the original strength of the project was that it worked immediately in the browser. Removing that would have made the project more fragile during the transition to API-based storage.
+
+### Why use rule-based OCR parsing instead of AI from the start?
+
+The first goal was reliability, readability, and controllable false positives. A rule-based system was easier to debug and better aligned with a portfolio-scale MVP.
+
+### Why Express + Prisma + PostgreSQL?
+
+This stack keeps the backend simple enough for a solo developer while still showing practical backend skills:
+
+- REST API design
+- schema modeling
+- validation
+- migration flow
+- environment-based deployment setup
 
 ## Project Structure
 
 ```bash
 src/
+  api/
   components/
   data/
   db/
   hooks/
   pages/
   utils/
-scripts/
 server/
+  src/
+    db/
+    lib/
+    routes/
 prisma/
+scripts/
 ```
 
-## Local Persistence
+## Run Locally
 
-FridgeMate stores ingredient data in the browser using IndexedDB. Refreshing the page keeps the saved ingredients on the same browser and device.
-
-By default, the current MVP still works as a local-first app:
-
-- there is no authentication
-- a backend is optional unless `VITE_API_BASE_URL` is configured
-- data does not sync across devices
-
-## Backend Expansion Path
-
-This project now includes a starter backend structure for moving beyond the local-only MVP:
-
-- `server/` contains an Express API skeleton
-- `prisma/schema.prisma` defines the initial `Ingredient` database model
-- `.env.example` documents the required environment variables
-- the frontend can use the API when `VITE_API_BASE_URL` is set
-- if `VITE_API_BASE_URL` is not set, the app keeps using IndexedDB as a fallback
-
-### Planned API Endpoints
-
-- `GET /api/health`
-- `GET /api/ingredients`
-- `GET /api/ingredients/:id`
-- `POST /api/ingredients`
-- `POST /api/ingredients/bulk`
-- `PATCH /api/ingredients/:id`
-- `DELETE /api/ingredients/:id`
-- `GET /api/recipes/recommendations`
-
-## OCR Import Flow
-
-- Upload a shopping app screenshot or receipt image
-- Run OCR in the browser with `tesseract.js`
-- Parse extracted text with the rule-based import pipeline in `src/utils/import/`
-- Review, edit, and select the detected items
-- Import only the confirmed items into IndexedDB
-
-## Recipe Recommendation Logic
-
-- Base score uses matched required ingredients ratio
-- Bonus when a recipe uses ingredients expiring within 2 days
-- Bonus when the recipe can be made immediately
-- Bonus when only 1 ingredient is missing
-- Missing ingredients are shown in the UI
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18 or newer
-- npm 9 or newer
-
-### Install
+### 1. Install
 
 ```bash
 npm install
 ```
 
-### Run the App
+### 2. Create `.env`
+
+macOS / Linux:
+
+```bash
+cp .env.example .env
+```
+
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+### 3. Example `.env`
+
+Frontend-only mode:
+
+```bash
+VITE_API_BASE_URL=
+PORT=4000
+CLIENT_ORIGIN=http://localhost:5173
+DATABASE_URL="postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=public"
+```
+
+Frontend + backend mode:
+
+```bash
+VITE_API_BASE_URL=http://localhost:4000/api
+PORT=4000
+CLIENT_ORIGIN=http://localhost:5173
+DATABASE_URL="postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=public"
+```
+
+### 4. Prisma Setup
+
+```bash
+npm run prisma:validate
+npm run prisma:generate
+npm run prisma:migrate
+```
+
+### 5. Run the Backend
+
+```bash
+npm run dev:server
+```
+
+### 6. Run the Frontend
 
 ```bash
 npm run dev
 ```
 
-### Run the API Server
+### 7. Verify
+
+- frontend: `http://localhost:5173`
+- health check: `http://localhost:4000/api/health`
+
+## Backend Deployment
+
+Recommended backend platforms:
+
+- Render
+- Railway
+
+Recommended production environment variables:
 
 ```bash
-npm run dev:server
+PORT=10000
+CLIENT_ORIGIN=https://YOUR-FRONTEND.vercel.app
+DATABASE_URL=postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=public
 ```
 
-## Local PostgreSQL Setup
-
-This machine does not currently have `psql` or Docker installed, so you will need a PostgreSQL server before the API can run end-to-end.
-
-### Option 1: Install PostgreSQL locally
-
-1. Install PostgreSQL on your machine
-2. Create a database named `fridgemate`
-3. Update `.env` with your local database username and password
-4. Run:
+Frontend Vercel environment variable:
 
 ```bash
-npm run prisma:migrate
-npm run dev:server
+VITE_API_BASE_URL=https://YOUR-BACKEND-DOMAIN/api
 ```
 
-Example `.env` value:
+Prisma production note:
 
-```bash
-DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/fridgemate?schema=public"
-```
+- use `npm run prisma:generate` during build
+- use `npm run prisma:deploy` in deploy environments
+- do not use `npm run prisma:migrate` as a production deploy command
 
-### Option 2: Use a hosted PostgreSQL database
+## What I Learned
 
-If you do not want to install PostgreSQL locally, you can use a hosted database from services like Supabase, Neon, or Railway and paste that connection string into `.env`.
+- how to build a usable MVP first before expanding architecture
+- how to preserve an existing frontend while adding backend integration
+- how to design fallback behavior instead of hard-switching data sources
+- how to structure rule-based OCR parsing for a real UI workflow
+- how to introduce Prisma and PostgreSQL incrementally without rewriting the whole app
 
-### Build for Production
+## Portfolio Talking Points
 
-```bash
-npm run build
-```
+- Built a local-first ingredient management app with IndexedDB persistence, expiry tracking, and recipe recommendation logic.
+- Designed a rule-based OCR import flow with review-and-confirm UX instead of unsafe auto-registration.
+- Extended a frontend MVP into an Express + Prisma + PostgreSQL architecture without removing the original fallback path.
+- Implemented API-first ingredient CRUD with IndexedDB fallback for safer gradual migration.
+- Organized recommendation logic so it can run locally today and move toward backend or AI-based recommendation later.
 
-### Preview the Production Build
+## Resume Bullet Examples
 
-```bash
-npm run preview
-```
-
-## Scripts
-
-- `npm run dev` starts the Vite development server
-- `npm run dev:server` starts the Express API server with `.env`
-- `npm run build` creates the production build
-- `npm run preview` previews the production build locally
-- `npm run prisma:generate` generates the Prisma client
-- `npm run prisma:migrate` runs a local Prisma migration
-
-## Portfolio Notes
-
-This project is a strong beginner portfolio piece because it shows:
-
-- CRUD flows and state management
-- local persistence with IndexedDB
-- filtering and sorting UX
-- recommendation logic
-- browser-side OCR and post-processing
-- a practical single-user MVP scope
-
-## Known Limitations
-
-- No user accounts or authorization yet
-- Recipe data is local seed data only
-- OCR quality depends heavily on screenshot clarity and layout
-- Import parsing is currently tuned for the existing shopping screenshot format
-- Backend files are scaffolded, but a real PostgreSQL database must be configured before the API can run end-to-end
+- Built a local-first fridge management web app using React, Vite, Tailwind CSS, and IndexedDB to manage ingredients, expiry dates, and recipe suggestions.
+- Implemented a rule-based OCR import workflow with browser-side text extraction, product normalization, and review-before-save UX.
+- Added an Express + Prisma + PostgreSQL backend path for ingredient CRUD and recommendation APIs while preserving IndexedDB fallback.
+- Designed fallback-first frontend data flow so the app continues working locally even when backend APIs are unavailable.
+- Documented local development, database setup, and deployment flow for Vercel frontend and separately deployed backend services.
 
 ## Future Improvements
 
-- Better OCR dictionaries and correction rules
-- Ingredient aliases or fuzzy matching
-- Recipe filters by category and cooking time
-- Import history and correction learning
-- Optional export and backup flow
+The following are planned improvements, not fully implemented features yet:
+
+- hosted PostgreSQL deployment and production verification
+- unified recommendation source across dashboard and recipe pages
+- better OCR dictionaries and normalization rules
+- import history and correction management UI
+- user accounts and multi-device sync
+- AI-assisted recommendation or personalized meal planning
+
+## License
+
+No license has been added yet. If this project is going to stay public as a portfolio repository, adding an MIT license would be a reasonable next step.

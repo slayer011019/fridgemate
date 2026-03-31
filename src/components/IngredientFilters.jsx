@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 function IngredientFilters({ filters, categories, storageTypes, onChange }) {
   return (
     <section className="card grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -38,11 +40,11 @@ function IngredientFilters({ filters, categories, storageTypes, onChange }) {
         <select value={filters.status} onChange={(event) => onChange('status', event.target.value)}>
           <option value="all">{'\uC804\uCCB4 \uC7AC\uB8CC'}</option>
           <option value="active">{'\uBCF4\uC720 \uC911\uB9CC'}</option>
-          <option value="consumed">{'\uC18C\uBE44 \uC644\uB8CC\uB9CC'}</option>
+          <option value="consumed">{'\uC7AC\uB4F1\uB85D \uD544\uC694\uB9CC'}</option>
         </select>
       </label>
     </section>
   );
 }
 
-export default IngredientFilters;
+export default memo(IngredientFilters);

@@ -119,18 +119,6 @@ function IngredientFormPage() {
             placeholder={'\uBCF4\uAD00 \uD301\uC774\uB098 \uC0AC\uC6A9 \uC608\uC815 \uBA54\uBAA8'}
           />
         </label>
-
-        <label className="soft-panel flex items-center gap-3 text-sm font-medium text-slate-700 md:col-span-2">
-          <input
-            className="h-4 w-4 rounded border-slate-300"
-            name="consumed"
-            type="checkbox"
-            checked={form.consumed}
-            onChange={handleChange}
-          />
-          {'\uC774\uBBF8 \uC18C\uBE44\uD55C \uC7AC\uB8CC\uB85C \uD45C\uC2DC'}
-        </label>
-
         <div className="flex flex-wrap gap-3 md:col-span-2">
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? '\uBD88\uB7EC\uC624\uB294 \uC911...' : isEditMode ? '\uC218\uC815 \uC800\uC7A5' : '\uC7AC\uB8CC \uCD94\uAC00'}

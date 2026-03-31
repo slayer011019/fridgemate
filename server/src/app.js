@@ -26,6 +26,12 @@ export function createApp() {
   app.use('/api/ingredients', ingredientRoutes);
   app.use('/api/recipes', recipeRoutes);
 
+  app.use('/api', (_request, response) => {
+    response.status(404).json({
+      message: 'API route not found.'
+    });
+  });
+
   app.use((error, _request, response, _next) => {
     const status = error.status || 500;
     const message = status >= 500 ? 'Internal server error.' : error.message;

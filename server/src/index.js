@@ -1,7 +1,8 @@
 import { createApp } from './app.js';
 import { prisma } from './db/prisma.js';
-import { serverConfig } from './config.js';
+import { assertServerEnv, serverConfig } from './config.js';
 
+assertServerEnv();
 const app = createApp();
 
 const server = app.listen(serverConfig.port, () => {

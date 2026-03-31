@@ -10,9 +10,13 @@
     "dev:server": "node --watch --env-file=.env server/src/index.js",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node --env-file=.env server/src/index.js",
+    "server": "node server/src/index.js",
+    "start": "node server/src/index.js",
+    "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",

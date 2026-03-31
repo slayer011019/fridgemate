@@ -16,7 +16,7 @@ const SPACED_NOISE_PATTERNS = [
 ];
 
 const PRICE_PATTERN = /\d{1,3}(?:,\d{3})*\uC6D0/g;
-const SPEC_PATTERN = /(\d+(?:\.\d+)?\s*(?:g|kg|ml|l|L)|\d+\s*(?:\uAC1C\uC785|\uC785|\uAC1C|\uBD09|\uD329|\uBC15\uC2A4|\uAD6C|\uC190|\uC1A1\uC774))/gi;
+const SPEC_PATTERN = /(\d+(?:\.\d+)?\s*(?:g|kg|ml|l|L)|\d+\s*(?:\uAC1C\uC785|\uC785|\uAC1C|\uBD09|\uD329|\uBC15\uC2A4|\uAD6C|\uC190|\uC1A1\uC774|\uC7A5|\uD310))/gi;
 
 const OCR_JUNK_PATTERNS = [
   /\b[A-Z]{1,6}\d*[A-Z0-9]*\b/g,
