@@ -3,10 +3,8 @@ function OcrResultPanel({
   progress,
   error,
   rawText,
-  ocrModeLabel,
   showRawText,
-  onToggleRawText,
-  onRetryMode
+  onToggleRawText
 }) {
   const progressPercent = Math.round((progress || 0) * 100);
 
@@ -44,29 +42,10 @@ function OcrResultPanel({
       {rawText ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            {ocrModeLabel ? (
-              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
-                {`\uD604\uC7AC \uBAA8\uB4DC: ${ocrModeLabel}`}
-              </span>
-            ) : null}
             <button type="button" className="btn-secondary" onClick={onToggleRawText}>
               {showRawText ? '\uC6D0\uBCF8 OCR \uD14D\uC2A4\uD2B8 \uC228\uAE30\uAE30' : '\uC6D0\uBCF8 OCR \uD14D\uC2A4\uD2B8 \uBCF4\uAE30'}
             </button>
           </div>
-
-          {onRetryMode ? (
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="btn-secondary" onClick={() => onRetryMode('contrast')}>
-                {'\uC120\uBA85\uB3C4 \uAC15\uD654\uB85C \uB2E4\uC2DC \uC2DC\uB3C4'}
-              </button>
-              <button type="button" className="btn-secondary" onClick={() => onRetryMode('threshold')}>
-                {'\uAC15\uD55C \uD751\uBC31\uC73C\uB85C \uB2E4\uC2DC \uC2DC\uB3C4'}
-              </button>
-              <button type="button" className="btn-secondary" onClick={() => onRetryMode('original')}>
-                {'\uC6D0\uBCF8 \uADF8\uB300\uB85C \uB2E4\uC2DC \uC2DC\uB3C4'}
-              </button>
-            </div>
-          ) : null}
 
           {showRawText ? (
             <pre className="max-h-72 overflow-auto rounded-[24px] bg-slate-950 p-4 text-xs text-slate-100">{rawText}</pre>

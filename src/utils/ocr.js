@@ -1,8 +1,4 @@
-const OCR_MODE_LABELS = {
-  contrast: '\uC120\uBA85\uB3C4 \uAC15\uD654',
-  threshold: '\uAC15\uD55C \uD751\uBC31',
-  original: '\uC6D0\uBCF8 \uADF8\uB300\uB85C'
-};
+const DEFAULT_OCR_MODE = 'contrast';
 
 function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
@@ -46,10 +42,6 @@ function applyPreprocessMode(image, mode) {
   const scale = image.width < 1400 ? 2 : 1.4;
   const { canvas, context } = drawScaledImage(image, scale);
 
-  if (mode === 'original') {
-    return canvas;
-  }
-
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
   const { data } = imageData;
 
@@ -61,12 +53,8 @@ function applyPreprocessMode(image, mode) {
 
     let nextValue = grayscale;
 
-    if (mode === 'contrast') {
+    if (mode === DEFAULT_OCR_MODE) {
       nextValue = grayscale > 185 ? 255 : grayscale < 110 ? 0 : Math.round(grayscale);
-    }
-
-    if (mode === 'threshold') {
-      nextValue = grayscale > 165 ? 255 : 0;
     }
 
     data[index] = nextValue;
@@ -156,19 +144,13 @@ async function recognizeVariant(worker, source) {
   };
 }
 
-function buildVariantList(image, preferredMode) {
-  const baseModes = ['contrast', 'threshold', 'original'];
-  const orderedModes = preferredMode ? [preferredMode] : baseModes;
-
-  return orderedModes.map((mode) => ({
-    key: mode,
-    label: OCR_MODE_LABELS[mode],
-    source: applyPreprocessMode(image, mode)
-  }));
-}
-
-export function getOcrModeLabel(mode) {
-  return OCR_MODE_LABELS[mode] || mode || '';
+function buildVariantList(image) {
+  return [
+    {
+      key: DEFAULT_OCR_MODE,
+      source: applyPreprocessMode(image, DEFAULT_OCR_MODE)
+    }
+  ];
 }
 
 export async function extractTextFromImage(file, options = {}) {
@@ -176,10 +158,10 @@ export async function extractTextFromImage(file, options = {}) {
     throw new Error('\uC120\uD0DD\uD55C \uC774\uBBF8\uC9C0\uAC00 \uC5C6\uC5B4\uC694.');
   }
 
-  const { onProgress, preferredMode = '' } = options;
+  const { onProgress } = options;
   const { createWorker, PSM } = await import('tesseract.js');
   const image = await loadImageFromFile(file);
-  const variants = buildVariantList(image, preferredMode);
+  const variants = buildVariantList(image);
 
   const worker = await createWorker('kor+eng', 1, {
     logger: (message) => {
@@ -210,7 +192,6 @@ export async function extractTextFromImage(file, options = {}) {
       if (score > best.score) {
         best = {
           mode: variant.key,
-          label: variant.label,
           text,
           score,
           lineItems: recognized.lineItems
