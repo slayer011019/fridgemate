@@ -4,6 +4,9 @@ FridgeMate는 식재료를 등록·관리하고 유통기한을 추적하며,
 보유 재료를 기반으로 레시피를 추천해주는 웹앱입니다.
 주문내역 캡처를 활용한 반자동 식재료 등록 기능도 함께 실험하고 있습니다.
 
+Live Demo:
+`https://fridgemate-ten.vercel.app/`
+
 Short GitHub description:
 `Local-first fridge tracker with expiry alerts, recipe recommendations, and OCR-based ingredient import.`
 
