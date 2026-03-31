@@ -5,13 +5,22 @@ import { buildRecipeRecommendations } from '../../../src/utils/recommendations.j
 
 export const recipeRoutes = Router();
 
-recipeRoutes.get('/recommendations', async (_request, response, next) => {
+async function handleRecommendations(request, response, next) {
   try {
-    const ingredients = await prisma.ingredient.findMany();
-    const recommendations = buildRecipeRecommendations(seedRecipes, ingredients);
+    const ingredients = await prisma.ingredient.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    const pantryOwnership =
+      request.body && typeof request.body.pantryOwnership === 'object' && request.body.pantryOwnership !== null
+        ? request.body.pantryOwnership
+        : {};
+    const recommendations = buildRecipeRecommendations(seedRecipes, ingredients, { pantryOwnership });
 
     response.json(recommendations);
   } catch (error) {
     next(error);
   }
-});
+}
+
+recipeRoutes.get('/recommendations', handleRecommendations);
+recipeRoutes.post('/recommendations', handleRecommendations);

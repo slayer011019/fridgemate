@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { joinIngredientLabels } from '../utils/displayText';
 
 function RecipeCard({ recipe }) {
@@ -9,12 +10,18 @@ function RecipeCard({ recipe }) {
             <p className="kicker">{recipe.category}</p>
             <h3 className="text-xl font-semibold text-slate-900">{recipe.title}</h3>
             <p className="text-sm leading-6 muted">{recipe.description}</p>
+            {recipe.reason ? (
+              <div className="rounded-[18px] border border-brand-100/80 bg-brand-50/70 px-4 py-3 text-sm text-brand-900">
+                {recipe.reason}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">
             {recipe.useSoon ? <span className="badge bg-amber-100 text-amber-800">{'\uBE68\uB9AC \uC368\uC57C \uD574\uC694'}</span> : null}
             {recipe.canMakeNow ? <span className="badge bg-brand-50 text-brand-700">{'\uC9C0\uAE08 \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694'}</span> : null}
             <span className="badge bg-white text-slate-600">{recipe.cookingTime}</span>
+            <span className="badge bg-white text-slate-600">{recipe.difficulty || '\uBCF4\uD1B5'}</span>
           </div>
         </div>
 
@@ -25,7 +32,7 @@ function RecipeCard({ recipe }) {
             <p className="mt-1 text-xs muted">{`\uAE30\uBCF8 \uC810\uC218 ${Math.round((recipe.baseScore || 0) * 100)}%`}</p>
           </div>
           <div className="soft-panel border-brand-100/70 bg-brand-50/60">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">{'\uBCF4\uC720 \uC7AC\uB8CC'}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">{'\uD575\uC2EC \uC7AC\uB8CC'}</p>
             <p className="mt-3 text-2xl font-semibold text-slate-900">
               {recipe.matchedCount ?? recipe.ingredients.length}/{recipe.totalRequiredIngredients ?? recipe.ingredients.length}
             </p>
@@ -40,7 +47,7 @@ function RecipeCard({ recipe }) {
 
         <div className="grid gap-3">
           <div className="soft-panel">
-            <p className="text-sm font-semibold text-slate-900">{'\uD544\uC218 \uC7AC\uB8CC'}</p>
+            <p className="text-sm font-semibold text-slate-900">{'\uD575\uC2EC \uC7AC\uB8CC'}</p>
             <p className="mt-2 text-sm leading-6 muted">{joinIngredientLabels(recipe.ingredients)}</p>
           </div>
 
@@ -49,6 +56,21 @@ function RecipeCard({ recipe }) {
             <p className="mt-2 text-sm leading-6 muted">
               {recipe.optionalIngredients.length ? joinIngredientLabels(recipe.optionalIngredients) : '\uC5C6\uC74C'}
             </p>
+          </div>
+
+          <div className="soft-panel">
+            <p className="text-sm font-semibold text-slate-900">{'\uD32C\uD2B8\uB9AC \uC7AC\uB8CC'}</p>
+            <p className="mt-2 text-sm leading-6 muted">
+              {recipe.pantryIngredients.length ? joinIngredientLabels(recipe.pantryIngredients) : '\uC5C6\uC74C'}
+            </p>
+            {recipe.pantryMissingIngredients?.length ? (
+              <p className="mt-2 text-xs text-rose-700">
+                {`${joinIngredientLabels(recipe.pantryMissingIngredients)} \uAC19\uC740 \uAE30\uBCF8 \uC870\uBBF8\uB8CC\uAC00 \uBD80\uC871\uD560 \uC218 \uC788\uC5B4\uC694.`}
+              </p>
+            ) : null}
+            {!recipe.pantryMissingIngredients?.length && recipe.pantryUnknownIngredients?.length ? (
+              <p className="mt-2 text-xs text-slate-500">{'\uD32C\uD2B8\uB9AC \uBCF4\uC720 \uC5EC\uBD80\uAC00 \uC815\uD574\uC9C0\uBA74 \uCD94\uCC9C\uC774 \uB354 \uC815\uAD50\uD574\uC838\uC694.'}</p>
+            ) : null}
           </div>
 
           {recipe.expiringMatchedIngredients?.length ? (
@@ -63,4 +85,4 @@ function RecipeCard({ recipe }) {
   );
 }
 
-export default RecipeCard;
+export default memo(RecipeCard);

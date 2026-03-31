@@ -1,0 +1,84 @@
+import { useEffect, useMemo, useState } from 'react';
+import { getRecipeRecommendations, RecipesApiError } from '../api/recipesApi';
+import { seedRecipes } from '../data/seedRecipes';
+import { useIngredients } from './useIngredients';
+import { isBackendEnabled } from '../utils/backendConfig';
+import { buildRecipeRecommendations } from '../utils/recommendations';
+
+function shouldFallbackToLocalRecommendations(error) {
+  return error instanceof RecipesApiError;
+}
+
+export function useRecipeRecommendations(pantryOwnership = {}) {
+  const { ingredients, loading: ingredientsLoading } = useIngredients();
+  const localRecommendations = useMemo(
+    () => buildRecipeRecommendations(seedRecipes, ingredients, { pantryOwnership }),
+    [ingredients, pantryOwnership]
+  );
+  const [recommendations, setRecommendations] = useState(localRecommendations);
+  const [loading, setLoading] = useState(ingredientsLoading);
+  const [error, setError] = useState('');
+  const [dataSource, setDataSource] = useState(isBackendEnabled() ? 'api' : 'local');
+
+  useEffect(() => {
+    if (!isBackendEnabled()) {
+      setRecommendations(localRecommendations);
+      setLoading(ingredientsLoading);
+      setError('');
+      setDataSource('local');
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadRecommendations = async () => {
+      setLoading(true);
+
+      try {
+        const nextRecommendations = await getRecipeRecommendations(pantryOwnership);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setRecommendations(nextRecommendations);
+        setError('');
+        setDataSource('api');
+      } catch (nextError) {
+        if (!isMounted) {
+          return;
+        }
+
+        if (!shouldFallbackToLocalRecommendations(nextError)) {
+          setError(nextError.message || '추천 결과를 불러오지 못했어요.');
+          setRecommendations(localRecommendations);
+          setDataSource('local');
+          return;
+        }
+
+        console.warn('[useRecipeRecommendations] Failed to load via API. Falling back to local recommendations.', nextError);
+        setRecommendations(localRecommendations);
+        setError('추천 API 연결에 실패해서 브라우저 기준 추천을 보여주고 있어요.');
+        setDataSource('local');
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadRecommendations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [ingredientsLoading, localRecommendations, pantryOwnership]);
+
+  return {
+    recommendations,
+    loading,
+    error,
+    dataSource,
+    ingredients
+  };
+}

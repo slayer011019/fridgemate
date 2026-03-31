@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
@@ -5,25 +6,34 @@ import RecipeCard from '../components/RecipeCard';
 import StatCard from '../components/StatCard';
 import { seedRecipes } from '../data/seedRecipes';
 import { useIngredients } from '../hooks/useIngredients';
+import { usePantryStaples } from '../hooks/usePantryStaples';
 import { getCategoryLabel, getStorageLabel } from '../utils/displayText';
 import { getDashboardSummary, getExpiryLabel, getRemainingDays } from '../utils/date';
 import { getTopRecommendations } from '../utils/recommendations';
 
 function HomePage() {
   const { ingredients, loading } = useIngredients();
-  const summary = getDashboardSummary(ingredients);
-  const topRecommendations = getTopRecommendations(seedRecipes, ingredients, 3);
-  const upcomingItems = [...ingredients]
-    .filter((ingredient) => !ingredient.consumed)
-    .sort((a, b) => {
-      const left = getRemainingDays(a.expiryDate);
-      const right = getRemainingDays(b.expiryDate);
-      const leftValue = left === null ? Number.MAX_SAFE_INTEGER : left;
-      const rightValue = right === null ? Number.MAX_SAFE_INTEGER : right;
+  const { pantryOwnership } = usePantryStaples();
+  const summary = useMemo(() => getDashboardSummary(ingredients), [ingredients]);
+  const topRecommendations = useMemo(
+    () => getTopRecommendations(seedRecipes, ingredients, 3, { pantryOwnership }),
+    [ingredients, pantryOwnership]
+  );
+  const upcomingItems = useMemo(
+    () =>
+      [...ingredients]
+        .filter((ingredient) => !ingredient.consumed)
+        .sort((a, b) => {
+          const left = getRemainingDays(a.expiryDate);
+          const right = getRemainingDays(b.expiryDate);
+          const leftValue = left === null ? Number.MAX_SAFE_INTEGER : left;
+          const rightValue = right === null ? Number.MAX_SAFE_INTEGER : right;
 
-      return leftValue - rightValue;
-    })
-    .slice(0, 4);
+          return leftValue - rightValue;
+        })
+        .slice(0, 4),
+    [ingredients]
+  );
 
   return (
     <div className="space-y-6">
