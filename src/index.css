@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --fm-bg: #f6f2e8;
+    --fm-bg-soft: #fbf8f2;
+    --fm-card: rgba(255, 255, 255, 0.86);
+    --fm-line: rgba(143, 157, 143, 0.2);
+    --fm-text: #243428;
+    --fm-text-soft: #657065;
+    --fm-brand: #7ea382;
+    --fm-brand-deep: #5f8364;
+    --fm-brand-soft: #e5efe2;
+    --fm-warning: #f0bf74;
+    --fm-danger: #df8f86;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(126, 163, 130, 0.18), transparent 28rem),
+      radial-gradient(circle at top right, rgba(255, 231, 195, 0.38), transparent 24rem),
+      linear-gradient(180deg, #fbf8f2 0%, #f6f2e8 100%);
+    color: var(--fm-text);
+    font-family: "Trebuchet MS", "Noto Sans KR", sans-serif;
+    @apply min-h-screen;
+  }
+
+  * {
+    @apply border-transparent;
+  }
+
+  input,
+  select,
+  textarea {
+    border-color: var(--fm-line);
+    background-color: rgba(255, 255, 255, 0.82);
+    color: var(--fm-text);
+    @apply w-full rounded-2xl border px-4 py-3 text-sm shadow-sm outline-none transition duration-200;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: rgba(126, 163, 130, 0.55);
+    box-shadow: 0 0 0 4px rgba(126, 163, 130, 0.12);
+  }
+
+  button {
+    @apply transition duration-200;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 252, 247, 0.82));
+    border-color: var(--fm-line);
+    box-shadow: 0 14px 38px rgba(103, 118, 94, 0.08);
+    @apply rounded-[28px] border backdrop-blur-sm;
+  }
+
+  .card {
+    @apply glass-card p-5 sm:p-6;
+  }
+
+  .soft-panel {
+    @apply rounded-[24px] border p-4;
+    border-color: rgba(126, 163, 130, 0.14);
+    background: rgba(250, 247, 241, 0.76);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--fm-brand) 0%, var(--fm-brand-deep) 100%);
+    box-shadow: 0 10px 24px rgba(95, 131, 100, 0.22);
+    @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(95, 131, 100, 0.26);
+  }
+
+  .btn-secondary {
+    border-color: rgba(126, 163, 130, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--fm-text);
+    @apply inline-flex items-center justify-center rounded-full border px-5 py-3 text-sm font-semibold;
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-[0.02em];
+  }
+
+  .kicker {
+    color: var(--fm-brand-deep);
+    @apply text-xs font-semibold uppercase tracking-[0.28em];
+  }
+
+  .section-title {
+    @apply text-[1.75rem] font-semibold leading-tight text-slate-900;
+  }
+
+  .muted {
+    color: var(--fm-text-soft);
+  }
+}
