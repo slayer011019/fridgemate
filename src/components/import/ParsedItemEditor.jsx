@@ -35,9 +35,16 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                 <input type="checkbox" checked={item.selected} onChange={() => onToggleItem(item.id)} />
                 <span className="whitespace-nowrap">{'\uC774 \uD56D\uBAA9 \uAC00\uC838\uC624\uAE30'}</span>
               </label>
-              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
-                {'\uC790\uB3D9 \uCD94\uCD9C\uB428'}
-              </span>
+              <div className="flex flex-wrap gap-2">
+                {item.learnedCorrection ? (
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+                    {'\uC774\uC804 \uC218\uC815 \uC774\uB825 \uBC18\uC601'}
+                  </span>
+                ) : null}
+                <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+                  {'\uC790\uB3D9 \uCD94\uCD9C\uB428'}
+                </span>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

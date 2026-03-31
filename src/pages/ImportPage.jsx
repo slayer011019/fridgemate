@@ -6,6 +6,7 @@ import OcrResultPanel from '../components/import/OcrResultPanel';
 import ParsedItemEditor from '../components/import/ParsedItemEditor';
 import UploadBox from '../components/import/UploadBox';
 import { useIngredients } from '../hooks/useIngredients';
+import { applyImportCorrections, saveImportCorrections } from '../utils/import/importLearning';
 import { parseImportText } from '../utils/importParser';
 import { extractTextFromImage, getOcrModeLabel } from '../utils/ocr';
 
@@ -53,7 +54,7 @@ function ImportPage() {
   const parseResult = useMemo(() => parseImportText(ocrResult), [ocrResult]);
 
   useEffect(() => {
-    setItems(parseResult.candidates);
+    setItems(applyImportCorrections(parseResult.candidates));
   }, [parseResult]);
 
   const handleFileChange = (event) => {
@@ -103,7 +104,8 @@ function ImportPage() {
 
         return {
           ...item,
-          [field]: value
+          [field]: value,
+          learnedCorrection: false
         };
       })
     );
@@ -116,6 +118,7 @@ function ImportPage() {
   };
 
   const handleImport = async () => {
+    const selectedRawItems = items.filter((item) => item.selected && item.name.trim());
     const selectedItems = toImportableItems(items);
 
     if (!selectedItems.length) {
@@ -124,6 +127,7 @@ function ImportPage() {
     }
 
     try {
+      saveImportCorrections(selectedRawItems);
       await addIngredients(selectedItems);
       setImportMessage(`${selectedItems.length}\uAC1C \uD56D\uBAA9\uC744 \uAC00\uC838\uC654\uC5B4\uC694.`);
       navigate('/ingredients');
