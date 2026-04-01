@@ -1,25 +1,33 @@
 const DB_NAME = 'fridgemate-db';
 const DB_VERSION = 1;
 const STORE_NAME = 'ingredients';
+let databasePromise = null;
 
 function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+  if (!databasePromise) {
+    databasePromise = new Promise((resolve, reject) => {
+      const request = window.indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
-      const database = request.result;
+      request.onupgradeneeded = () => {
+        const database = request.result;
 
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        const store = database.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        store.createIndex('expiryDate', 'expiryDate', { unique: false });
-        store.createIndex('category', 'category', { unique: false });
-        store.createIndex('storageType', 'storageType', { unique: false });
-      }
-    };
+        if (!database.objectStoreNames.contains(STORE_NAME)) {
+          const store = database.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          store.createIndex('expiryDate', 'expiryDate', { unique: false });
+          store.createIndex('category', 'category', { unique: false });
+          store.createIndex('storageType', 'storageType', { unique: false });
+        }
+      };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => {
+        databasePromise = null;
+        reject(request.error);
+      };
+    });
+  }
+
+  return databasePromise;
 }
 
 function runTransaction(mode, handler) {

@@ -15,7 +15,7 @@ function IngredientsPage() {
     category: 'all',
     storageType: 'all',
     sortOrder: 'asc',
-    status: 'all'
+    status: 'active'
   });
 
   const filteredIngredients = useMemo(() => {
@@ -107,6 +107,7 @@ function IngredientsPage() {
       {!loading ? (
         <ShoppingListPanel
           items={shoppingListItems}
+          onDelete={handleDelete}
           onRestore={handleToggleConsumed}
           onRestoreAll={handleRestoreAllShoppingItems}
           onSaveDetails={handleSaveShoppingListDetails}

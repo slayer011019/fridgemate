@@ -1,144 +1,316 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const PRIORITY_STORAGE_KEY = 'fridgemate-shopping-priority';
+const EMPTY_DRAFT = { quantity: '', memo: '' };
+const AUTO_SAVE_DELAY_MS = 450;
+const SAVE_FEEDBACK_MS = 1400;
 
-function getInitialPriorityMap() {
-  if (typeof window === 'undefined') {
-    return {};
-  }
+const SAVE_STATUS = {
+  IDLE: 'idle',
+  EDITING: 'editing',
+  SAVING: 'saving',
+  SAVED: 'saved',
+  ERROR: 'error'
+};
 
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(PRIORITY_STORAGE_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
+function getNormalizedDraft(item) {
+  return {
+    quantity: item.quantity || '',
+    memo: item.memo || ''
+  };
 }
 
-const EMPTY_DRAFT = { quantity: '', memo: '' };
+function isSameDraft(left = EMPTY_DRAFT, right = EMPTY_DRAFT) {
+  return (left.quantity || '') === (right.quantity || '') && (left.memo || '') === (right.memo || '');
+}
+
+function isSameStateMap(left = {}, right = {}) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => left[key] === right[key]);
+}
+
+function getSaveStatusLabel(status) {
+  if (status === SAVE_STATUS.EDITING) {
+    return '입력 중';
+  }
+
+  if (status === SAVE_STATUS.SAVING) {
+    return '저장 중';
+  }
+
+  if (status === SAVE_STATUS.SAVED) {
+    return '저장됨';
+  }
+
+  if (status === SAVE_STATUS.ERROR) {
+    return '저장 실패';
+  }
+
+  return '자동 저장';
+}
+
+function getSaveStatusClassName(status) {
+  if (status === SAVE_STATUS.SAVING) {
+    return 'text-brand-700';
+  }
+
+  if (status === SAVE_STATUS.SAVED) {
+    return 'text-emerald-700';
+  }
+
+  if (status === SAVE_STATUS.ERROR) {
+    return 'text-rose-700';
+  }
+
+  return 'muted';
+}
 
 const ShoppingListItemCard = memo(function ShoppingListItemCard({
   item,
   draft,
-  isPriority,
+  saveStatus,
+  onDelete,
   onDraftChange,
-  onTogglePriority,
-  onSaveDetails,
   onRestore
 }) {
   return (
-    <div className={`rounded-[22px] border p-4 ${isPriority ? 'border-amber-200 bg-amber-50/70' : 'border-white/80 bg-white/75'}`}>
+    <div className="rounded-[22px] border border-white/80 bg-white/75 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-base font-semibold text-slate-900">{item.name}</p>
-            {isPriority ? <span className="badge bg-amber-100 text-amber-800">{'우선 사야 함'}</span> : null}
-          </div>
-          <p className="mt-1 text-sm muted">{item.category || '재료'}</p>
+          <p className="truncate text-base font-semibold text-slate-900">{item.name}</p>
+          <p className="mt-1 text-sm muted">{item.category || '미분류'}</p>
         </div>
-        <span className="badge bg-slate-200 text-slate-700">{'재등록 필요'}</span>
+        <span className="badge bg-slate-200 text-slate-700">재등록 필요</span>
       </div>
 
       <div className="mt-4 grid gap-3">
         <label className="space-y-2 text-sm font-medium text-slate-700">
-          {'다음에 살 수량'}
-          <input value={draft.quantity} onChange={(event) => onDraftChange(item.id, 'quantity', event.target.value)} placeholder="예: 2개, 1봉" />
+          다음 구매 수량
+          <input
+            value={draft.quantity}
+            onChange={(event) => onDraftChange(item.id, 'quantity', event.target.value)}
+            placeholder="예: 2개, 1봉"
+          />
         </label>
 
         <label className="space-y-2 text-sm font-medium text-slate-700">
-          {'장보기 메모'}
+          장보기 메모
           <textarea
             rows="2"
             value={draft.memo}
             onChange={(event) => onDraftChange(item.id, 'memo', event.target.value)}
-            placeholder="예: 할인하면 사기, 큰 사이즈 말고 작은 걸로"
+            placeholder="예: 할인하면 구매, 큰 사이즈 말고 작은 걸로"
           />
         </label>
       </div>
 
+      <p className={`mt-3 text-xs ${getSaveStatusClassName(saveStatus)}`}>{getSaveStatusLabel(saveStatus)}</p>
+
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" className="btn-secondary" onClick={() => onTogglePriority(item.id)}>
-          {isPriority ? '우선순위 해제' : '우선 사야 함'}
+        <button type="button" className="btn-primary" onClick={() => onRestore(item)}>
+          다시 채워짐
         </button>
         <button
           type="button"
-          className="btn-secondary"
-          onClick={() =>
-            onSaveDetails({
-              ...item,
-              quantity: draft.quantity,
-              memo: draft.memo
-            })
-          }
+          className="inline-flex items-center justify-center rounded-full bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600"
+          onClick={() => onDelete(item.id)}
         >
-          {'장보기 메모 저장'}
+          완전 삭제
         </button>
-        <button type="button" className="btn-primary" onClick={() => onRestore(item)}>
-          {'다시 채워짐'}
-        </button>
-        <Link className="btn-secondary" to={`/ingredients/${item.id}/edit`}>
-          {'상세 수정'}
-        </Link>
       </div>
     </div>
   );
 });
 
-function ShoppingListPanel({ items, onRestore, onRestoreAll, onSaveDetails }) {
+function ShoppingListPanel({ items, onDelete, onRestore, onRestoreAll, onSaveDetails }) {
   const [drafts, setDrafts] = useState({});
-  const [priorityMap, setPriorityMap] = useState(getInitialPriorityMap);
+  const [saveStates, setSaveStates] = useState({});
+  const draftsRef = useRef(drafts);
+  const saveStatesRef = useRef(saveStates);
+  const saveVersionRef = useRef({});
+  const savedFeedbackTimersRef = useRef({});
 
   useEffect(() => {
-    setDrafts(
-      items.reduce((nextDrafts, item) => {
-        nextDrafts[item.id] = {
-          quantity: item.quantity || '',
-          memo: item.memo || ''
-        };
-        return nextDrafts;
-      }, {})
-    );
-  }, [items]);
+    draftsRef.current = drafts;
+  }, [drafts]);
 
   useEffect(() => {
-    const activeIds = new Set(items.map((item) => item.id));
-    const nextPriorityMap = Object.fromEntries(Object.entries(priorityMap).filter(([id]) => activeIds.has(id)));
+    saveStatesRef.current = saveStates;
+  }, [saveStates]);
 
-    if (Object.keys(nextPriorityMap).length !== Object.keys(priorityMap).length) {
-      setPriorityMap(nextPriorityMap);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(PRIORITY_STORAGE_KEY, JSON.stringify(nextPriorityMap));
-      }
-    }
-  }, [items, priorityMap]);
+  useEffect(
+    () => () => {
+      Object.values(savedFeedbackTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    },
+    []
+  );
 
-  const sortedItems = useMemo(
-    () =>
-      [...items].sort((left, right) => {
-        const leftPriority = priorityMap[left.id] ? 1 : 0;
-        const rightPriority = priorityMap[right.id] ? 1 : 0;
+  useEffect(() => {
+    const itemIds = new Set(items.map((item) => item.id));
 
-        if (leftPriority !== rightPriority) {
-          return rightPriority - leftPriority;
+    setDrafts((current) => {
+      const nextDrafts = {};
+
+      items.forEach((item) => {
+        const normalizedDraft = getNormalizedDraft(item);
+        const currentStatus = saveStatesRef.current[item.id] || SAVE_STATUS.IDLE;
+
+        if (!current[item.id] || currentStatus === SAVE_STATUS.IDLE || currentStatus === SAVE_STATUS.SAVED) {
+          nextDrafts[item.id] = normalizedDraft;
+          return;
         }
 
-        return String(left.name || '').localeCompare(String(right.name || ''), 'ko');
-      }),
-    [items, priorityMap]
+        nextDrafts[item.id] = current[item.id];
+      });
+
+      return nextDrafts;
+    });
+
+    setSaveStates((current) => {
+      const nextStates = Object.fromEntries(Object.entries(current).filter(([id]) => itemIds.has(id)));
+      return isSameStateMap(current, nextStates) ? current : nextStates;
+    });
+
+    Object.keys(savedFeedbackTimersRef.current).forEach((id) => {
+      if (itemIds.has(id)) {
+        return;
+      }
+
+      window.clearTimeout(savedFeedbackTimersRef.current[id]);
+      delete savedFeedbackTimersRef.current[id];
+      delete saveVersionRef.current[id];
+    });
+  }, [items]);
+
+  const sortedItems = useMemo(
+    () => [...items].sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'ko')),
+    [items]
   );
+
+  const markSavedTemporarily = useCallback((id) => {
+    if (savedFeedbackTimersRef.current[id]) {
+      window.clearTimeout(savedFeedbackTimersRef.current[id]);
+    }
+
+    savedFeedbackTimersRef.current[id] = window.setTimeout(() => {
+      setSaveStates((current) => {
+        if ((current[id] || SAVE_STATUS.IDLE) !== SAVE_STATUS.SAVED) {
+          return current;
+        }
+
+        const nextStates = { ...current };
+        nextStates[id] = SAVE_STATUS.IDLE;
+        return nextStates;
+      });
+
+      delete savedFeedbackTimersRef.current[id];
+    }, SAVE_FEEDBACK_MS);
+  }, []);
+
+  const persistDraft = useCallback(
+    async (item, draft) => {
+      const id = item.id;
+      const nextVersion = (saveVersionRef.current[id] || 0) + 1;
+      saveVersionRef.current[id] = nextVersion;
+
+      if (savedFeedbackTimersRef.current[id]) {
+        window.clearTimeout(savedFeedbackTimersRef.current[id]);
+        delete savedFeedbackTimersRef.current[id];
+      }
+
+      setSaveStates((current) => ({
+        ...current,
+        [id]: SAVE_STATUS.SAVING
+      }));
+
+      try {
+        await onSaveDetails({
+          ...item,
+          quantity: draft.quantity,
+          memo: draft.memo
+        });
+
+        if (saveVersionRef.current[id] !== nextVersion) {
+          return;
+        }
+
+        const currentDraft = draftsRef.current[id] || EMPTY_DRAFT;
+        if (!isSameDraft(currentDraft, draft)) {
+          setSaveStates((current) => ({
+            ...current,
+            [id]: SAVE_STATUS.EDITING
+          }));
+          return;
+        }
+
+        setSaveStates((current) => ({
+          ...current,
+          [id]: SAVE_STATUS.SAVED
+        }));
+        markSavedTemporarily(id);
+      } catch {
+        if (saveVersionRef.current[id] !== nextVersion) {
+          return;
+        }
+
+        setSaveStates((current) => ({
+          ...current,
+          [id]: SAVE_STATUS.ERROR
+        }));
+      }
+    },
+    [markSavedTemporarily, onSaveDetails]
+  );
+
+  useEffect(() => {
+    const itemsToSave = items
+      .map((item) => {
+        const draft = drafts[item.id];
+
+        if (!draft) {
+          return null;
+        }
+
+        const currentDraft = getNormalizedDraft(item);
+        const saveStatus = saveStates[item.id] || SAVE_STATUS.IDLE;
+
+        if (saveStatus !== SAVE_STATUS.EDITING && saveStatus !== SAVE_STATUS.ERROR) {
+          return null;
+        }
+
+        if (isSameDraft(draft, currentDraft)) {
+          return null;
+        }
+
+        return {
+          item,
+          draft
+        };
+      })
+      .filter(Boolean);
+
+    if (!itemsToSave.length) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      itemsToSave.forEach(({ item, draft }) => {
+        void persistDraft(item, draft);
+      });
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [drafts, items, persistDraft, saveStates]);
 
   if (!items.length) {
     return null;
   }
-
-  const persistPriorityMap = useCallback((nextPriorityMap) => {
-    setPriorityMap(nextPriorityMap);
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(PRIORITY_STORAGE_KEY, JSON.stringify(nextPriorityMap));
-    }
-  }, []);
 
   const handleDraftChange = useCallback((id, field, value) => {
     setDrafts((current) => ({
@@ -148,31 +320,12 @@ function ShoppingListPanel({ items, onRestore, onRestoreAll, onSaveDetails }) {
         [field]: value
       }
     }));
+
+    setSaveStates((current) => ({
+      ...current,
+      [id]: SAVE_STATUS.EDITING
+    }));
   }, []);
-
-  const handleTogglePriority = useCallback((id) => {
-    const nextPriorityMap = { ...priorityMap };
-
-    if (nextPriorityMap[id]) {
-      delete nextPriorityMap[id];
-    } else {
-      nextPriorityMap[id] = true;
-    }
-
-    persistPriorityMap(nextPriorityMap);
-  }, [persistPriorityMap, priorityMap]);
-
-  const handleRestore = useCallback((item) => {
-    const nextPriorityMap = { ...priorityMap };
-    delete nextPriorityMap[item.id];
-    persistPriorityMap(nextPriorityMap);
-    onRestore(item);
-  }, [onRestore, persistPriorityMap, priorityMap]);
-
-  const handleRestoreAll = useCallback(() => {
-    persistPriorityMap({});
-    onRestoreAll();
-  }, [onRestoreAll, persistPriorityMap]);
 
   return (
     <section className="card bg-gradient-to-br from-amber-50/70 via-white/70 to-brand-50/50">
@@ -181,18 +334,16 @@ function ShoppingListPanel({ items, onRestore, onRestoreAll, onSaveDetails }) {
           <p className="kicker">다시 사야 할 재료</p>
           <h3 className="text-2xl font-semibold text-slate-900">장바구니처럼 모아두고 한 번에 다시 채워보세요</h3>
           <p className="max-w-2xl text-sm leading-6 muted">
-            이미 다 쓴 재료를 따로 모아둔 영역이에요. 팬트리처럼 평소 보유를 설정하는 곳이 아니라, 다음 장보기 때 다시 사야 하는 목록에
-            가까워요.
+            다 쓴 재료를 따로 모아둔 영역이에요. 보유 중인 재료와 분리해서 보고, 다음 장보기 전에 수량과 메모만 가볍게 정리할 수 있어요.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="badge bg-amber-100 text-amber-800">{`재등록 필요 ${items.length}개`}</span>
-          <span className="badge bg-white text-slate-600">{`우선 사야 함 ${Object.keys(priorityMap).length}개`}</span>
-          <button type="button" className="btn-secondary" onClick={handleRestoreAll}>
-            {'모두 다시 채워짐'}
+          <button type="button" className="btn-secondary" onClick={onRestoreAll}>
+            모두 다시 채워짐
           </button>
           <Link to="/ingredients/new" className="btn-secondary">
-            {'새 재료 추가'}
+            새 재료 추가
           </Link>
         </div>
       </div>
@@ -202,12 +353,11 @@ function ShoppingListPanel({ items, onRestore, onRestoreAll, onSaveDetails }) {
           <ShoppingListItemCard
             key={item.id}
             item={item}
-            draft={drafts[item.id] || EMPTY_DRAFT}
-            isPriority={Boolean(priorityMap[item.id])}
+            draft={drafts[item.id] || getNormalizedDraft(item)}
+            saveStatus={saveStates[item.id] || SAVE_STATUS.IDLE}
+            onDelete={onDelete}
             onDraftChange={handleDraftChange}
-            onTogglePriority={handleTogglePriority}
-            onSaveDetails={onSaveDetails}
-            onRestore={handleRestore}
+            onRestore={onRestore}
           />
         ))}
       </div>

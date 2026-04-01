@@ -26,9 +26,11 @@ FridgeMate was built to make that flow simpler:
 
 - ingredient CRUD
 - consumed state toggle
+- optimistic ingredient updates for faster add/edit/delete feedback
 - lightweight “buy again” shopping-list style section for consumed items
-- quick quantity and memo editing inside the buy-again section
-- shopping priority toggle and bulk restore action for buy-again items
+- consumed items are separated into a dedicated shopping-list panel by default
+- quick quantity and memo editing with auto-save inside the buy-again section
+- bulk restore action for buy-again items
 - filtering and sorting
 - expiry date tracking with D-day style display
 - recipe recommendations based on current ingredients
@@ -127,6 +129,8 @@ FridgeMate is intentionally designed as a gradual system instead of a full backe
 - default philosophy: local-first
 - frontend can run without backend
 - IndexedDB remains the safety net
+- ingredient state is shared through one client-side store so pages reuse the same loaded data
+- pantry staple ownership state is also shared globally so recipe pages stay in sync immediately
 
 ### API Connection Strategy
 

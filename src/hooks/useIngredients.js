@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as ingredientsApi from '../api/ingredientsApi';
 import { IngredientsApiError } from '../api/ingredientsApi';
 import * as indexedDb from '../db/indexedDB';
 import { getPreferredDataSource, isBackendEnabled } from '../utils/backendConfig';
+
+const IngredientsContext = createContext(null);
+
+let cachedIngredients = [];
+let hasLoadedIngredients = false;
+let loadIngredientsPromise = null;
 
 function shouldFallbackToIndexedDb(error) {
   if (!(error instanceof IngredientsApiError)) {
@@ -12,7 +18,7 @@ function shouldFallbackToIndexedDb(error) {
   return !error.status || error.status >= 500;
 }
 
-function ensureIndexedDbIngredientId(ingredient) {
+function ensureIngredientId(ingredient) {
   return ingredient.id ? ingredient : { ...ingredient, id: crypto.randomUUID() };
 }
 
@@ -29,11 +35,40 @@ function upsertIngredient(items, nextIngredient) {
   return nextItems;
 }
 
-export function useIngredients() {
-  const [ingredients, setIngredients] = useState([]);
-  const [loading, setLoading] = useState(true);
+function restoreIngredient(items, ingredient, index) {
+  const nextItems = [...items];
+  const existingIndex = nextItems.findIndex((item) => item.id === ingredient.id);
+
+  if (existingIndex !== -1) {
+    nextItems[existingIndex] = ingredient;
+    return nextItems;
+  }
+
+  const safeIndex = index < 0 ? 0 : Math.min(index, nextItems.length);
+  nextItems.splice(safeIndex, 0, ingredient);
+  return nextItems;
+}
+
+export function IngredientsProvider({ children }) {
+  const [ingredients, setIngredients] = useState(() => (hasLoadedIngredients ? cachedIngredients : []));
+  const [loading, setLoading] = useState(() => !hasLoadedIngredients);
   const [error, setError] = useState('');
   const [dataSource, setDataSource] = useState(getPreferredDataSource());
+  const ingredientsRef = useRef(ingredients);
+
+  const commitIngredients = useCallback((nextValue) => {
+    setIngredients((current) => {
+      const nextIngredients = typeof nextValue === 'function' ? nextValue(current) : nextValue;
+      ingredientsRef.current = nextIngredients;
+      cachedIngredients = nextIngredients;
+      hasLoadedIngredients = true;
+      return nextIngredients;
+    });
+  }, []);
+
+  useEffect(() => {
+    ingredientsRef.current = ingredients;
+  }, [ingredients]);
 
   const runWithFallback = useCallback(async (actionLabel, apiOperation, fallbackOperation) => {
     if (!isBackendEnabled()) {
@@ -55,122 +90,229 @@ export function useIngredients() {
 
       console.warn(`[useIngredients] ${actionLabel} failed via API. Falling back to IndexedDB.`, nextError);
       setDataSource('indexeddb');
-      setError('API 연결에 실패해서 브라우저 저장소를 사용 중이에요.');
+      setError('API 연결이 불안정해서 브라우저 저장소를 사용 중이에요.');
       return fallbackOperation();
     }
   }, []);
 
-  const loadIngredients = useCallback(async () => {
-    setLoading(true);
+  const loadIngredients = useCallback(
+    async ({ force = false } = {}) => {
+      if (!force && hasLoadedIngredients) {
+        setLoading(false);
+        return cachedIngredients;
+      }
 
-    try {
-      const items = await runWithFallback(
+      if (!force && loadIngredientsPromise) {
+        setLoading(true);
+
+        try {
+          const items = await loadIngredientsPromise;
+          commitIngredients(items);
+          return items;
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      setLoading(true);
+
+      const task = runWithFallback(
         'loadIngredients',
         () => ingredientsApi.getAllIngredients(),
         () => indexedDb.getAllIngredients()
-      );
-      setIngredients(items || []);
-    } finally {
-      setLoading(false);
-    }
-  }, [runWithFallback]);
+      ).then((items) => items || []);
+
+      if (!force) {
+        loadIngredientsPromise = task;
+      }
+
+      try {
+        const items = await task;
+        commitIngredients(items);
+        return items;
+      } finally {
+        if (!force && loadIngredientsPromise === task) {
+          loadIngredientsPromise = null;
+        }
+
+        setLoading(false);
+      }
+    },
+    [commitIngredients, runWithFallback]
+  );
 
   useEffect(() => {
-    loadIngredients();
+    if (hasLoadedIngredients) {
+      setLoading(false);
+      return;
+    }
+
+    loadIngredients().catch(() => {
+      setLoading(false);
+    });
   }, [loadIngredients]);
 
-  const addIngredient = useCallback(async (ingredient) => {
-    const nextIngredient = {
-      ...ingredient
-    };
+  const addIngredient = useCallback(
+    async (ingredient) => {
+      const optimisticIngredient = ensureIngredientId({ ...ingredient });
+      commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
 
-    const savedIngredient = await runWithFallback(
-      'addIngredient',
-      () => ingredientsApi.saveIngredient(nextIngredient),
-      () => {
-        const fallbackIngredient = ensureIndexedDbIngredientId(nextIngredient);
-        return indexedDb.saveIngredient(fallbackIngredient).then(() => fallbackIngredient);
+      try {
+        const savedIngredient = await runWithFallback(
+          'addIngredient',
+          () => ingredientsApi.saveIngredient(optimisticIngredient),
+          () => indexedDb.saveIngredient(optimisticIngredient).then(() => optimisticIngredient)
+        );
+
+        if (savedIngredient) {
+          commitIngredients((current) => upsertIngredient(current, savedIngredient));
+        }
+
+        return savedIngredient || optimisticIngredient;
+      } catch (nextError) {
+        commitIngredients((current) => current.filter((item) => item.id !== optimisticIngredient.id));
+        throw nextError;
       }
-    );
+    },
+    [commitIngredients, runWithFallback]
+  );
 
-    if (savedIngredient) {
-      setIngredients((current) => upsertIngredient(current, savedIngredient));
-    }
+  const updateIngredient = useCallback(
+    async (ingredient) => {
+      const optimisticIngredient = ensureIngredientId({ ...ingredient });
+      const previousIndex = ingredientsRef.current.findIndex((item) => item.id === optimisticIngredient.id);
+      const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
 
-    return savedIngredient || nextIngredient;
-  }, [runWithFallback]);
+      commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
 
-  const updateIngredient = useCallback(async (ingredient) => {
-    const updatedIngredient = await runWithFallback(
-      'updateIngredient',
-      () => ingredientsApi.saveIngredient(ingredient),
-      () => {
-        const fallbackIngredient = ensureIndexedDbIngredientId(ingredient);
-        return indexedDb.saveIngredient(fallbackIngredient).then(() => fallbackIngredient);
+      try {
+        const updatedIngredient = await runWithFallback(
+          'updateIngredient',
+          () => ingredientsApi.saveIngredient(optimisticIngredient),
+          () => indexedDb.saveIngredient(optimisticIngredient).then(() => optimisticIngredient)
+        );
+
+        if (updatedIngredient) {
+          commitIngredients((current) => upsertIngredient(current, updatedIngredient));
+        }
+
+        return updatedIngredient || optimisticIngredient;
+      } catch (nextError) {
+        if (previousIngredient) {
+          commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
+        } else {
+          commitIngredients((current) => current.filter((item) => item.id !== optimisticIngredient.id));
+        }
+
+        throw nextError;
       }
-    );
+    },
+    [commitIngredients, runWithFallback]
+  );
 
-    if (updatedIngredient) {
-      setIngredients((current) => upsertIngredient(current, updatedIngredient));
-    }
+  const addIngredients = useCallback(
+    async (items) => {
+      const optimisticIngredients = items.map((ingredient) => ensureIngredientId({ ...ingredient }));
+      const optimisticIds = new Set(optimisticIngredients.map((ingredient) => ingredient.id));
 
-    return updatedIngredient || ingredient;
-  }, [runWithFallback]);
+      commitIngredients((current) =>
+        optimisticIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current)
+      );
 
-  const addIngredients = useCallback(async (items) => {
-    const nextIngredients = items.map((ingredient) => ({ ...ingredient }));
+      try {
+        const savedIngredients = await runWithFallback(
+          'addIngredients',
+          () => ingredientsApi.saveIngredients(optimisticIngredients),
+          () => indexedDb.saveIngredients(optimisticIngredients).then(() => optimisticIngredients)
+        );
 
-    const savedIngredients = await runWithFallback(
-      'addIngredients',
-      () =>
-        ingredientsApi.saveIngredients(
-          nextIngredients.map((ingredient) => ({
-            ...ingredient,
-            id: undefined
-          }))
-        ),
-      () => {
-        const fallbackIngredients = nextIngredients.map((ingredient) => ensureIndexedDbIngredientId(ingredient));
-        return indexedDb.saveIngredients(fallbackIngredients).then(() => fallbackIngredients);
+        if (savedIngredients?.length) {
+          commitIngredients((current) =>
+            savedIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current)
+          );
+        }
+
+        return savedIngredients || optimisticIngredients;
+      } catch (nextError) {
+        commitIngredients((current) => current.filter((ingredient) => !optimisticIds.has(ingredient.id)));
+        throw nextError;
       }
-    );
+    },
+    [commitIngredients, runWithFallback]
+  );
 
-    if (savedIngredients?.length) {
-      setIngredients((current) => savedIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current));
-    }
+  const removeIngredient = useCallback(
+    async (id) => {
+      const previousIndex = ingredientsRef.current.findIndex((ingredient) => ingredient.id === id);
+      const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
 
-    return savedIngredients || nextIngredients;
-  }, [runWithFallback]);
+      commitIngredients((current) => current.filter((ingredient) => ingredient.id !== id));
 
-  const removeIngredient = useCallback(async (id) => {
-    await runWithFallback(
-      'removeIngredient',
-      () => ingredientsApi.deleteIngredient(id),
-      () => indexedDb.deleteIngredient(id)
-    );
-    setIngredients((current) => current.filter((ingredient) => ingredient.id !== id));
-  }, [runWithFallback]);
+      try {
+        await runWithFallback(
+          'removeIngredient',
+          () => ingredientsApi.deleteIngredient(id),
+          () => indexedDb.deleteIngredient(id)
+        );
+      } catch (nextError) {
+        if (previousIngredient) {
+          commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
+        }
+
+        throw nextError;
+      }
+    },
+    [commitIngredients, runWithFallback]
+  );
 
   const findIngredient = useCallback(
-    (id) =>
-      runWithFallback(
+    async (id) => {
+      const existingIngredient = ingredientsRef.current.find((ingredient) => ingredient.id === id);
+
+      if (existingIngredient) {
+        return existingIngredient;
+      }
+
+      const foundIngredient = await runWithFallback(
         'findIngredient',
         () => ingredientsApi.getIngredientById(id),
         () => indexedDb.getIngredientById(id)
-      ),
-    [runWithFallback]
+      );
+
+      if (foundIngredient) {
+        commitIngredients((current) => upsertIngredient(current, foundIngredient));
+      }
+
+      return foundIngredient;
+    },
+    [commitIngredients, runWithFallback]
   );
 
-  return {
-    ingredients,
-    loading,
-    error,
-    dataSource,
-    loadIngredients,
-    addIngredient,
-    addIngredients,
-    updateIngredient,
-    removeIngredient,
-    findIngredient
-  };
+  const value = useMemo(
+    () => ({
+      ingredients,
+      loading,
+      error,
+      dataSource,
+      loadIngredients,
+      addIngredient,
+      addIngredients,
+      updateIngredient,
+      removeIngredient,
+      findIngredient
+    }),
+    [addIngredient, addIngredients, dataSource, error, findIngredient, ingredients, loadIngredients, loading, removeIngredient, updateIngredient]
+  );
+
+  return createElement(IngredientsContext.Provider, { value }, children);
+}
+
+export function useIngredients() {
+  const context = useContext(IngredientsContext);
+
+  if (!context) {
+    throw new Error('useIngredients must be used within IngredientsProvider.');
+  }
+
+  return context;
 }

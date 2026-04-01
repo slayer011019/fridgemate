@@ -32,7 +32,7 @@ const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onTo
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="truncate text-lg font-semibold text-slate-900">{ingredient.name}</h3>
               <span className={`badge ${toneClass}`}>{expiryLabel}</span>
-              {ingredient.consumed ? <span className="badge bg-slate-200 text-slate-700">{'재등록 필요'}</span> : null}
+              {ingredient.consumed ? <span className="badge bg-slate-200 text-slate-700">재등록 필요</span> : null}
             </div>
             <div className="flex flex-wrap gap-2 text-sm muted">
               <span className="badge bg-brand-50 text-brand-700">{getCategoryLabel(ingredient.category)}</span>
@@ -48,11 +48,11 @@ const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onTo
 
         <div className="grid gap-2 text-sm text-slate-700">
           <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/65 px-3 py-2">
-            <span className="muted">{'구매일'}</span>
+            <span className="muted">구매일</span>
             <span>{ingredient.purchaseDate || '-'}</span>
           </div>
           <div className="rounded-2xl bg-white/65 px-3 py-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{'메모'}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">메모</p>
             <p className="mt-1 line-clamp-2 text-sm text-slate-700">{ingredient.memo || '메모 없음'}</p>
           </div>
         </div>
@@ -62,15 +62,17 @@ const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onTo
             {ingredient.consumed ? '보유 중으로 변경' : '장바구니 재등록'}
           </button>
           <Link className="btn-secondary" to={`/ingredients/${ingredient.id}/edit`}>
-            {'수정'}
+            수정
           </Link>
-          <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-full bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600"
-            onClick={() => onDelete(ingredient.id)}
-          >
-            {'삭제'}
-          </button>
+          {!ingredient.consumed ? (
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-full bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600"
+              onClick={() => onDelete(ingredient.id)}
+            >
+              삭제
+            </button>
+          ) : null}
         </div>
       </div>
     </article>

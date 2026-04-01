@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { PANTRY_STATUS, PANTRY_STATUS_ORDER, pantryStaples } from '../data/pantryStaples';
 
 const STORAGE_KEY = 'fridgemate-pantry-ownership';
+const PantryStaplesContext = createContext(null);
 
 function getInitialPantryOwnership() {
   if (typeof window === 'undefined') {
@@ -27,7 +28,7 @@ function getNextStatus(currentStatus) {
   return PANTRY_STATUS_ORDER[nextIndex];
 }
 
-export function usePantryStaples() {
+export function PantryStaplesProvider({ children }) {
   const [pantryOwnership, setPantryOwnership] = useState(getInitialPantryOwnership);
 
   const persistPantryOwnership = useCallback((updater) => {
@@ -40,6 +41,23 @@ export function usePantryStaples() {
 
       return nextOwnership;
     });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleStorage = (event) => {
+      if (event.key !== STORAGE_KEY) {
+        return;
+      }
+
+      setPantryOwnership(getInitialPantryOwnership());
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const setPantryStatus = useCallback(
@@ -81,11 +99,26 @@ export function usePantryStaples() {
     return summary;
   }, [pantryOwnership]);
 
-  return {
-    pantryStaples,
-    pantryOwnership,
-    pantrySummary,
-    setPantryStatus,
-    cyclePantryStatus
-  };
+  const value = useMemo(
+    () => ({
+      pantryStaples,
+      pantryOwnership,
+      pantrySummary,
+      setPantryStatus,
+      cyclePantryStatus
+    }),
+    [cyclePantryStatus, pantryOwnership, pantrySummary, setPantryStatus]
+  );
+
+  return createElement(PantryStaplesContext.Provider, { value }, children);
+}
+
+export function usePantryStaples() {
+  const context = useContext(PantryStaplesContext);
+
+  if (!context) {
+    throw new Error('usePantryStaples must be used within PantryStaplesProvider.');
+  }
+
+  return context;
 }
