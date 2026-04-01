@@ -56,6 +56,10 @@ export function IngredientsProvider({ children }) {
   const [dataSource, setDataSource] = useState(getPreferredDataSource());
   const ingredientsRef = useRef(ingredients);
 
+  const clearError = useCallback(() => {
+    setError('');
+  }, []);
+
   const commitIngredients = useCallback((nextValue) => {
     setIngredients((current) => {
       const nextIngredients = typeof nextValue === 'function' ? nextValue(current) : nextValue;
@@ -294,6 +298,7 @@ export function IngredientsProvider({ children }) {
       loading,
       error,
       dataSource,
+      clearError,
       loadIngredients,
       addIngredient,
       addIngredients,
@@ -301,7 +306,19 @@ export function IngredientsProvider({ children }) {
       removeIngredient,
       findIngredient
     }),
-    [addIngredient, addIngredients, dataSource, error, findIngredient, ingredients, loadIngredients, loading, removeIngredient, updateIngredient]
+    [
+      addIngredient,
+      addIngredients,
+      clearError,
+      dataSource,
+      error,
+      findIngredient,
+      ingredients,
+      loadIngredients,
+      loading,
+      removeIngredient,
+      updateIngredient
+    ]
   );
 
   return createElement(IngredientsContext.Provider, { value }, children);

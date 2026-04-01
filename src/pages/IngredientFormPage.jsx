@@ -7,9 +7,11 @@ import { defaultIngredientForm, ingredientCategories, storageTypes } from '../ut
 function IngredientFormPage() {
   const navigate = useNavigate();
   const { ingredientId } = useParams();
-  const { addIngredient, findIngredient, updateIngredient } = useIngredients();
+  const { addIngredient, clearError, error, findIngredient, updateIngredient } = useIngredients();
   const [form, setForm] = useState(defaultIngredientForm);
   const [loading, setLoading] = useState(Boolean(ingredientId));
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const isEditMode = Boolean(ingredientId);
 
   useEffect(() => {
@@ -18,13 +20,15 @@ function IngredientFormPage() {
     }
 
     const loadIngredient = async () => {
-      const ingredient = await findIngredient(ingredientId);
+      try {
+        const ingredient = await findIngredient(ingredientId);
 
-      if (ingredient) {
-        setForm(ingredient);
+        if (ingredient) {
+          setForm(ingredient);
+        }
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     loadIngredient();
@@ -32,6 +36,14 @@ function IngredientFormPage() {
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
+
+    if (submitError) {
+      setSubmitError('');
+    }
+
+    if (error) {
+      clearError();
+    }
 
     setForm((current) => ({
       ...current,
@@ -41,14 +53,22 @@ function IngredientFormPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setSubmitError('');
+    setSubmitting(true);
 
-    if (isEditMode) {
-      await updateIngredient(form);
-    } else {
-      await addIngredient(form);
+    try {
+      if (isEditMode) {
+        await updateIngredient(form);
+      } else {
+        await addIngredient(form);
+      }
+
+      navigate('/ingredients');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : '재료를 저장하지 못했습니다.');
+    } finally {
+      setSubmitting(false);
     }
-
-    navigate('/ingredients');
   };
 
   return (
@@ -65,6 +85,10 @@ function IngredientFormPage() {
           </Link>
         }
       />
+
+      {submitError || error ? (
+        <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{submitError || error}</div>
+      ) : null}
 
       <form className="card grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
         <label className="space-y-2 text-sm font-medium text-slate-700">
@@ -120,8 +144,14 @@ function IngredientFormPage() {
           />
         </label>
         <div className="flex flex-wrap gap-3 md:col-span-2">
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? '\uBD88\uB7EC\uC624\uB294 \uC911...' : isEditMode ? '\uC218\uC815 \uC800\uC7A5' : '\uC7AC\uB8CC \uCD94\uAC00'}
+          <button type="submit" className="btn-primary" disabled={loading || submitting}>
+            {loading
+              ? '\uBD88\uB7EC\uC624\uB294 \uC911...'
+              : submitting
+                ? '\uC800\uC7A5 \uC911...'
+                : isEditMode
+                  ? '\uC218\uC815 \uC800\uC7A5'
+                  : '\uC7AC\uB8CC \uCD94\uAC00'}
           </button>
           <Link to="/ingredients" className="btn-secondary">
             {'\uCDE8\uC18C'}

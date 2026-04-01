@@ -10,7 +10,7 @@ import { getRemainingDays } from '../utils/date';
 import { ingredientCategories, storageTypes } from '../utils/ingredientOptions';
 
 function IngredientsPage() {
-  const { ingredients, loading, removeIngredient, updateIngredient } = useIngredients();
+  const { ingredients, loading, error, removeIngredient, updateIngredient } = useIngredients();
   const [filters, setFilters] = useState({
     category: 'all',
     storageType: 'all',
@@ -52,29 +52,45 @@ function IngredientsPage() {
   }, []);
 
   const handleToggleConsumed = useCallback(async (ingredient) => {
-    await updateIngredient({
-      ...ingredient,
-      consumed: !ingredient.consumed
-    });
+    try {
+      await updateIngredient({
+        ...ingredient,
+        consumed: !ingredient.consumed
+      });
+    } catch {
+      // Error state is surfaced from the hook.
+    }
   }, [updateIngredient]);
 
   const handleDelete = useCallback(async (id) => {
-    await removeIngredient(id);
+    try {
+      await removeIngredient(id);
+    } catch {
+      // Error state is surfaced from the hook.
+    }
   }, [removeIngredient]);
 
   const handleSaveShoppingListDetails = useCallback(async (ingredient) => {
-    await updateIngredient(ingredient);
+    try {
+      await updateIngredient(ingredient);
+    } catch {
+      // Error state is surfaced from the hook.
+    }
   }, [updateIngredient]);
 
   const handleRestoreAllShoppingItems = useCallback(async () => {
-    await Promise.all(
-      shoppingListItems.map((ingredient) =>
-        updateIngredient({
-          ...ingredient,
-          consumed: false
-        })
-      )
-    );
+    try {
+      await Promise.all(
+        shoppingListItems.map((ingredient) =>
+          updateIngredient({
+            ...ingredient,
+            consumed: false
+          })
+        )
+      );
+    } catch {
+      // Error state is surfaced from the hook.
+    }
   }, [shoppingListItems, updateIngredient]);
 
   return (
@@ -115,6 +131,7 @@ function IngredientsPage() {
       ) : null}
 
       {loading ? <div className="card text-sm muted">{'\uC7AC\uB8CC\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4...'}</div> : null}
+      {error ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
 
       {!loading && !filteredIngredients.length ? (
         <EmptyState
