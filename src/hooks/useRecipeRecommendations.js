@@ -13,8 +13,8 @@ export function useRecipeRecommendations(pantryOwnership = {}) {
   const { ingredients, loading: ingredientsLoading } = useIngredients();
   const requestIdRef = useRef(0);
   const localRecommendations = useMemo(
-    () => buildRecipeRecommendations(seedRecipes, ingredients, { pantryOwnership }),
-    [ingredients, pantryOwnership]
+    () => buildRecipeRecommendations(seedRecipes, ingredients),
+    [ingredients]
   );
   const [recommendations, setRecommendations] = useState(localRecommendations);
   const [loading, setLoading] = useState(ingredientsLoading);
@@ -39,7 +39,7 @@ export function useRecipeRecommendations(pantryOwnership = {}) {
       setLoading(true);
 
       try {
-        const nextRecommendations = await getRecipeRecommendations(pantryOwnership);
+        const nextRecommendations = await getRecipeRecommendations(ingredients);
 
         if (!isMounted || requestIdRef.current !== requestId) {
           return;
@@ -76,7 +76,7 @@ export function useRecipeRecommendations(pantryOwnership = {}) {
     return () => {
       isMounted = false;
     };
-  }, [ingredientsLoading, localRecommendations, pantryOwnership]);
+  }, [ingredients, ingredientsLoading, localRecommendations, pantryOwnership]);
 
   return {
     recommendations,

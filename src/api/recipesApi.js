@@ -33,12 +33,35 @@ async function request(path, options = {}) {
   return response.json();
 }
 
-export function getRecipeRecommendations(pantryOwnership = {}) {
+export function getRecipeRecommendations(ingredients = []) {
   return request('/recipes/recommendations', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ pantryOwnership })
+    body: JSON.stringify({
+      ingredients: ingredients.map((ingredient) => ({
+        name: ingredient.name,
+        expiresAt: ingredient.expiryDate || ingredient.expiresAt || null,
+        consumed: Boolean(ingredient.consumed)
+      }))
+    })
+  });
+}
+
+export function aiSuggestRecipes(ingredients = []) {
+  return request('/recipes/ai-suggest', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      ingredients: ingredients.map((ingredient) => ({
+        name: ingredient.name,
+        expiresAt: ingredient.expiryDate || ingredient.expiresAt || null,
+        quantity: ingredient.quantity ?? null,
+        consumed: Boolean(ingredient.consumed)
+      }))
+    })
   });
 }
