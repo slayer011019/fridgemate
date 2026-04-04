@@ -15,19 +15,19 @@ function RecommendationSection({
   suggestedIngredients = []
 }) {
   return (
-    <section className="space-y-4">
+    <section className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-2xl font-semibold text-slate-900">{title}</h3>
+          <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">{title}</h3>
           <p className="mt-1 text-sm leading-6 muted">{description}</p>
         </div>
         {recipes.length ? <span className="badge bg-white text-slate-500">{`\uB808\uC2DC\uD53C ${recipes.length}\uAC1C`}</span> : null}
       </div>
 
       {!recipes.length ? (
-        <div className="rounded-[24px] border border-dashed border-slate-200 bg-white/70 p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-2">
+        <div className="rounded-[20px] border border-dashed border-slate-200 bg-white/70 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-1.5">
               <p className="text-base font-semibold text-slate-900">{emptyTitle}</p>
               <p className="text-sm leading-6 muted">{emptyDescription}</p>
               {suggestedIngredients.length ? (
@@ -55,7 +55,7 @@ function RecommendationSection({
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-2">
           {recipes.map((recipe) => (
             <RecipeCard key={recipe.id} recipe={recipe} />
           ))}

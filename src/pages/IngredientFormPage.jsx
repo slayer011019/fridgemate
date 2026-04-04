@@ -72,7 +72,7 @@ function IngredientFormPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         eyebrow={isEditMode ? '\uC7AC\uB8CC \uC218\uC815' : '\uC7AC\uB8CC \uCD94\uAC00'}
         title={isEditMode ? '\uC7AC\uB8CC \uC815\uBCF4\uB97C \uCC28\uBD84\uD788 \uB2E4\uC2DC \uB2E4\uB4EC\uC5B4\uBCFC\uAE4C\uC694?' : '\uC0C8 \uC7AC\uB8CC\uB97C \uAE54\uB054\uD558\uAC8C \uB4F1\uB85D\uD574\uBCF4\uC138\uC694'}
@@ -90,60 +90,81 @@ function IngredientFormPage() {
         <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{submitError || error}</div>
       ) : null}
 
-      <form className="card grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
-        <label className="space-y-2 text-sm font-medium text-slate-700">
-          {'\uC774\uB984'}
-          <input name="name" value={form.name} onChange={handleChange} placeholder={'\uC6B0\uC720'} required />
-        </label>
+      <form className="card space-y-4" onSubmit={handleSubmit}>
+        <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="soft-panel space-y-4">
+            <div>
+              <p className="kicker">기본 정보</p>
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">재료 이름과 분류를 먼저 입력하세요</h3>
+            </div>
 
-        <label className="space-y-2 text-sm font-medium text-slate-700">
-          {'\uC218\uB7C9'}
-          <input name="quantity" value={form.quantity} onChange={handleChange} placeholder={'1\uD1B5'} required />
-        </label>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                {'\uC774\uB984'}
+                <input name="name" value={form.name} onChange={handleChange} placeholder={'\uC6B0\uC720'} required />
+              </label>
 
-        <label className="space-y-2 text-sm font-medium text-slate-700">
-          {'\uCE74\uD14C\uACE0\uB9AC'}
-          <select name="category" value={form.category} onChange={handleChange}>
-            {ingredientCategories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </label>
+              <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                {'\uC218\uB7C9'}
+                <input name="quantity" value={form.quantity} onChange={handleChange} placeholder={'1\uD1B5'} required />
+              </label>
 
-        <label className="space-y-2 text-sm font-medium text-slate-700">
-          {'\uBCF4\uAD00 \uBC29\uC2DD'}
-          <select name="storageType" value={form.storageType} onChange={handleChange}>
-            {storageTypes.map((storageType) => (
-              <option key={storageType} value={storageType}>
-                {storageType}
-              </option>
-            ))}
-          </select>
-        </label>
+              <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                {'\uCE74\uD14C\uACE0\uB9AC'}
+                <select name="category" value={form.category} onChange={handleChange}>
+                  {ingredientCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-        <label className="space-y-2 text-sm font-medium text-slate-700">
-          {'\uAD6C\uB9E4\uC77C'}
-          <input name="purchaseDate" type="date" value={form.purchaseDate} onChange={handleChange} />
-        </label>
+              <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                {'\uBCF4\uAD00 \uBC29\uC2DD'}
+                <select name="storageType" value={form.storageType} onChange={handleChange}>
+                  {storageTypes.map((storageType) => (
+                    <option key={storageType} value={storageType}>
+                      {storageType}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
 
-        <label className="space-y-2 text-sm font-medium text-slate-700">
-          {'\uC720\uD1B5\uAE30\uD55C'}
-          <input name="expiryDate" type="date" value={form.expiryDate} onChange={handleChange} />
-        </label>
+          <section className="soft-panel space-y-4">
+            <div>
+              <p className="kicker">날짜와 메모</p>
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">구매일과 유통기한을 필요한 만큼만 기록하세요</h3>
+            </div>
 
-        <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
-          {'\uBA54\uBAA8'}
-          <textarea
-            name="memo"
-            rows="4"
-            value={form.memo}
-            onChange={handleChange}
-            placeholder={'\uBCF4\uAD00 \uD301\uC774\uB098 \uC0AC\uC6A9 \uC608\uC815 \uBA54\uBAA8'}
-          />
-        </label>
-        <div className="flex flex-wrap gap-3 md:col-span-2">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                {'\uAD6C\uB9E4\uC77C'}
+                <input name="purchaseDate" type="date" value={form.purchaseDate} onChange={handleChange} />
+              </label>
+
+              <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                {'\uC720\uD1B5\uAE30\uD55C'}
+                <input name="expiryDate" type="date" value={form.expiryDate} onChange={handleChange} />
+              </label>
+
+              <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
+                {'\uBA54\uBAA8'}
+                <textarea
+                  name="memo"
+                  rows="4"
+                  value={form.memo}
+                  onChange={handleChange}
+                  placeholder={'\uBCF4\uAD00 \uD301\uC774\uB098 \uC0AC\uC6A9 \uC608\uC815 \uBA54\uBAA8'}
+                />
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <div className="flex flex-wrap gap-3 border-t border-white/70 pt-1">
           <button type="submit" className="btn-primary" disabled={loading || submitting}>
             {loading
               ? '\uBD88\uB7EC\uC624\uB294 \uC911...'

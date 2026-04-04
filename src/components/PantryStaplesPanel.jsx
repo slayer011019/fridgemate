@@ -15,14 +15,14 @@ const statusClassName = {
 
 function PantryStaplesPanel({ items, pantryOwnership, pantrySummary, onCycle }) {
   return (
-    <div className="rounded-[24px] border border-white/70 bg-white/75 p-5">
+    <div className="rounded-[20px] border border-white/70 bg-white/75 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <p className="kicker">기본 조미료 / 팬트리</p>
-          <h4 className="text-lg font-semibold text-slate-900">평소 갖춰두는 재료만 가볍게 체크해두세요</h4>
+          <h4 className="text-lg font-semibold text-slate-900">없으면 아쉬운 재료만 가볍게 체크해두세요</h4>
           <p className="text-sm leading-6 muted">
-            냉장고 재료처럼 유통기한을 관리하지 않아도 되는 기본 조미료예요. 클릭할 때마다 보유 → 미보유 → 모름 순서로 바뀌고,
-            장바구니와는 별개로 추천 계산에만 반영돼요.
+            냉장고 재료처럼 유통기한을 관리하지 않아도 되는 기본 양념은 보유 / 미보유 / 모름 상태로만 기록하고,
+            레시피 추천 계산에만 가볍게 반영합니다.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">

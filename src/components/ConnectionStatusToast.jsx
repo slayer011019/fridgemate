@@ -27,21 +27,21 @@ function ConnectionStatusToast() {
       nextNotices.push({
         id: 'offline',
         tone: 'danger',
-        title: 'Offline mode',
-        description: 'The API is unavailable right now, so FridgeMate is temporarily using the authenticated local cache.'
+        title: '오프라인 상태',
+        description: 'API에 연결할 수 없어 잠시 로컬 인증 캐시를 사용하고 있어요.'
       });
     } else if (dataSource === 'indexeddb') {
       nextNotices.push({
         id: 'fallback',
         tone: 'warning',
-        title: 'Using local fallback',
-        description: error || 'The server response was unstable, so the app switched to the authenticated IndexedDB cache.'
+        title: '로컬 캐시 사용 중',
+        description: error || '서버 응답이 불안정해서 인증된 IndexedDB 캐시로 전환했어요.'
       });
     } else if (error) {
       nextNotices.push({
         id: 'api-error',
         tone: 'danger',
-        title: 'Server request failed',
+        title: '서버 요청 실패',
         description: error
       });
     }
@@ -50,8 +50,8 @@ function ConnectionStatusToast() {
       nextNotices.push({
         id: 'syncing',
         tone: 'info',
-        title: 'Syncing changes',
-        description: 'Recent updates are being mirrored to the local authenticated cache.'
+        title: '동기화 중',
+        description: '최근 변경 사항을 로컬 인증 캐시에 함께 반영하고 있어요.'
       });
     }
 
@@ -63,11 +63,11 @@ function ConnectionStatusToast() {
   }
 
   return (
-    <div aria-live="polite" className="pointer-events-none fixed right-4 top-20 z-50 flex w-full max-w-sm flex-col gap-3">
+    <div aria-live="polite" className="pointer-events-none fixed right-4 top-20 z-50 flex w-full max-w-sm flex-col gap-2.5">
       {notices.map((notice) => (
         <section
           key={notice.id}
-          className={`pointer-events-auto rounded-[22px] border px-4 py-3 shadow-lg backdrop-blur ${TOAST_STYLES[notice.tone]}`}
+          className={`pointer-events-auto rounded-[18px] border px-4 py-3 shadow-lg backdrop-blur ${TOAST_STYLES[notice.tone]}`}
         >
           <p className="text-sm font-semibold">{notice.title}</p>
           <p className="mt-1 text-sm leading-6">{notice.description}</p>

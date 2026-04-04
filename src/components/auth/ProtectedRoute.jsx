@@ -6,7 +6,7 @@ function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <div className="card text-sm muted">Checking your session...</div>;
+    return <div className="card text-sm muted">세션을 확인하는 중입니다...</div>;
   }
 
   if (!isAuthenticated) {

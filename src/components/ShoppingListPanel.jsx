@@ -80,17 +80,20 @@ const ShoppingListItemCard = memo(function ShoppingListItemCard({
   onRestore
 }) {
   return (
-    <div className="rounded-[22px] border border-white/80 bg-white/75 p-4">
+    <div className="rounded-[18px] border border-white/80 bg-white/75 p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-slate-900">{item.name}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-base font-semibold text-slate-900">{item.name}</p>
+            <span className="badge bg-slate-200 text-slate-700">재등록 필요</span>
+          </div>
           <p className="mt-1 text-sm muted">{item.category || '미분류'}</p>
         </div>
-        <span className="badge bg-slate-200 text-slate-700">재등록 필요</span>
+        <p className={`text-xs font-medium ${getSaveStatusClassName(saveStatus)}`}>{getSaveStatusLabel(saveStatus)}</p>
       </div>
 
-      <div className="mt-4 grid gap-3">
-        <label className="space-y-2 text-sm font-medium text-slate-700">
+      <div className="mt-3 grid gap-3 lg:grid-cols-[0.7fr_1.3fr]">
+        <label className="space-y-1.5 text-sm font-medium text-slate-700">
           다음 구매 수량
           <input
             value={draft.quantity}
@@ -99,26 +102,24 @@ const ShoppingListItemCard = memo(function ShoppingListItemCard({
           />
         </label>
 
-        <label className="space-y-2 text-sm font-medium text-slate-700">
+        <label className="space-y-1.5 text-sm font-medium text-slate-700">
           장보기 메모
           <textarea
             rows="2"
             value={draft.memo}
             onChange={(event) => onDraftChange(item.id, 'memo', event.target.value)}
-            placeholder="예: 할인하면 구매, 큰 사이즈 말고 작은 걸로"
+            placeholder="예: 할인하면 구매, 작은 사이즈 우선"
           />
         </label>
       </div>
 
-      <p className={`mt-3 text-xs ${getSaveStatusClassName(saveStatus)}`}>{getSaveStatusLabel(saveStatus)}</p>
-
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className="btn-primary" onClick={() => onRestore(item)}>
           다시 채워짐
         </button>
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-full bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-600"
+          className="inline-flex min-h-[2.5rem] items-center justify-center rounded-full bg-rose-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-600"
           onClick={() => onDelete(item.id)}
         >
           완전 삭제
@@ -308,10 +309,6 @@ function ShoppingListPanel({ items, onDelete, onRestore, onRestoreAll, onSaveDet
     return () => window.clearTimeout(timer);
   }, [drafts, items, persistDraft, saveStates]);
 
-  if (!items.length) {
-    return null;
-  }
-
   const handleDraftChange = useCallback((id, field, value) => {
     setDrafts((current) => ({
       ...current,
@@ -327,14 +324,18 @@ function ShoppingListPanel({ items, onDelete, onRestore, onRestoreAll, onSaveDet
     }));
   }, []);
 
+  if (!items.length) {
+    return null;
+  }
+
   return (
     <section className="card bg-gradient-to-br from-amber-50/70 via-white/70 to-brand-50/50">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-1.5">
           <p className="kicker">다시 사야 할 재료</p>
-          <h3 className="text-2xl font-semibold text-slate-900">장바구니처럼 모아두고 한 번에 다시 채워보세요</h3>
+          <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">장바구니처럼 모아두고 한 번에 다시 채워보세요</h3>
           <p className="max-w-2xl text-sm leading-6 muted">
-            다 쓴 재료를 따로 모아둔 영역이에요. 보유 중인 재료와 분리해서 보고, 다음 장보기 전에 수량과 메모만 가볍게 정리할 수 있어요.
+            소비 처리한 재료를 따로 모아두고, 다음 장보기 전에 수량과 메모만 가볍게 정리할 수 있어요.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -348,7 +349,7 @@ function ShoppingListPanel({ items, onDelete, onRestore, onRestoreAll, onSaveDet
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid gap-2.5 xl:grid-cols-2">
         {sortedItems.map((item) => (
           <ShoppingListItemCard
             key={item.id}

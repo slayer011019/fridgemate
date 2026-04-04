@@ -1,56 +1,46 @@
-function OcrResultPanel({
-  status,
-  progress,
-  error,
-  rawText,
-  showRawText,
-  onToggleRawText
-}) {
+function OcrResultPanel({ status, progress, error, rawText, showRawText, onToggleRawText }) {
   const progressPercent = Math.round((progress || 0) * 100);
 
   return (
     <section className="card space-y-4">
-      <div>
-        <p className="kicker">{'2. OCR \uACB0\uACFC'}</p>
-        <h3 className="mt-2 text-2xl font-semibold text-slate-900">{'\uD14D\uC2A4\uD2B8\uB97C \uCD94\uCD9C\uD558\uACE0 \uAC00\uC838\uC624\uAE30 \uC804\uC5D0 \uD655\uC778\uD558\uC138\uC694'}</h3>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="kicker">2. OCR 결과</p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">텍스트를 추출하고 가져오기 전에 확인하세요</h3>
+        </div>
+        {rawText ? (
+          <button type="button" className="btn-secondary" onClick={onToggleRawText}>
+            {showRawText ? '원본 OCR 텍스트 숨기기' : '원본 OCR 텍스트 보기'}
+          </button>
+        ) : null}
       </div>
 
       {status === 'processing' ? (
         <div className="soft-panel">
           <div className="flex items-center justify-between text-sm font-medium text-slate-700">
-            <span>{'OCR \uCC98\uB9AC \uC911'}</span>
+            <span>OCR 처리 중</span>
             <span>{progressPercent}%</span>
           </div>
-          <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
+          <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-slate-200">
             <div className="h-full rounded-full bg-brand-600" style={{ width: `${progressPercent}%` }} />
           </div>
         </div>
       ) : null}
 
       {status === 'error' ? (
-        <div className="rounded-[24px] border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-700">
-          {`\u004F\u0043\u0052 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694. ${error || '\uB354 \uC120\uBA85\uD55C \uC2A4\uD06C\uB9B0\uC0F7\uC73C\uB85C \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'}`}
+        <div className="rounded-[20px] border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-700">
+          {`OCR 처리에 실패했어요. ${error || '더 선명한 스크린샷으로 다시 시도해주세요.'}`}
         </div>
       ) : null}
 
       {status === 'success' && !rawText ? (
-        <div className="rounded-[24px] border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800">
-          {'OCR\uC740 \uB05D\uB0AC\uC9C0\uB9CC \uC774\uBBF8\uC9C0\uC5D0\uC11C \uC77D\uC744 \uC218 \uC788\uB294 \uD14D\uC2A4\uD2B8\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694.'}
+        <div className="rounded-[20px] border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800">
+          OCR은 끝났지만 이미지에서 읽을 수 있는 텍스트를 찾지 못했어요.
         </div>
       ) : null}
 
-      {rawText ? (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="btn-secondary" onClick={onToggleRawText}>
-              {showRawText ? '\uC6D0\uBCF8 OCR \uD14D\uC2A4\uD2B8 \uC228\uAE30\uAE30' : '\uC6D0\uBCF8 OCR \uD14D\uC2A4\uD2B8 \uBCF4\uAE30'}
-            </button>
-          </div>
-
-          {showRawText ? (
-            <pre className="max-h-72 overflow-auto rounded-[24px] bg-slate-950 p-4 text-xs text-slate-100">{rawText}</pre>
-          ) : null}
-        </div>
+      {showRawText && rawText ? (
+        <pre className="max-h-72 overflow-auto rounded-[20px] bg-slate-950 p-4 text-xs text-slate-100">{rawText}</pre>
       ) : null}
     </section>
   );

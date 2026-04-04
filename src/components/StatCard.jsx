@@ -8,10 +8,12 @@ function StatCard({ label, value, tone = 'default', helper = '' }) {
   };
 
   return (
-    <div className="card">
-      <div className={`badge ${toneClass[tone]}`}>{label}</div>
-      <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">{value}</p>
-      {helper ? <p className="mt-2 text-sm muted">{helper}</p> : null}
+    <div className="card flex h-full flex-col gap-3">
+      <div className={`badge w-fit ${toneClass[tone]}`}>{label}</div>
+      <div className="space-y-1">
+        <p className="text-[1.9rem] font-semibold tracking-tight text-slate-900">{value}</p>
+        {helper ? <p className="text-sm leading-6 muted">{helper}</p> : null}
+      </div>
     </div>
   );
 }
