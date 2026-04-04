@@ -3,14 +3,23 @@ import express from 'express';
 import { ingredientRoutes } from './routes/ingredientRoutes.js';
 import { recipeRoutes } from './routes/recipeRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
-import { serverConfig } from './config.js';
+import { isAllowedOrigin, serverConfig } from './config.js';
 
 export function createApp() {
   const app = express();
 
   app.use(
     cors({
-      origin: serverConfig.clientOrigin
+      origin(origin, callback) {
+        if (isAllowedOrigin(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        const error = new Error('Origin not allowed by CORS.');
+        error.status = 403;
+        callback(error);
+      }
     })
   );
   app.use(express.json());
@@ -22,6 +31,7 @@ export function createApp() {
     });
   });
 
+  app.use('/health', healthRoutes);
   app.use('/api/health', healthRoutes);
   app.use('/api/ingredients', ingredientRoutes);
   app.use('/api/recipes', recipeRoutes);

@@ -1,20 +1,14 @@
 import { Router } from 'express';
-import { prisma } from '../db/prisma.js';
+import { getDatabaseHealth } from '../db/prisma.js';
 
 export const healthRoutes = Router();
 
 healthRoutes.get('/', async (_request, response) => {
-  let database = 'disconnected';
-
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    database = 'connected';
-  } catch (_error) {
-    database = 'error';
-  }
+  const db = await getDatabaseHealth();
 
   response.json({
-    status: database === 'connected' ? 'ok' : 'degraded',
-    database
+    status: db === 'connected' ? 'ok' : 'degraded',
+    db,
+    timestamp: new Date().toISOString()
   });
 });

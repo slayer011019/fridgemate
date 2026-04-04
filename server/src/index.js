@@ -1,12 +1,11 @@
 import { createApp } from './app.js';
 import { prisma } from './db/prisma.js';
-import { assertServerEnv, serverConfig } from './config.js';
+import { serverConfig } from './config.js';
 
-assertServerEnv();
 const app = createApp();
 
-const server = app.listen(serverConfig.port, () => {
-  console.log(`FridgeMate API listening on http://localhost:${serverConfig.port}`);
+const server = app.listen(serverConfig.port, serverConfig.host, () => {
+  console.log(`FridgeMate API listening on ${serverConfig.host}:${serverConfig.port}`);
 });
 
 async function shutdown(signal) {
