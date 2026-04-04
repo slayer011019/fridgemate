@@ -44,6 +44,8 @@ export const serverConfig = {
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
   allowedOrigins,
   databaseUrl: process.env.DATABASE_URL || '',
+  jwtSecret: process.env.JWT_SECRET || 'fridgemate-dev-secret',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || ''
 };
 

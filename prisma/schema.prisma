@@ -7,6 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  ingredients  Ingredient[]
+}
+
 model Ingredient {
   id           String   @id @default(cuid())
   name         String
@@ -19,9 +28,13 @@ model Ingredient {
   consumed     Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([expiryDate])
   @@index([category])
   @@index([storageType])
+  @@index([userId, createdAt])
+  @@index([userId, updatedAt])
 }

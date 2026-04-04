@@ -1,21 +1,46 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import * as ingredientsApi from '../api/ingredientsApi';
-import { IngredientsApiError } from '../api/ingredientsApi';
-import * as indexedDb from '../db/indexedDB';
+import {
+  findIngredientInRepository,
+  ingredientCache,
+  loadIngredientsFromRepository,
+  removeIngredientFromRepository,
+  saveIngredientInRepository,
+  saveIngredientsInRepository
+} from '../features/ingredients/ingredientRepository';
 import { getPreferredDataSource, isBackendEnabled } from '../utils/backendConfig';
+import { markIngredientAsSynced, SYNC_STATE, SYNC_STRATEGY, syncIngredientSnapshot } from '../utils/syncStrategy';
+import { useAuth } from './useAuth';
 
 const IngredientsContext = createContext(null);
+const FALLBACK_WARNING_MESSAGE =
+  'The API connection is unstable, so FridgeMate is temporarily using the authenticated local cache.';
+const scopeStateCache = new Map();
 
-let cachedIngredients = [];
-let hasLoadedIngredients = false;
-let loadIngredientsPromise = null;
+function createEmptySyncSummary() {
+  return {
+    strategy: SYNC_STRATEGY,
+    pendingUploads: [],
+    pendingDownloads: [],
+    conflicts: [],
+    nextSnapshot: []
+  };
+}
 
-function shouldFallbackToIndexedDb(error) {
-  if (!(error instanceof IngredientsApiError)) {
-    return false;
+function getScopeState(scope) {
+  if (!scopeStateCache.has(scope)) {
+    scopeStateCache.set(scope, {
+      items: [],
+      loaded: false,
+      promise: null,
+      syncSummary: createEmptySyncSummary()
+    });
   }
 
-  return !error.status || error.status >= 500;
+  return scopeStateCache.get(scope);
+}
+
+function buildScopeOptions(scope) {
+  return { scope };
 }
 
 function ensureIngredientId(ingredient) {
@@ -50,103 +75,201 @@ function restoreIngredient(items, ingredient, index) {
 }
 
 export function IngredientsProvider({ children }) {
-  const [ingredients, setIngredients] = useState(() => (hasLoadedIngredients ? cachedIngredients : []));
-  const [loading, setLoading] = useState(() => !hasLoadedIngredients);
+  const { isAuthenticated, loading: authLoading, storageScope } = useAuth();
+  const useApi = isBackendEnabled() && isAuthenticated;
+  const initialScopeState = getScopeState(storageScope);
+  const [ingredients, setIngredients] = useState(() => (initialScopeState.loaded ? initialScopeState.items : []));
+  const [loading, setLoading] = useState(() => authLoading || !initialScopeState.loaded);
   const [error, setError] = useState('');
-  const [dataSource, setDataSource] = useState(getPreferredDataSource());
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [dataSource, setDataSource] = useState(() => (useApi ? getPreferredDataSource() : 'indexeddb'));
+  const [syncSummary, setSyncSummary] = useState(() => initialScopeState.syncSummary || createEmptySyncSummary());
   const ingredientsRef = useRef(ingredients);
+  const activeSyncCountRef = useRef(0);
+  const scopeRef = useRef(storageScope);
 
   const clearError = useCallback(() => {
     setError('');
   }, []);
 
-  const commitIngredients = useCallback((nextValue) => {
-    setIngredients((current) => {
-      const nextIngredients = typeof nextValue === 'function' ? nextValue(current) : nextValue;
+  const commitIngredients = useCallback((nextValue, targetScope = scopeRef.current) => {
+    const scopeState = getScopeState(targetScope);
+    const currentItems = targetScope === scopeRef.current ? ingredientsRef.current : scopeState.items;
+    const nextIngredients = typeof nextValue === 'function' ? nextValue(currentItems) : nextValue;
+
+    scopeState.items = nextIngredients;
+    scopeState.loaded = true;
+
+    if (targetScope === scopeRef.current) {
       ingredientsRef.current = nextIngredients;
-      cachedIngredients = nextIngredients;
-      hasLoadedIngredients = true;
-      return nextIngredients;
-    });
+      setIngredients(nextIngredients);
+    }
   }, []);
+
+  const commitSyncSummary = useCallback((nextSummary, targetScope = scopeRef.current) => {
+    const scopeState = getScopeState(targetScope);
+    scopeState.syncSummary = nextSummary;
+
+    if (targetScope === scopeRef.current) {
+      setSyncSummary(nextSummary);
+    }
+  }, []);
+
+  useEffect(() => {
+    const nextScopeState = getScopeState(storageScope);
+    scopeRef.current = storageScope;
+    ingredientsRef.current = nextScopeState.items;
+    activeSyncCountRef.current = 0;
+    setIngredients(nextScopeState.loaded ? nextScopeState.items : []);
+    setLoading(authLoading || !nextScopeState.loaded);
+    setError('');
+    setIsSyncing(false);
+    setDataSource(useApi ? 'api' : 'indexeddb');
+    setSyncSummary(nextScopeState.syncSummary || createEmptySyncSummary());
+  }, [authLoading, storageScope, useApi]);
 
   useEffect(() => {
     ingredientsRef.current = ingredients;
   }, [ingredients]);
 
-  const runWithFallback = useCallback(async (actionLabel, apiOperation, fallbackOperation) => {
-    if (!isBackendEnabled()) {
-      setDataSource('indexeddb');
-      setError('');
-      return fallbackOperation();
-    }
+  const startSync = useCallback(() => {
+    activeSyncCountRef.current += 1;
+    setIsSyncing(true);
+  }, []);
 
+  const finishSync = useCallback(() => {
+    activeSyncCountRef.current = Math.max(0, activeSyncCountRef.current - 1);
+    setIsSyncing(activeSyncCountRef.current > 0);
+  }, []);
+
+  const syncIndexedDbCache = useCallback(async (actionLabel, operation) => {
     try {
-      const result = await apiOperation();
-      setDataSource('api');
-      setError('');
-      return result;
+      await operation();
     } catch (nextError) {
-      if (!shouldFallbackToIndexedDb(nextError)) {
-        setError(nextError.message || 'Failed to process ingredient data.');
-        throw nextError;
-      }
-
-      console.warn(`[useIngredients] ${actionLabel} failed via API. Falling back to IndexedDB.`, nextError);
-      setDataSource('indexeddb');
-      setError('API 연결이 불안정해서 브라우저 저장소를 사용 중이에요.');
-      return fallbackOperation();
+      console.warn(`[useIngredients] Failed to update IndexedDB cache after ${actionLabel}.`, nextError);
     }
   }, []);
 
+  const runRepositoryCommand = useCallback(
+    async (actionLabel, repositoryOperation) => {
+      try {
+        const { result, source, usedFallback } = await repositoryOperation();
+
+        if (!useApi) {
+          setDataSource('indexeddb');
+          setError('');
+          return { result, source, usedFallback };
+        }
+
+        if (usedFallback) {
+          console.warn(`[useIngredients] ${actionLabel} failed via API. Falling back to IndexedDB.`);
+          setDataSource('indexeddb');
+          setError(FALLBACK_WARNING_MESSAGE);
+          return { result, source, usedFallback };
+        }
+
+        setDataSource(source);
+        setError('');
+        return { result, source, usedFallback };
+      } catch (nextError) {
+        setError(nextError.message || 'Failed to process ingredient data.');
+        throw nextError;
+      }
+    },
+    [useApi]
+  );
+
   const loadIngredients = useCallback(
     async ({ force = false } = {}) => {
-      if (!force && hasLoadedIngredients) {
-        setLoading(false);
-        return cachedIngredients;
+      if (authLoading) {
+        return getScopeState(storageScope).items;
       }
 
-      if (!force && loadIngredientsPromise) {
+      const scopeState = getScopeState(storageScope);
+
+      if (!force && scopeState.loaded) {
+        setLoading(false);
+        return scopeState.items;
+      }
+
+      if (!force && scopeState.promise) {
         setLoading(true);
 
         try {
-          const items = await loadIngredientsPromise;
-          commitIngredients(items);
+          const { items, sync } = await scopeState.promise;
+
+          if (scopeRef.current === storageScope) {
+            commitIngredients(items, storageScope);
+            commitSyncSummary(sync, storageScope);
+          }
+
           return items;
         } finally {
-          setLoading(false);
+          if (scopeRef.current === storageScope) {
+            setLoading(false);
+          }
         }
       }
 
       setLoading(true);
 
-      const task = runWithFallback(
-        'loadIngredients',
-        () => ingredientsApi.getAllIngredients(),
-        () => indexedDb.getAllIngredients()
-      ).then((items) => items || []);
+      const task = runRepositoryCommand('loadIngredients', () =>
+        loadIngredientsFromRepository({
+          scope: storageScope,
+          useApi
+        })
+      ).then(async ({ result, source }) => {
+        let items = result || [];
+        let nextSyncSummary = createEmptySyncSummary();
 
-      if (!force) {
-        loadIngredientsPromise = task;
-      }
-
-      try {
-        const items = await task;
-        commitIngredients(items);
-        return items;
-      } finally {
-        if (!force && loadIngredientsPromise === task) {
-          loadIngredientsPromise = null;
+        if (source === 'api') {
+          const localIngredients = await ingredientCache.getAll(buildScopeOptions(storageScope));
+          nextSyncSummary = await syncIngredientSnapshot({
+            localIngredients,
+            remoteIngredients: items
+          });
+          items = nextSyncSummary.nextSnapshot;
+          await syncIndexedDbCache('loadIngredients', () =>
+            ingredientCache.replaceAll(items, buildScopeOptions(storageScope))
+          );
         }
 
-        setLoading(false);
+        return {
+          items,
+          sync: nextSyncSummary
+        };
+      });
+
+      scopeState.promise = task;
+
+      try {
+        const { items, sync } = await task;
+
+        if (scopeRef.current === storageScope) {
+          commitIngredients(items, storageScope);
+          commitSyncSummary(sync, storageScope);
+        }
+
+        return items;
+      } finally {
+        scopeState.promise = null;
+
+        if (scopeRef.current === storageScope) {
+          setLoading(false);
+        }
       }
     },
-    [commitIngredients, runWithFallback]
+    [authLoading, commitIngredients, commitSyncSummary, runRepositoryCommand, storageScope, syncIndexedDbCache, useApi]
   );
 
   useEffect(() => {
-    if (hasLoadedIngredients) {
+    if (authLoading) {
+      return;
+    }
+
+    const scopeState = getScopeState(storageScope);
+
+    if (scopeState.loaded) {
       setLoading(false);
       return;
     }
@@ -154,31 +277,47 @@ export function IngredientsProvider({ children }) {
     loadIngredients().catch(() => {
       setLoading(false);
     });
-  }, [loadIngredients]);
+  }, [authLoading, loadIngredients, storageScope]);
 
   const addIngredient = useCallback(
     async (ingredient) => {
       const optimisticIngredient = ensureIngredientId({ ...ingredient });
       commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
+      startSync();
 
       try {
-        const savedIngredient = await runWithFallback(
-          'addIngredient',
-          () => ingredientsApi.saveIngredient(optimisticIngredient),
-          () => indexedDb.saveIngredient(optimisticIngredient).then(() => optimisticIngredient)
+        const { result: savedIngredient, source } = await runRepositoryCommand('addIngredient', () =>
+          saveIngredientInRepository({
+            ingredient: optimisticIngredient,
+            scope: storageScope,
+            useApi,
+            pendingSyncState: SYNC_STATE.PENDING_CREATE
+          })
         );
 
-        if (savedIngredient) {
-          commitIngredients((current) => upsertIngredient(current, savedIngredient));
+        const committedIngredient =
+          source === 'api' && savedIngredient ? markIngredientAsSynced(savedIngredient) : savedIngredient;
+
+        if (source === 'api' && committedIngredient) {
+          await syncIndexedDbCache('addIngredient', () =>
+            ingredientCache.save(committedIngredient, buildScopeOptions(storageScope))
+          );
+          commitSyncSummary(createEmptySyncSummary(), storageScope);
         }
 
-        return savedIngredient || optimisticIngredient;
+        if (committedIngredient) {
+          commitIngredients((current) => upsertIngredient(current, committedIngredient));
+        }
+
+        return committedIngredient || optimisticIngredient;
       } catch (nextError) {
         commitIngredients((current) => current.filter((item) => item.id !== optimisticIngredient.id));
         throw nextError;
+      } finally {
+        finishSync();
       }
     },
-    [commitIngredients, runWithFallback]
+    [commitIngredients, commitSyncSummary, finishSync, runRepositoryCommand, startSync, storageScope, syncIndexedDbCache, useApi]
   );
 
   const updateIngredient = useCallback(
@@ -188,19 +327,33 @@ export function IngredientsProvider({ children }) {
       const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
 
       commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
+      startSync();
 
       try {
-        const updatedIngredient = await runWithFallback(
-          'updateIngredient',
-          () => ingredientsApi.saveIngredient(optimisticIngredient),
-          () => indexedDb.saveIngredient(optimisticIngredient).then(() => optimisticIngredient)
+        const { result: updatedIngredient, source } = await runRepositoryCommand('updateIngredient', () =>
+          saveIngredientInRepository({
+            ingredient: optimisticIngredient,
+            scope: storageScope,
+            useApi,
+            pendingSyncState: SYNC_STATE.PENDING_UPDATE
+          })
         );
 
-        if (updatedIngredient) {
-          commitIngredients((current) => upsertIngredient(current, updatedIngredient));
+        const committedIngredient =
+          source === 'api' && updatedIngredient ? markIngredientAsSynced(updatedIngredient) : updatedIngredient;
+
+        if (source === 'api' && committedIngredient) {
+          await syncIndexedDbCache('updateIngredient', () =>
+            ingredientCache.save(committedIngredient, buildScopeOptions(storageScope))
+          );
+          commitSyncSummary(createEmptySyncSummary(), storageScope);
         }
 
-        return updatedIngredient || optimisticIngredient;
+        if (committedIngredient) {
+          commitIngredients((current) => upsertIngredient(current, committedIngredient));
+        }
+
+        return committedIngredient || optimisticIngredient;
       } catch (nextError) {
         if (previousIngredient) {
           commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
@@ -209,9 +362,11 @@ export function IngredientsProvider({ children }) {
         }
 
         throw nextError;
+      } finally {
+        finishSync();
       }
     },
-    [commitIngredients, runWithFallback]
+    [commitIngredients, commitSyncSummary, finishSync, runRepositoryCommand, startSync, storageScope, syncIndexedDbCache, useApi]
   );
 
   const addIngredients = useCallback(
@@ -222,27 +377,43 @@ export function IngredientsProvider({ children }) {
       commitIngredients((current) =>
         optimisticIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current)
       );
+      startSync();
 
       try {
-        const savedIngredients = await runWithFallback(
-          'addIngredients',
-          () => ingredientsApi.saveIngredients(optimisticIngredients),
-          () => indexedDb.saveIngredients(optimisticIngredients).then(() => optimisticIngredients)
+        const { result: savedIngredients, source } = await runRepositoryCommand('addIngredients', () =>
+          saveIngredientsInRepository({
+            ingredients: optimisticIngredients,
+            scope: storageScope,
+            useApi,
+            pendingSyncState: SYNC_STATE.PENDING_CREATE
+          })
         );
 
-        if (savedIngredients?.length) {
+        const committedIngredients =
+          source === 'api' ? savedIngredients.map((ingredient) => markIngredientAsSynced(ingredient)) : savedIngredients;
+
+        if (source === 'api' && committedIngredients.length) {
+          await syncIndexedDbCache('addIngredients', () =>
+            ingredientCache.saveMany(committedIngredients, buildScopeOptions(storageScope))
+          );
+          commitSyncSummary(createEmptySyncSummary(), storageScope);
+        }
+
+        if (committedIngredients.length) {
           commitIngredients((current) =>
-            savedIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current)
+            committedIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current)
           );
         }
 
-        return savedIngredients || optimisticIngredients;
+        return committedIngredients || optimisticIngredients;
       } catch (nextError) {
         commitIngredients((current) => current.filter((ingredient) => !optimisticIds.has(ingredient.id)));
         throw nextError;
+      } finally {
+        finishSync();
       }
     },
-    [commitIngredients, runWithFallback]
+    [commitIngredients, commitSyncSummary, finishSync, runRepositoryCommand, startSync, storageScope, syncIndexedDbCache, useApi]
   );
 
   const removeIngredient = useCallback(
@@ -251,22 +422,35 @@ export function IngredientsProvider({ children }) {
       const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
 
       commitIngredients((current) => current.filter((ingredient) => ingredient.id !== id));
+      startSync();
 
       try {
-        await runWithFallback(
-          'removeIngredient',
-          () => ingredientsApi.deleteIngredient(id),
-          () => indexedDb.deleteIngredient(id)
+        const { source } = await runRepositoryCommand('removeIngredient', () =>
+          removeIngredientFromRepository({
+            id,
+            scope: storageScope,
+            useApi,
+            allowFallback: !useApi
+          })
         );
+
+        if (source === 'api') {
+          await syncIndexedDbCache('removeIngredient', () =>
+            ingredientCache.remove(id, buildScopeOptions(storageScope))
+          );
+          commitSyncSummary(createEmptySyncSummary(), storageScope);
+        }
       } catch (nextError) {
         if (previousIngredient) {
           commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
         }
 
         throw nextError;
+      } finally {
+        finishSync();
       }
     },
-    [commitIngredients, runWithFallback]
+    [commitIngredients, commitSyncSummary, finishSync, runRepositoryCommand, startSync, storageScope, syncIndexedDbCache, useApi]
   );
 
   const findIngredient = useCallback(
@@ -277,27 +461,40 @@ export function IngredientsProvider({ children }) {
         return existingIngredient;
       }
 
-      const foundIngredient = await runWithFallback(
-        'findIngredient',
-        () => ingredientsApi.getIngredientById(id),
-        () => indexedDb.getIngredientById(id)
+      const { result: foundIngredient, source } = await runRepositoryCommand('findIngredient', () =>
+        findIngredientInRepository({
+          id,
+          scope: storageScope,
+          useApi
+        })
       );
 
-      if (foundIngredient) {
-        commitIngredients((current) => upsertIngredient(current, foundIngredient));
+      const committedIngredient =
+        source === 'api' && foundIngredient ? markIngredientAsSynced(foundIngredient) : foundIngredient;
+
+      if (source === 'api' && committedIngredient) {
+        await syncIndexedDbCache('findIngredient', () =>
+          ingredientCache.save(committedIngredient, buildScopeOptions(storageScope))
+        );
       }
 
-      return foundIngredient;
+      if (committedIngredient) {
+        commitIngredients((current) => upsertIngredient(current, committedIngredient));
+      }
+
+      return committedIngredient;
     },
-    [commitIngredients, runWithFallback]
+    [commitIngredients, runRepositoryCommand, storageScope, syncIndexedDbCache, useApi]
   );
 
   const value = useMemo(
     () => ({
       ingredients,
       loading,
+      isSyncing,
       error,
       dataSource,
+      syncSummary,
       clearError,
       loadIngredients,
       addIngredient,
@@ -314,9 +511,11 @@ export function IngredientsProvider({ children }) {
       error,
       findIngredient,
       ingredients,
+      isSyncing,
       loadIngredients,
       loading,
       removeIngredient,
+      syncSummary,
       updateIngredient
     ]
   );

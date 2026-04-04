@@ -23,6 +23,33 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
 # Local-only files
 *.local
+
+# Vercel
+.vercel
+
+# Prisma (백엔드)
+server/node_modules/
+server/dist/
+server/.env
+server/.env.*
+!server/.env.example
+prisma/*.db
+prisma/*.db-journal
+
+# Tesseract.js OCR 임시 파일
+*.traineddata
+tesseract-cache/
+
+# 테스트
+.vitest/
+test-results/
+
+# 번들 분석
+stats.html
+bundle-stats.json

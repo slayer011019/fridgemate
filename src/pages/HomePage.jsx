@@ -5,8 +5,10 @@ import PageHeader from '../components/PageHeader';
 import RecipeCard from '../components/RecipeCard';
 import StatCard from '../components/StatCard';
 import { seedRecipes } from '../data/seedRecipes';
+import { getUpcomingIngredients } from '../features/ingredients/ingredientSelectors';
 import { useIngredients } from '../hooks/useIngredients';
 import { usePantryStaples } from '../hooks/usePantryStaples';
+import { isOcrEnabled } from '../utils/backendConfig';
 import { getCategoryLabel, getStorageLabel } from '../utils/displayText';
 import { getDashboardSummary, getExpiryLabel, getRemainingDays } from '../utils/date';
 import { getTopRecommendations } from '../utils/recommendations';
@@ -14,26 +16,13 @@ import { getTopRecommendations } from '../utils/recommendations';
 function HomePage() {
   const { ingredients, loading } = useIngredients();
   const { pantryOwnership } = usePantryStaples();
+  const ocrEnabled = isOcrEnabled();
   const summary = useMemo(() => getDashboardSummary(ingredients), [ingredients]);
   const topRecommendations = useMemo(
     () => getTopRecommendations(seedRecipes, ingredients, 3, { pantryOwnership }),
     [ingredients, pantryOwnership]
   );
-  const upcomingItems = useMemo(
-    () =>
-      [...ingredients]
-        .filter((ingredient) => !ingredient.consumed)
-        .sort((a, b) => {
-          const left = getRemainingDays(a.expiryDate);
-          const right = getRemainingDays(b.expiryDate);
-          const leftValue = left === null ? Number.MAX_SAFE_INTEGER : left;
-          const rightValue = right === null ? Number.MAX_SAFE_INTEGER : right;
-
-          return leftValue - rightValue;
-        })
-        .slice(0, 4),
-    [ingredients]
-  );
+  const upcomingItems = useMemo(() => getUpcomingIngredients(ingredients, 4), [ingredients]);
 
   return (
     <div className="space-y-6">
@@ -45,9 +34,11 @@ function HomePage() {
         }
         action={
           <>
-            <Link to="/import" className="btn-secondary">
-              {'\uC2A4\uD06C\uB9B0\uC0F7 \uBD88\uB7EC\uC624\uAE30'}
-            </Link>
+            {ocrEnabled ? (
+              <Link to="/import" className="btn-secondary">
+                {'\uC2A4\uD06C\uB9B0\uC0F7 \uBD88\uB7EC\uC624\uAE30'}
+              </Link>
+            ) : null}
             <Link to="/ingredients/new" className="btn-primary">
               {'\uC7AC\uB8CC \uCD94\uAC00'}
             </Link>

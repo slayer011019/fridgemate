@@ -1,66 +1,69 @@
 # FridgeMate
 
-FridgeMate is a local-first web app for managing fridge and pantry ingredients, tracking expiry dates, and recommending recipes based on what the user already has.
-
-This project started as a frontend MVP focused on everyday single-user use cases, and was later extended with an Express + Prisma + PostgreSQL backend path while keeping IndexedDB fallback for local-first usage.
-
-Live Demo: `https://fridgemate-ten.vercel.app/`
-
-Short GitHub Description:
-`Local-first fridge tracker with expiry alerts, recipe recommendations, and OCR-based ingredient import.`
+FridgeMate is a local-first fridge and pantry tracker built as a portfolio project.
+It helps users manage ingredients, track expiry dates, reduce food waste, and get recipe suggestions based on what they already have.
 
 ## Overview
 
-People living alone often forget what ingredients they already have, miss expiry dates, or struggle to decide what to cook with leftover items.
+Current product scope:
 
-FridgeMate was built to make that flow simpler:
+- Ingredient CRUD with expiry tracking
+- Recipe recommendations with pantry-aware scoring
+- OCR-based ingredient import from shopping screenshots
+- Guest mode with local-first IndexedDB persistence
+- Authenticated mode with JWT-based login and user-scoped server persistence
+- Express + Prisma backend with PostgreSQL-backed ingredient storage
 
-- register and organize ingredients
-- see expiring or expired items clearly
-- get recipe suggestions from owned ingredients
-- reduce input friction with OCR-based screenshot import
+The project is intentionally practical and understandable. It is not a full enterprise architecture, but it now has clearer boundaries so future features like authentication and user-based persistence can be added without rewriting the app.
 
-## What Is Implemented
+## Features
 
-### Frontend MVP
+### Ingredient management
 
-- ingredient CRUD
-- consumed state toggle
-- optimistic ingredient updates for faster add/edit/delete feedback
-- lightweight “buy again” shopping-list style section for consumed items
-- consumed items are separated into a dedicated shopping-list panel by default
-- quick quantity and memo editing with auto-save inside the buy-again section
-- bulk restore action for buy-again items
-- filtering and sorting
-- expiry date tracking with D-day style display
-- recipe recommendations based on current ingredients
-- pantry staple ownership toggle for common seasonings and sauces
-- local persistence with IndexedDB
+- Add, edit, delete, and mark ingredients as consumed
+- Track quantity, category, storage type, purchase date, expiry date, and notes
+- Filter by category and storage type
+- Sort by expiry date
+- Shopping panel for consumed items
 
-### OCR Import Flow
+### Expiry awareness
 
-- image upload for shopping/order screenshots
-- browser-side OCR with `tesseract.js`
-- rule-based parsing and normalization
-- review-and-confirm import flow
-- learned correction history for repeated import edits
+- D-day style expiry labels
+- Expiring-soon and expired summaries
+- Dashboard preview of ingredients to use first
 
-### Backend Path
+### Recipe recommendations
 
-- Express API structure
-- Prisma schema for ingredients
-- PostgreSQL-ready server configuration
-- ingredient CRUD API
-- recipe recommendation API
-- frontend API integration with IndexedDB fallback
+- Rule-based scoring using required ingredients, optional ingredients, and expiring items
+- Pantry staple support for items like oil, soy sauce, or salt
+- Recommendation groups:
+  - Ready now
+  - Buy one more
+  - Use soon
 
-## What Is Not Fully Finished Yet
+### OCR import
 
-- authentication or multi-user support
-- shared fridge or sync across devices
-- production database deployment and persistent hosted backend verification
-- AI-based recommendation engine
-- generalized OCR support for many shopping layouts
+- Upload screenshot
+- Extract text in the browser with Tesseract.js
+- Parse shopping/order text into ingredient candidates
+- Review and selectively save parsed items
+- Learn user corrections for future imports
+
+### Local-first data flow
+
+- Works without a backend by using IndexedDB
+- Uses the API when the user is authenticated
+- Falls back to IndexedDB on network or 5xx API failures for authenticated sessions
+- Keeps guest and authenticated caches in separate IndexedDB scopes
+- Mirrors successful API reads and writes into the authenticated local cache
+
+### Authentication and persistence
+
+- Sign up, log in, log out, and restore a persistent session with JWT bearer tokens
+- Protect ingredient and recipe API access on the backend
+- Scope server-backed ingredients by user
+- Keep guest mode separate instead of forcing account creation
+- Offer a manual "import guest ingredients" step after login instead of auto-merging local data
 
 ## Tech Stack
 
@@ -68,251 +71,219 @@ FridgeMate was built to make that flow simpler:
 
 - React
 - Vite
-- JavaScript
 - Tailwind CSS
-
-### Storage and Data
-
+- React Context + custom hooks + local component state
 - IndexedDB
-- PostgreSQL
-- Prisma
 
 ### Backend
 
 - Express
-- Node.js
+- Prisma
+- PostgreSQL
+- JWT bearer auth with Node `crypto`
 
-### Experimental Import
+### Testing and tooling
+
+- Vitest
+- React Testing Library
+- ESLint
+- Prettier
+- GitHub Actions
+
+### OCR and AI
 
 - Tesseract.js
-- rule-based parsing and normalization
+- Anthropic API (optional, rule-based fallback exists)
 
-## Key Features
+## Refactored Structure
 
-### 1. Ingredient Management
-
-- add, edit, and delete ingredients
-- mark ingredients as consumed
-- organize by category and storage type
-- sort by expiry date
-
-### 2. Expiry Tracking
-
-- display expiry dates clearly
-- highlight expiring soon ingredients
-- separate expired items from active items
-
-### 3. Recipe Recommendation
-
-- calculate recommendation score from owned ingredients
-- separate fridge ingredients, pantry staples, and shopping intent conceptually
-- distinguish:
-  - recipes that can be cooked now
-  - recipes that need only one more ingredient
-  - other partially matched recipes
-- show missing ingredients explicitly
-- treat pantry staples as lightweight penalties instead of hard blockers
-
-### 4. OCR-Based Import
-
-- upload screenshot image
-- extract text in the browser
-- normalize noisy product names into simpler ingredient names
-- keep review before final save
-
-## Architecture Notes
-
-FridgeMate is intentionally designed as a gradual system instead of a full backend-first application.
-
-### Current Data Strategy
-
-- default philosophy: local-first
-- frontend can run without backend
-- IndexedDB remains the safety net
-- ingredient state is shared through one client-side store so pages reuse the same loaded data
-- pantry staple ownership state is also shared globally so recipe pages stay in sync immediately
-
-### API Connection Strategy
-
-- if `VITE_API_BASE_URL` is set, the frontend tries the backend API first
-- if the API is unavailable or returns a server-side failure, ingredient data falls back to IndexedDB
-- recipe recommendations can also use the backend API, but keep local recommendation logic as fallback
-
-This was a deliberate decision to avoid breaking the original MVP while expanding the project toward a more service-like architecture.
-
-## Technical Decisions
-
-### Why local-first first?
-
-This project started as a student-friendly MVP. Using IndexedDB made it possible to finish a usable product quickly without waiting on backend infrastructure.
-
-### Why keep IndexedDB fallback even after adding backend support?
-
-Because the original strength of the project was that it worked immediately in the browser. Removing that would have made the project more fragile during the transition to API-based storage.
-
-### Why use rule-based OCR parsing instead of AI from the start?
-
-The first goal was reliability, readability, and controllable false positives. A rule-based system was easier to debug and better aligned with a portfolio-scale MVP.
-
-### Why Express + Prisma + PostgreSQL?
-
-This stack keeps the backend simple enough for a solo developer while still showing practical backend skills:
-
-- REST API design
-- schema modeling
-- validation
-- migration flow
-- environment-based deployment setup
-
-## Project Structure
-
-```bash
-src/
-  api/
-  components/
-  data/
-  db/
-  hooks/
-  pages/
-  utils/
-server/
-  src/
-    db/
-    lib/
-    routes/
-prisma/
-scripts/
+```text
+fridgemate/
+├── prisma/
+│   └── schema.prisma
+├── server/
+│   └── src/
+│       ├── controllers/      # Request/response handlers
+│       ├── db/               # Prisma client and DB health helpers
+│       ├── lib/              # Validation and shared backend utilities
+│       ├── routes/           # Express route definitions
+│       ├── services/         # Business logic and DB-backed operations
+│       ├── app.js
+│       ├── config.js
+│       └── index.js
+├── src/
+│   ├── api/                  # Fetch wrappers for backend requests
+│   ├── components/           # Reusable UI components
+│   ├── data/                 # Seed data and pantry defaults
+│   ├── db/                   # IndexedDB implementation
+│   ├── features/
+│   │   ├── import/           # Import flow helpers
+│   │   ├── ingredients/      # Ingredient fields, selectors, repository
+│   │   └── recipes/          # Recommendation view helpers
+│   ├── hooks/                # App-level state hooks
+│   ├── pages/                # Route-level screens
+│   ├── test/                 # Shared test setup and smoke test
+│   ├── utils/                # Pure utilities used across features
+│   ├── App.jsx
+│   └── main.jsx
+├── docs/
+├── scripts/
+├── railway.json
+├── vercel.json
+└── package.json
 ```
 
-## Run Locally
+## Why This Refactor Helps
 
-### 1. Install
+### Frontend
+
+- `pages/` now focus more on composition and user flow
+- `features/ingredients/` centralizes ingredient-specific constants, selectors, and data-source orchestration
+- `features/recipes/` groups recommendation presentation logic instead of leaving it inside page components
+- `features/import/` keeps import-item selection logic out of the page component
+
+### Backend
+
+- `routes/` are now thin
+- `controllers/` handle HTTP request/response concerns
+- `services/` contain business logic and Prisma calls
+
+This separation is small enough for a student portfolio project but makes the code easier to explain in an interview.
+
+## Data Flow
+
+### Ingredient flow
+
+```text
+UI action
+  -> page component
+  -> useIngredients hook
+  -> ingredientRepository
+     -> API first when backend is enabled
+     -> IndexedDB only when backend is disabled
+     -> IndexedDB fallback on network / 5xx API failure
+  -> React state update
+  -> mirror successful API data into IndexedDB
+```
+
+### Recommendation flow
+
+```text
+RecipesPage / HomePage
+  -> useRecipeRecommendations
+  -> local recommendation engine
+  -> optional backend recommendation API
+  -> pantry staples merged into available ingredients
+```
+
+### Backend flow
+
+```text
+Route
+  -> Controller
+  -> Service
+  -> Prisma / seed data / recommendation engine
+  -> JSON response
+```
+
+## Authentication and Persistence
+
+FridgeMate now supports two clear modes:
+
+- Guest mode
+  - IndexedDB is the source of truth
+  - no account is required
+  - no protected backend calls are made
+- Authenticated mode
+  - JWT bearer auth protects the API
+  - ingredients are scoped by `userId`
+  - IndexedDB acts as a user-scoped local cache
+  - successful server reads and writes mirror into the authenticated cache
+
+This keeps the project simple enough for a portfolio app while making the data boundary easy to explain:
+
+```text
+Route
+  -> auth middleware
+  -> controller
+  -> service
+  -> Prisma query scoped by userId
+```
+
+The sync strategy is also slightly stronger than a naive last-write-wins approach:
+
+- guest mode remains fully local
+- authenticated mode compares cached and remote items by `updatedAt`
+- newer remote items replace stale local cache entries
+- pending local fallback writes are retained with sync metadata for future improvement
+
+## Getting Started
+
+### Install
 
 ```bash
 npm install
 ```
 
-### 2. Create `.env`
+### Frontend-only mode
 
-macOS / Linux:
-
-```bash
-cp .env.example .env
-```
-
-PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-### 3. Example `.env`
-
-Frontend-only mode:
-
-```bash
-VITE_API_BASE_URL=
-PORT=4000
-CLIENT_ORIGIN=http://localhost:5173
-DATABASE_URL="postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=public"
-```
-
-Frontend + backend mode:
-
-```bash
-VITE_API_BASE_URL=http://localhost:4000/api
-PORT=4000
-CLIENT_ORIGIN=http://localhost:5173
-DATABASE_URL="postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=public"
-```
-
-### 4. Prisma Setup
-
-```bash
-npm run prisma:validate
-npm run prisma:generate
-npm run prisma:migrate
-```
-
-### 5. Run the Backend
-
-```bash
-npm run dev:server
-```
-
-### 6. Run the Frontend
+Set `VITE_API_URL=` in `.env` so the app runs in local-only mode.
 
 ```bash
 npm run dev
 ```
 
-### 7. Verify
+### Frontend + backend mode
 
-- frontend: `http://localhost:5173`
-- health check: `http://localhost:4000/api/health`
+Set the API URL and database connection in `.env`.
 
-## Backend Deployment
-
-Recommended backend platforms:
-
-- Render
-- Railway
-
-Recommended production environment variables:
-
-```bash
-PORT=10000
-CLIENT_ORIGIN=https://YOUR-FRONTEND.vercel.app
-DATABASE_URL=postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=public
+```env
+VITE_API_URL=http://localhost:4000/api
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/fridgemate?schema=public
+PORT=4000
+ALLOWED_ORIGINS=http://localhost:5173
+JWT_SECRET=replace-this-in-production
+JWT_EXPIRES_IN=7d
+ANTHROPIC_API_KEY=
 ```
 
-Frontend Vercel environment variable:
+Then run:
 
 ```bash
-VITE_API_BASE_URL=https://YOUR-BACKEND-DOMAIN/api
+npm run prisma:generate
+npm run prisma:migrate
+npm run dev:server
 ```
 
-Prisma production note:
+In another terminal:
 
-- use `npm run prisma:generate` during build
-- use `npm run prisma:deploy` in deploy environments
-- do not use `npm run prisma:migrate` as a production deploy command
+```bash
+npm run dev
+```
 
-## What I Learned
+### Health check
 
-- how to build a usable MVP first before expanding architecture
-- how to preserve an existing frontend while adding backend integration
-- how to design fallback behavior instead of hard-switching data sources
-- how to structure rule-based OCR parsing for a real UI workflow
-- how to introduce Prisma and PostgreSQL incrementally without rewriting the whole app
+```text
+http://localhost:4000/health
+```
 
-## Portfolio Talking Points
+## Tests and Quality
 
-- Built a local-first ingredient management app with IndexedDB persistence, expiry tracking, and recipe recommendation logic.
-- Designed a rule-based OCR import flow with review-and-confirm UX instead of unsafe auto-registration.
-- Extended a frontend MVP into an Express + Prisma + PostgreSQL architecture without removing the original fallback path.
-- Implemented API-first ingredient CRUD with IndexedDB fallback for safer gradual migration.
-- Organized recommendation logic so it can run locally today and move toward backend or AI-based recommendation later.
+```bash
+npm run test:run
+npm run build
+```
 
-## Resume Bullet Examples
+Optional:
 
-- Built a local-first fridge management web app using React, Vite, Tailwind CSS, and IndexedDB to manage ingredients, expiry dates, and recipe suggestions.
-- Implemented a rule-based OCR import workflow with browser-side text extraction, product normalization, and review-before-save UX.
-- Added an Express + Prisma + PostgreSQL backend path for ingredient CRUD and recommendation APIs while preserving IndexedDB fallback.
-- Designed fallback-first frontend data flow so the app continues working locally even when backend APIs are unavailable.
-- Documented local development, database setup, and deployment flow for Vercel frontend and separately deployed backend services.
+```bash
+npm run test:coverage
+npm run lint
+```
 
-## Future Improvements
+## Suggested Next Improvements
 
-The following are planned improvements, not fully implemented features yet:
-
-- hosted PostgreSQL deployment and production verification
-- unified recommendation source across dashboard and recipe pages
-- better OCR dictionaries and normalization rules
-- import history and correction management UI
-- user accounts and multi-device sync
-- AI-assisted recommendation or personalized meal planning
-
-## License
-
-No license has been added yet. If this project is going to stay public as a portfolio repository, adding an MIT license would be a reasonable next step.
+- Add conflict-aware sync uploads for pending authenticated writes
+- Move shared recipe data/logic into a dedicated `shared/` module if the backend becomes a permanent part of the app
+- Add component-level tests for page flows
+- Add user-scoped pantry staple persistence so auth mode covers the full recipe context

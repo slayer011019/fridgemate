@@ -5,6 +5,12 @@ import PageHeader from '../components/PageHeader';
 import OcrResultPanel from '../components/import/OcrResultPanel';
 import ParsedItemEditor from '../components/import/ParsedItemEditor';
 import UploadBox from '../components/import/UploadBox';
+import {
+  setImportItemsSelected,
+  toImportableItems,
+  toggleImportItemSelection,
+  updateImportItem
+} from '../features/import/importSelection';
 import { useIngredients } from '../hooks/useIngredients';
 import { applyImportCorrections, saveImportCorrections } from '../utils/import/importLearning';
 import { parseImportText } from '../utils/importParser';
@@ -17,12 +23,6 @@ const IMPORT_PAGE_COPY = {
     '\uAC00\uC838\uC62C \uD56D\uBAA9\uC774 \uC120\uD0DD\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694. \uCD5C\uC18C 1\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.',
   importFailed: '\uAC00\uC838\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694. \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
 };
-
-function toImportableItems(items) {
-  return items
-    .filter((item) => item.selected && item.name.trim())
-    .map(({ selected, sourceLine, rawLine, displayName, normalizedName, specText, ...item }) => item);
-}
 
 function ImportPage() {
   const navigate = useNavigate();
@@ -92,25 +92,11 @@ function ImportPage() {
   };
 
   const handleItemChange = (id, field, value) => {
-    setItems((current) =>
-      current.map((item) => {
-        if (item.id !== id) {
-          return item;
-        }
-
-        return {
-          ...item,
-          [field]: value,
-          learnedCorrection: false
-        };
-      })
-    );
+    setItems((current) => updateImportItem(current, id, { [field]: value }));
   };
 
   const handleToggleItem = (id) => {
-    setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, selected: !item.selected } : item))
-    );
+    setItems((current) => toggleImportItemSelection(current, id));
   };
 
   const handleImport = async () => {
@@ -185,8 +171,8 @@ function ImportPage() {
           items={items}
           onItemChange={handleItemChange}
           onToggleItem={handleToggleItem}
-          onSelectAll={() => setItems((current) => current.map((item) => ({ ...item, selected: true })))}
-          onDeselectAll={() => setItems((current) => current.map((item) => ({ ...item, selected: false })))}
+          onSelectAll={() => setItems((current) => setImportItemsSelected(current, true))}
+          onDeselectAll={() => setItems((current) => setImportItemsSelected(current, false))}
           onImport={handleImport}
         />
       ) : null}

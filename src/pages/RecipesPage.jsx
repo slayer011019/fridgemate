@@ -5,52 +5,39 @@ import RecommendationSection from '../components/RecommendationSection';
 import StatCard from '../components/StatCard';
 import { aiSuggestRecipes, RecipesApiError } from '../api/recipesApi';
 import { PANTRY_STATUS } from '../data/pantryStaples';
+import {
+  getMissingBasicIngredients,
+  getSectionHelperText,
+  splitRecommendationsByReadiness
+} from '../features/recipes/recommendationSections';
+import { useAuth } from '../hooks/useAuth';
 import { usePantryStaples } from '../hooks/usePantryStaples';
 import { useRecipeRecommendations } from '../hooks/useRecipeRecommendations';
-import { isBackendEnabled } from '../utils/backendConfig';
+import { isBackendEnabled, isOcrEnabled } from '../utils/backendConfig';
 import { getDashboardSummary } from '../utils/date';
 
-const BASIC_INGREDIENTS = ['계란', '양파', '대파', '두부', '버섯'];
-
-function normalizeName(name) {
-  return String(name || '').trim().toLowerCase();
-}
-
-function getMissingBasicIngredients(ingredients) {
-  const owned = new Set(ingredients.filter((ingredient) => !ingredient.consumed).map((ingredient) => normalizeName(ingredient.name)));
-  return BASIC_INGREDIENTS.filter((ingredient) => !owned.has(normalizeName(ingredient)));
-}
-
-function getSectionHelperText(count, emptyText, lowText, positiveText) {
-  if (!count) {
-    return emptyText;
-  }
-
-  if (count <= 2) {
-    return lowText;
-  }
-
-  return positiveText;
-}
-
 function RecipesPage() {
+  const { isAuthenticated } = useAuth();
   const { pantryStaples, pantryOwnership, pantrySummary, cyclePantryStatus } = usePantryStaples();
-  const { recommendations, loading, error, ingredients } = useRecipeRecommendations(pantryOwnership);
+  const ocrEnabled = isOcrEnabled();
+  const ownedPantryItems = useMemo(
+    () =>
+      pantryStaples
+        .filter((staple) => pantryOwnership[staple.id] === PANTRY_STATUS.OWNED)
+        .map((staple) => staple.name),
+    [pantryOwnership, pantryStaples]
+  );
+  const { recommendations, loading, error, ingredients } = useRecipeRecommendations(ownedPantryItems);
   const [aiRecommendations, setAiRecommendations] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const summary = useMemo(() => getDashboardSummary(ingredients), [ingredients]);
-  const missingBasicIngredients = useMemo(() => getMissingBasicIngredients(ingredients).slice(0, 5), [ingredients]);
+  const missingBasicIngredients = useMemo(() => getMissingBasicIngredients(ingredients), [ingredients]);
   const activeIngredientCount = useMemo(() => ingredients.filter((ingredient) => !ingredient.consumed).length, [ingredients]);
-  const readyRecommendations = useMemo(() => recommendations.filter((recipe) => recipe.canMakeNow), [recommendations]);
-  const buyOneRecommendations = useMemo(
-    () => recommendations.filter((recipe) => !recipe.canMakeNow && recipe.missingCore.length === 1),
-    [recommendations]
-  );
-  const otherRecommendations = useMemo(
-    () => recommendations.filter((recipe) => !recipe.canMakeNow && recipe.missingCore.length !== 1 && recipe.score > 0),
-    [recommendations]
-  );
+  const recommendationGroups = useMemo(() => splitRecommendationsByReadiness(recommendations), [recommendations]);
+  const readyRecommendations = recommendationGroups.ready;
+  const buyOneRecommendations = recommendationGroups.buyOneMore;
+  const useSoonRecommendations = recommendationGroups.useSoon;
   const recommendationCoverage = useMemo(
     () => readyRecommendations.length + buyOneRecommendations.length,
     [buyOneRecommendations.length, readyRecommendations.length]
@@ -100,25 +87,25 @@ function RecipesPage() {
               '장보기 효율이 좋아요'
             )
       },
-      other: {
-        value: loading ? '...' : otherRecommendations.length,
+      useSoon: {
+        value: loading ? '...' : useSoonRecommendations.length,
         helper: loading
           ? '추천을 정리 중이에요'
           : getSectionHelperText(
-              otherRecommendations.length,
+              useSoonRecommendations.length,
               '아직 후보가 적어요',
               '먼저 처리할 재료가 보여요',
               '소비 순서를 잡기 좋아요'
             )
       }
     }),
-    [buyOneRecommendations.length, loading, otherRecommendations.length, readyRecommendations.length]
+    [buyOneRecommendations.length, loading, readyRecommendations.length, useSoonRecommendations.length]
   );
 
   useEffect(() => {
     const activeIngredients = ingredients.filter((ingredient) => !ingredient.consumed);
 
-    if (!isBackendEnabled()) {
+    if (!isBackendEnabled() || !isAuthenticated) {
       setAiRecommendations([]);
       setAiError('');
       setAiLoading(false);
@@ -169,7 +156,7 @@ function RecipesPage() {
     return () => {
       isMounted = false;
     };
-  }, [ingredients]);
+  }, [ingredients, isAuthenticated]);
 
   return (
     <div className="space-y-6">
@@ -195,9 +182,9 @@ function RecipesPage() {
         />
         <StatCard
           label={'\uBE68\uB9AC \uC368\uC57C \uD560 \uC7AC\uB8CC \uC911\uC2EC'}
-          value={sectionStats.other.value}
+          value={sectionStats.useSoon.value}
           tone="danger"
-          helper={sectionStats.other.helper}
+          helper={sectionStats.useSoon.helper}
         />
       </section>
 
@@ -265,8 +252,8 @@ function RecipesPage() {
         emptyDescription={'\uACC4\uB780, \uC591\uD30C, \uB300\uD30C \uAC19\uC740 \uAE30\uBCF8 \uC7AC\uB8CC 2~3\uAC1C\uB9CC \uB354 \uCC44\uC6B0\uBA74 \uBC14\uB85C \uD574\uBCFC \uC218 \uC788\uB294 \uBA54\uB274\uAC00 \uB298\uC5B4\uB0A0 \uAC00\uB2A5\uC131\uC774 \uCEE4\uC694.'}
         emptyActionLabel={'\uC7AC\uB8CC \uCD94\uAC00\uD558\uAE30'}
         emptyActionTo={'/ingredients/new'}
-        secondaryActionLabel={'OCR\uB85C \uBD88\uB7EC\uC624\uAE30'}
-        secondaryActionTo={'/import'}
+        secondaryActionLabel={ocrEnabled ? 'OCR\uB85C \uBD88\uB7EC\uC624\uAE30' : undefined}
+        secondaryActionTo={ocrEnabled ? '/import' : undefined}
         suggestedIngredients={missingBasicIngredients}
       />
 
@@ -286,11 +273,11 @@ function RecipesPage() {
       <RecommendationSection
         title={'\uBE68\uB9AC \uC368\uC57C \uD560 \uC7AC\uB8CC\uB85C \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694'}
         description={'\uC77C\uBD80 \uC7AC\uB8CC\uAC00 \uB9DE\uB294 \uBA54\uB274 \uC911\uC5D0\uC11C\uB3C4 \uC18C\uBE44 \uC6B0\uC120\uC21C\uC704\uAC00 \uC788\uB294 \uD6C4\uBCF4\uB97C \uBA3C\uC800 \uBCF4\uC5EC\uC918\uC694.'}
-        recipes={otherRecommendations}
+        recipes={useSoonRecommendations}
         emptyTitle={'\uC9C0\uAE08 \uCC98\uB9AC\uD558\uBA74 \uC88B\uC740 \uC7AC\uB8CC \uC911\uC2EC \uCD94\uCC9C\uC740 \uC544\uC9C1 \uC801\uC5B4\uC694'}
         emptyDescription={'\uC720\uD1B5\uAE30\uD55C\uC774 \uAC00\uAE4C\uC6B4 \uC7AC\uB8CC\uAC00 \uC0DD\uAE30\uAC70\uB098 \uAE30\uBCF8 \uC7AC\uB8CC\uAC00 \uC870\uAE08 \uB354 \uC313\uC774\uBA74 \uC18C\uBE44 \uC6B0\uC120 \uCD94\uCC9C\uC774 \uB354 \uC790\uC5F0\uC2A4\uB7FD\uAC8C \uB298\uC5B4\uB0A9\uB2C8\uB2E4.'}
-        emptyActionLabel={'OCR\uB85C \uC7AC\uB8CC \uBD88\uB7EC\uC624\uAE30'}
-        emptyActionTo={'/import'}
+        emptyActionLabel={ocrEnabled ? 'OCR\uB85C \uC7AC\uB8CC \uBD88\uB7EC\uC624\uAE30' : undefined}
+        emptyActionTo={ocrEnabled ? '/import' : undefined}
         secondaryActionLabel={'\uC7AC\uB8CC \uCD94\uAC00\uD558\uAE30'}
         secondaryActionTo={'/ingredients/new'}
         suggestedIngredients={missingBasicIngredients}

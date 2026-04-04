@@ -1,143 +1,108 @@
 # AGENTS.md
 
-## Project overview
-FridgeMate is a solo MVP web app for managing ingredients in a fridge/pantry and recommending recipes based on available ingredients.
+## Project Overview
+FridgeMate is a local-first fridge and pantry tracker with expiry alerts, recipe recommendations, OCR import, and an optional backend mode.
 
-## Goal
-Build a simple, clean, beginner-friendly web app that solves a real problem for people living alone:
-- track ingredients
-- monitor expiry dates
-- reduce waste
-- recommend recipes based on owned ingredients
+Current milestone: **v1.5**
 
-## Tech stack
-- React
-- Vite
-- JavaScript
-- Tailwind CSS
-- IndexedDB
+## Current Scope
+Do not treat this repository as strict "v1 only" anymore.
 
-## Scope for v1
-Implement only:
-- ingredient CRUD
-- expiry date tracking
-- filtering and sorting
-- recipe recommendation based on owned ingredients
-- local persistence with IndexedDB
+### v1.0 baseline (shipped)
+- Ingredient CRUD
+- Expiry date tracking with D-day display
+- Filtering and sorting
+- IndexedDB persistence
+- Dashboard summary cards
 
-Do NOT add in v1:
-- authentication
-- Firebase
-- backend server
-- OCR
-- barcode scanning
-- image recognition
-- real-time sync
+### v1.5 current (implemented)
+- Rule-based recipe recommendation groups
+- Pantry staple ownership UI
+- Pantry-aware recommendation scoring
+- OCR import with review-and-confirm flow
+- Import correction learning
+- Shopping panel with auto-save
+- Optional Express + Prisma backend
+- API-first ingredient flow with IndexedDB fallback
+- Connection status toast and offline/fallback feedback
+- Vitest test suite
+- GitHub Actions CI workflow
 
-## Future scope
-Possible later phases may include:
-- screenshot import with OCR
-- review-and-confirm batch import flow
-- barcode scanning
-- shared fridge features
+### Partial / incomplete
+- Full deployment setup and production operations
+- Authentication
+- Full two-way sync and conflict resolution
+- Timestamp-based merge using `updatedAt`
+- AI recipe suggestions require `ANTHROPIC_API_KEY`
+- CI exists, but lint cleanup is still in progress
 
-## Coding rules
+## Tech Stack
+- Frontend: React, Vite, JavaScript, Tailwind CSS
+- State: React Context + custom hooks + local component state
+- Local storage: IndexedDB
+- Backend: Express, Prisma, PostgreSQL
+- OCR: Tesseract.js
+- Testing: Vitest, React Testing Library, fake-indexeddb
+
+## Architecture Rules
+- `VITE_API_URL` enables backend-connected mode.
+- If `VITE_API_URL` is empty, the app reads and writes IndexedDB directly.
+- If backend mode is enabled, `useIngredients` tries the API first.
+- Successful API responses are mirrored into IndexedDB to keep the local cache warm.
+- Network failures and 5xx responses fall back to IndexedDB.
+- 4xx API errors must surface to the UI and roll back optimistic changes.
+- Current sync strategy is `last-write-wins`.
+- Planned sync upgrade: compare `updatedAt` timestamps before resolving conflicts.
+
+## Completed Features
+- Home dashboard with expiry summary and recommendation preview
+- Ingredient list, filters, sorting, consume/restore flow
+- Ingredient create/edit form
+- OCR import page
+- Recipes page with pantry staple controls
+- Express health, ingredient CRUD, and recipe recommendation routes
+- Optional AI suggestion route with rule-based fallback
+- Connection and syncing status feedback
+- Automated tests for date, recommendations, import parser, import learning, IndexedDB, and useIngredients
+
+## Not Yet Done
+- Deployment to a stable public frontend/backend environment
+- Authentication and multi-user support
+- Real sync conflict handling with timestamps
+- End-to-end browser tests
+- Fully green lint and CI quality gate
+
+## Next Milestone
+### v2.0
+- Deploy frontend and backend
+- Finish lint cleanup and make CI reliably green
+- Implement timestamp-based sync conflict resolution
+- Add authentication
+- Expand integration and UI test coverage
+
+## Working Rules
 - Use JavaScript, not TypeScript.
-- Keep the architecture simple and easy for one developer to maintain.
-- Prefer readable code over abstract patterns.
+- Keep the architecture readable and maintainable for one developer.
+- Prefer simple functions and hooks over abstract patterns.
 - Avoid unnecessary dependencies.
-- Keep components reasonably small and focused.
-- Add comments only where they help understanding.
-- Keep the UI modern, clean, and responsive.
-- Do not overengineer state management.
+- Update README and CHANGELOG when behavior or structure changes.
+- Run `npm run test:run` and `npm run build` before finishing code changes.
 
-## Suggested structure
-- src/pages
-- src/components
-- src/data
-- src/db
-- src/utils
-- src/hooks
-
-## Core pages
-- HomePage
-- IngredientsPage
-- IngredientFormPage
-- RecipesPage
-
-## Ingredient model
-Each ingredient should support:
-- id
-- name
-- category
-- storageType
-- quantity
-- purchaseDate
-- expiryDate
-- memo
-- consumed
-
-## Recipe recommendation rules
-Use local seed recipe data.
-Each recipe should include:
-- id
-- title
-- category
-- ingredients
-- optionalIngredients
-- cookingTime
-- description
-
-Recommendation logic should support:
-- matched required ingredients ratio
-- bonus when recipe uses ingredients expiring within 2 days
-- bonus when recipe can be made immediately
-- bonus when only 1 ingredient is missing
-- clear missing ingredient display in UI
-
-## UX expectations
-- Show expiring soon ingredients clearly
-- Show expired ingredients clearly
-- Show D-day or days remaining
-- Use cards, badges, empty states, and simple summaries
-- Make the app good enough for a portfolio or class demo
-
-## Workflow
-1. Inspect the repository first.
-2. Summarize what already exists.
-3. Make a short implementation plan.
-4. Implement in small logical steps.
-5. Run the app after major changes.
-6. Fix obvious errors before finishing.
-7. Update README.md when features or structure change.
-
-## Done means
-- Ingredient create/edit/delete works
-- Consumed state works
-- Data persists after refresh
-- Filtering and sorting work
+## Done Means
+- CRUD works in local-only mode
+- CRUD works in backend-connected mode
+- IndexedDB fallback works on network and 5xx failures
 - Expiry status is visible
-- Recipe recommendations work
-- Missing ingredients are shown clearly
-- Project runs with:
-  - npm install
-  - npm run dev
-  - npm run build
+- Recipe recommendations are grouped and scored correctly
+- Pantry-owned staples affect recommendation scoring
+- OCR import uses review-before-save
+- Tests and build pass
 
-## Final response expectations
+## Final Response Expectations
 At the end of each task, report:
-- files created/changed
+- files created or changed
 - what was implemented
-- how to run it
+- how to run or verify it
+- test results
 - known limitations
 - recommended next steps
-
-## OCR import rules for future phases
-When implementing screenshot import in a later phase:
-- Use a review-and-confirm flow.
-- Never auto-register OCR output directly without user confirmation.
-- Prefer modular OCR/parsing code so the OCR provider can be swapped later.
-- If browser OCR setup becomes too heavy or unreliable, implement the full import flow with a mock OCR adapter first, then plug in real OCR afterward without changing the UI flow.
-- Implement the parser as a readable rule-based system first.
-- Favor false negatives over false positives when parsing OCR lines.
-- Do not auto-register parsed items without a user review/edit step.

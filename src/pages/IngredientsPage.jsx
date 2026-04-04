@@ -5,47 +5,23 @@ import IngredientFilters from '../components/IngredientFilters';
 import IngredientList from '../components/IngredientList';
 import PageHeader from '../components/PageHeader';
 import ShoppingListPanel from '../components/ShoppingListPanel';
+import {
+  defaultIngredientFilters,
+  filterIngredients,
+  getConsumedIngredients
+} from '../features/ingredients/ingredientSelectors';
 import { useIngredients } from '../hooks/useIngredients';
-import { getRemainingDays } from '../utils/date';
+import { isOcrEnabled } from '../utils/backendConfig';
 import { ingredientCategories, storageTypes } from '../utils/ingredientOptions';
 
 function IngredientsPage() {
   const { ingredients, loading, error, removeIngredient, updateIngredient } = useIngredients();
-  const [filters, setFilters] = useState({
-    category: 'all',
-    storageType: 'all',
-    sortOrder: 'asc',
-    status: 'active'
-  });
+  const ocrEnabled = isOcrEnabled();
+  const [filters, setFilters] = useState(defaultIngredientFilters);
 
-  const filteredIngredients = useMemo(() => {
-    const items = ingredients.filter((ingredient) => {
-      const matchesCategory = filters.category === 'all' || ingredient.category === filters.category;
-      const matchesStorage = filters.storageType === 'all' || ingredient.storageType === filters.storageType;
-      const matchesStatus =
-        filters.status === 'all' ||
-        (filters.status === 'active' && !ingredient.consumed) ||
-        (filters.status === 'consumed' && ingredient.consumed);
+  const filteredIngredients = useMemo(() => filterIngredients(ingredients, filters), [filters, ingredients]);
 
-      return matchesCategory && matchesStorage && matchesStatus;
-    });
-
-    items.sort((a, b) => {
-      const left = getRemainingDays(a.expiryDate);
-      const right = getRemainingDays(b.expiryDate);
-      const leftValue = left === null ? Number.MAX_SAFE_INTEGER : left;
-      const rightValue = right === null ? Number.MAX_SAFE_INTEGER : right;
-
-      return filters.sortOrder === 'asc' ? leftValue - rightValue : rightValue - leftValue;
-    });
-
-    return items;
-  }, [filters, ingredients]);
-
-  const shoppingListItems = useMemo(
-    () => ingredients.filter((ingredient) => ingredient.consumed),
-    [ingredients]
-  );
+  const shoppingListItems = useMemo(() => getConsumedIngredients(ingredients), [ingredients]);
 
   const handleFilterChange = useCallback((field, value) => {
     setFilters((current) => ({ ...current, [field]: value }));
@@ -103,9 +79,11 @@ function IngredientsPage() {
         }
         action={
           <>
-            <Link to="/import" className="btn-secondary">
-              {'\uC2A4\uD06C\uB9B0\uC0F7 \uBD88\uB7EC\uC624\uAE30'}
-            </Link>
+            {ocrEnabled ? (
+              <Link to="/import" className="btn-secondary">
+                {'\uC2A4\uD06C\uB9B0\uC0F7 \uBD88\uB7EC\uC624\uAE30'}
+              </Link>
+            ) : null}
             <Link to="/ingredients/new" className="btn-primary">
               {'\uC7AC\uB8CC \uCD94\uAC00'}
             </Link>

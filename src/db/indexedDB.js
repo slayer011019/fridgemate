@@ -1,12 +1,33 @@
-const DB_NAME = 'fridgemate-db';
+const DB_NAME_PREFIX = 'fridgemate-db';
 const DB_VERSION = 1;
 const STORE_NAME = 'ingredients';
-let databasePromise = null;
+const DEFAULT_SCOPE = 'guest';
+const databasePromises = new Map();
 
-function openDatabase() {
-  if (!databasePromise) {
-    databasePromise = new Promise((resolve, reject) => {
-      const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+function resolveScope(scopeOrOptions) {
+  if (typeof scopeOrOptions === 'string') {
+    return scopeOrOptions.trim() || DEFAULT_SCOPE;
+  }
+
+  if (scopeOrOptions && typeof scopeOrOptions === 'object' && typeof scopeOrOptions.scope === 'string') {
+    return scopeOrOptions.scope.trim() || DEFAULT_SCOPE;
+  }
+
+  return DEFAULT_SCOPE;
+}
+
+function getDatabaseName(scopeOrOptions) {
+  const scope = resolveScope(scopeOrOptions);
+  const safeScope = scope.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `${DB_NAME_PREFIX}__${safeScope}`;
+}
+
+function openDatabase(scopeOrOptions) {
+  const databaseName = getDatabaseName(scopeOrOptions);
+
+  if (!databasePromises.has(databaseName)) {
+    const databasePromise = new Promise((resolve, reject) => {
+      const request = window.indexedDB.open(databaseName, DB_VERSION);
 
       request.onupgradeneeded = () => {
         const database = request.result;
@@ -21,17 +42,19 @@ function openDatabase() {
 
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => {
-        databasePromise = null;
+        databasePromises.delete(databaseName);
         reject(request.error);
       };
     });
+
+    databasePromises.set(databaseName, databasePromise);
   }
 
-  return databasePromise;
+  return databasePromises.get(databaseName);
 }
 
-function runTransaction(mode, handler) {
-  return openDatabase().then((database) => {
+function runTransaction(mode, handler, scopeOrOptions) {
+  return openDatabase(scopeOrOptions).then((database) => {
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(STORE_NAME, mode);
       const store = transaction.objectStore(STORE_NAME);
@@ -44,28 +67,44 @@ function runTransaction(mode, handler) {
   });
 }
 
-export function getAllIngredients() {
-  return runTransaction('readonly', (store) => store.getAll());
+export function getAllIngredients(scopeOrOptions) {
+  return runTransaction('readonly', (store) => store.getAll(), scopeOrOptions);
 }
 
-export function getIngredientById(id) {
-  return runTransaction('readonly', (store) => store.get(id));
+export function getIngredientById(id, scopeOrOptions) {
+  return runTransaction('readonly', (store) => store.get(id), scopeOrOptions);
 }
 
-export function saveIngredient(ingredient) {
-  return runTransaction('readwrite', (store) => store.put(ingredient));
+export function saveIngredient(ingredient, scopeOrOptions) {
+  return runTransaction('readwrite', (store) => store.put(ingredient), scopeOrOptions);
 }
 
-export function saveIngredients(ingredients) {
+export function saveIngredients(ingredients, scopeOrOptions) {
   return runTransaction('readwrite', (store) => {
     ingredients.forEach((ingredient) => {
       store.put(ingredient);
     });
 
     return null;
-  });
+  }, scopeOrOptions);
 }
 
-export function deleteIngredient(id) {
-  return runTransaction('readwrite', (store) => store.delete(id));
+export function clearIngredients(scopeOrOptions) {
+  return runTransaction('readwrite', (store) => store.clear(), scopeOrOptions);
+}
+
+export function replaceIngredients(ingredients = [], scopeOrOptions) {
+  return runTransaction('readwrite', (store) => {
+    store.clear();
+
+    ingredients.forEach((ingredient) => {
+      store.put(ingredient);
+    });
+
+    return null;
+  }, scopeOrOptions);
+}
+
+export function deleteIngredient(id, scopeOrOptions) {
+  return runTransaction('readwrite', (store) => store.delete(id), scopeOrOptions);
 }

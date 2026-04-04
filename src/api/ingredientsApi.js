@@ -1,79 +1,71 @@
-import { apiBaseUrl } from '../utils/backendConfig';
+import { ApiClientError, requestJson } from './apiClient';
 
-export class IngredientsApiError extends Error {
+export class IngredientsApiError extends ApiClientError {
   constructor(message, options = {}) {
-    super(message);
+    super(message, options);
     this.name = 'IngredientsApiError';
-    this.status = options.status;
-    this.path = options.path;
-    this.cause = options.cause;
   }
-}
-
-async function request(path, options = {}) {
-  let response;
-
-  try {
-    response = await fetch(`${apiBaseUrl}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-      },
-      ...options
-    });
-  } catch (error) {
-    throw new IngredientsApiError('API request could not reach the server.', {
-      path,
-      cause: error
-    });
-  }
-
-  if (!response.ok) {
-    const errorPayload = await response.json().catch(() => ({}));
-    throw new IngredientsApiError(errorPayload.message || 'API request failed.', {
-      status: response.status,
-      path
-    });
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  return response.json();
 }
 
 export function getAllIngredients() {
-  return request('/ingredients');
+  return requestJson('/ingredients', {}, { errorClass: IngredientsApiError });
 }
 
 export function getIngredientById(id) {
-  return request(`/ingredients/${id}`);
+  return requestJson(`/ingredients/${id}`, {}, { errorClass: IngredientsApiError });
 }
 
 export function saveIngredient(ingredient) {
   if (ingredient.id) {
-    return request(`/ingredients/${ingredient.id}`, {
+    return requestJson(
+      `/ingredients/${ingredient.id}`,
+      {
       method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(ingredient)
-    });
+      },
+      { errorClass: IngredientsApiError }
+    );
   }
 
-  return request('/ingredients', {
-    method: 'POST',
-    body: JSON.stringify(ingredient)
-  });
+  return requestJson(
+    '/ingredients',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(ingredient)
+    },
+    { errorClass: IngredientsApiError }
+  );
 }
 
 export function saveIngredients(ingredients) {
-  return request('/ingredients/bulk', {
-    method: 'POST',
-    body: JSON.stringify({ items: ingredients })
-  });
+  return requestJson(
+    '/ingredients/bulk',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ items: ingredients })
+    },
+    { errorClass: IngredientsApiError }
+  );
 }
 
 export function deleteIngredient(id) {
-  return request(`/ingredients/${id}`, {
-    method: 'DELETE'
-  });
+  return requestJson(
+    `/ingredients/${id}`,
+    {
+      method: 'DELETE'
+    },
+    {
+      errorClass: IngredientsApiError,
+      allowNoContent: true
+    }
+  );
 }

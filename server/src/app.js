@@ -1,9 +1,11 @@
 import cors from 'cors';
 import express from 'express';
+import { authRoutes } from './routes/authRoutes.js';
 import { ingredientRoutes } from './routes/ingredientRoutes.js';
 import { recipeRoutes } from './routes/recipeRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { isAllowedOrigin, serverConfig } from './config.js';
+import { requireAuth } from './middleware/requireAuth.js';
 
 export function createApp() {
   const app = express();
@@ -33,8 +35,9 @@ export function createApp() {
 
   app.use('/health', healthRoutes);
   app.use('/api/health', healthRoutes);
-  app.use('/api/ingredients', ingredientRoutes);
-  app.use('/api/recipes', recipeRoutes);
+  app.use('/api/auth', authRoutes);
+  app.use('/api/ingredients', requireAuth, ingredientRoutes);
+  app.use('/api/recipes', requireAuth, recipeRoutes);
 
   app.use('/api', (_request, response) => {
     response.status(404).json({

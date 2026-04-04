@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getRecipeRecommendations, RecipesApiError } from '../api/recipesApi';
 import { seedRecipes } from '../data/seedRecipes';
+import { useAuth } from './useAuth';
 import { useIngredients } from './useIngredients';
 import { isBackendEnabled } from '../utils/backendConfig';
 import { buildRecipeRecommendations } from '../utils/recommendations';
@@ -9,22 +10,23 @@ function shouldFallbackToLocalRecommendations(error) {
   return error instanceof RecipesApiError;
 }
 
-export function useRecipeRecommendations(pantryOwnership = {}) {
+export function useRecipeRecommendations(pantryItems = []) {
+  const { isAuthenticated } = useAuth();
   const { ingredients, loading: ingredientsLoading } = useIngredients();
   const requestIdRef = useRef(0);
   const localRecommendations = useMemo(
-    () => buildRecipeRecommendations(seedRecipes, ingredients),
-    [ingredients]
+    () => buildRecipeRecommendations(seedRecipes, ingredients, { pantryItems }),
+    [ingredients, pantryItems]
   );
   const [recommendations, setRecommendations] = useState(localRecommendations);
   const [loading, setLoading] = useState(ingredientsLoading);
   const [error, setError] = useState('');
-  const [dataSource, setDataSource] = useState(isBackendEnabled() ? 'api' : 'local');
+  const [dataSource, setDataSource] = useState(isBackendEnabled() && isAuthenticated ? 'api' : 'local');
 
   useEffect(() => {
     setRecommendations(localRecommendations);
 
-    if (!isBackendEnabled()) {
+    if (!isBackendEnabled() || !isAuthenticated) {
       setLoading(ingredientsLoading);
       setError('');
       setDataSource('local');
@@ -39,7 +41,7 @@ export function useRecipeRecommendations(pantryOwnership = {}) {
       setLoading(true);
 
       try {
-        const nextRecommendations = await getRecipeRecommendations(ingredients);
+        const nextRecommendations = await getRecipeRecommendations(ingredients, pantryItems);
 
         if (!isMounted || requestIdRef.current !== requestId) {
           return;
@@ -54,7 +56,7 @@ export function useRecipeRecommendations(pantryOwnership = {}) {
         }
 
         if (!shouldFallbackToLocalRecommendations(nextError)) {
-          setError(nextError.message || '추천 결과를 불러오지 못했어요.');
+          setError(nextError.message || 'Failed to load recipe recommendations.');
           setRecommendations(localRecommendations);
           setDataSource('local');
           return;
@@ -62,7 +64,7 @@ export function useRecipeRecommendations(pantryOwnership = {}) {
 
         console.warn('[useRecipeRecommendations] Failed to load via API. Falling back to local recommendations.', nextError);
         setRecommendations(localRecommendations);
-        setError('추천 API 연결이 불안정해서 브라우저 기준 추천을 보여주고 있어요.');
+        setError('The recommendation API is unstable, so FridgeMate is showing browser-based recommendations.');
         setDataSource('local');
       } finally {
         if (isMounted && requestIdRef.current === requestId) {
@@ -76,7 +78,7 @@ export function useRecipeRecommendations(pantryOwnership = {}) {
     return () => {
       isMounted = false;
     };
-  }, [ingredients, ingredientsLoading, localRecommendations, pantryOwnership]);
+  }, [ingredients, ingredientsLoading, isAuthenticated, localRecommendations, pantryItems]);
 
   return {
     recommendations,

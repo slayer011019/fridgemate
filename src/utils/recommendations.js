@@ -1,4 +1,5 @@
 import { getRemainingDays } from './date.js';
+import { PANTRY_STATUS, pantryStaples } from '../data/pantryStaples.js';
 
 const EXPIRING_SOON_DAYS = 3;
 const MAX_OPTIONAL_BONUS = 20;
@@ -66,12 +67,24 @@ export function normalizeIngredientName(name) {
   return aliasToCanonical[key] || String(name || '').trim();
 }
 
+function getItemName(item) {
+  if (typeof item === 'string') {
+    return item;
+  }
+
+  if (item && typeof item === 'object') {
+    return item.name || item.normalizedName || '';
+  }
+
+  return item;
+}
+
 function uniqueNormalized(items = []) {
   const seen = new Set();
   const result = [];
 
   items.forEach((item) => {
-    const normalized = normalizeIngredientName(item);
+    const normalized = normalizeIngredientName(getItemName(item));
 
     if (!normalized || seen.has(normalized)) {
       return;
@@ -84,8 +97,30 @@ function uniqueNormalized(items = []) {
   return result;
 }
 
-function buildIngredientIndex(ingredients = []) {
-  return ingredients.reduce(
+function getOwnedPantryItems(pantryOwnership = {}) {
+  return pantryStaples
+    .filter((staple) => pantryOwnership[staple.id] === PANTRY_STATUS.OWNED)
+    .map((staple) => staple.name);
+}
+
+function resolvePantryItems(options = {}) {
+  if (Array.isArray(options)) {
+    return options;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(options, 'pantryItems')) {
+    return Array.isArray(options.pantryItems) ? options.pantryItems : [];
+  }
+
+  if (options.pantryOwnership && typeof options.pantryOwnership === 'object') {
+    return getOwnedPantryItems(options.pantryOwnership);
+  }
+
+  return [];
+}
+
+function buildIngredientIndex(ingredients = [], pantryItems = []) {
+  const index = ingredients.reduce(
     (index, ingredient) => {
       if (ingredient?.consumed) {
         return index;
@@ -113,6 +148,12 @@ function buildIngredientIndex(ingredients = []) {
       urgentSet: new Set()
     }
   );
+
+  uniqueNormalized(pantryItems).forEach((item) => {
+    index.availableSet.add(item);
+  });
+
+  return index;
 }
 
 function getPreparedRecipe(recipe) {
@@ -204,8 +245,14 @@ function evaluateRecipe(recipe, ingredientIndex) {
   };
 }
 
-export function recommendRecipes({ recipes = [], fridgeIngredients = [], limit = recipes.length } = {}) {
-  const ingredientIndex = buildIngredientIndex(fridgeIngredients);
+export function recommendRecipes({
+  recipes = [],
+  fridgeIngredients = [],
+  pantryItems = [],
+  pantryOwnership = {},
+  limit = recipes.length
+} = {}) {
+  const ingredientIndex = buildIngredientIndex(fridgeIngredients, resolvePantryItems({ pantryItems, pantryOwnership }));
 
   return recipes
     .map((recipe) => evaluateRecipe(recipe, ingredientIndex))
@@ -223,26 +270,30 @@ export function recommendRecipes({ recipes = [], fridgeIngredients = [], limit =
     .slice(0, limit);
 }
 
-export function buildRecipeRecommendations(recipes, ingredients) {
+export function buildRecipeRecommendations(recipes, ingredients, options = {}) {
   return recommendRecipes({
     recipes,
     fridgeIngredients: ingredients,
+    pantryItems: resolvePantryItems(options),
     limit: recipes.length
   });
 }
 
-export function getTopRecommendations(recipes, ingredients, limit = 3) {
-  return buildRecipeRecommendations(recipes, ingredients)
+export function getTopRecommendations(recipes, ingredients, limit = 3, options = {}) {
+  return buildRecipeRecommendations(recipes, ingredients, options)
     .filter((recipe) => recipe.score > 0)
     .slice(0, limit);
 }
 
-export function explainRecipeMatch(recipeId, { recipes = [], fridgeIngredients = [] } = {}) {
+export function explainRecipeMatch(
+  recipeId,
+  { recipes = [], fridgeIngredients = [], pantryItems = [], pantryOwnership = {} } = {}
+) {
   const recipe = recipes.find((item) => item.id === recipeId);
 
   if (!recipe) {
     return null;
   }
 
-  return evaluateRecipe(recipe, buildIngredientIndex(fridgeIngredients));
+  return evaluateRecipe(recipe, buildIngredientIndex(fridgeIngredients, resolvePantryItems({ pantryItems, pantryOwnership })));
 }

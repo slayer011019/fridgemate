@@ -1,19 +1,24 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { isOcrEnabled } from '../utils/backendConfig';
 
 const navItems = [
-  { label: '홈', to: '/', match: (pathname) => pathname === '/' },
+  { label: 'Home', to: '/', match: (pathname) => pathname === '/' },
   {
-    label: '재료 관리',
+    label: 'Ingredients',
     to: '/ingredients',
     match: (pathname) => pathname === '/ingredients' || /^\/ingredients\/[^/]+\/edit$/.test(pathname)
   },
-  { label: '재료 추가', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
-  { label: '영수증 불러오기', to: '/import', match: (pathname) => pathname.startsWith('/import') },
-  { label: '레시피', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
+  { label: 'Add ingredient', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
+  { label: 'Import', to: '/import', match: (pathname) => pathname.startsWith('/import') },
+  { label: 'Recipes', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
 ];
 
 function Header() {
   const location = useLocation();
+  const ocrEnabled = isOcrEnabled();
+  const { isAuthenticated, logout, user } = useAuth();
+  const visibleNavItems = ocrEnabled ? navItems : navItems.filter((item) => item.to !== '/import');
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/50 bg-[#fbf8f2]/85 backdrop-blur-xl">
@@ -22,33 +27,54 @@ function Header() {
           <div className="space-y-2">
             <p className="kicker">FridgeMate</p>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-                {'혼자 살아도 산뜻하게 쓰는 냉장고 루틴'}
-              </h1>
-              <p className="mt-1 text-sm muted">
-                {'재료 관리, 유통기한 확인, 레시피 찾기를 하나의 흐름으로 연결해보세요.'}
-              </p>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900">A practical fridge and pantry tracker</h1>
+              <p className="mt-1 text-sm muted">Track ingredients, spot expiry risks, and plan what to cook next.</p>
             </div>
           </div>
 
-          <div className="glass-card flex w-full max-w-full gap-2 overflow-x-auto p-2 lg:w-auto">
-            {navItems.map((item) => {
-              const isActive = item.match(location.pathname);
+          <div className="flex flex-col gap-3 lg:items-end">
+            <div className="glass-card flex w-full max-w-full gap-2 overflow-x-auto p-2 lg:w-auto">
+              {visibleNavItems.map((item) => {
+                const isActive = item.match(location.pathname);
 
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
-                    isActive
-                      ? 'bg-brand-600 text-white shadow-sm'
-                      : 'bg-white/70 text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  {item.label}
-                </NavLink>
-              );
-            })}
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                      isActive
+                        ? 'bg-brand-600 text-white shadow-sm'
+                        : 'bg-white/70 text-slate-600 hover:bg-white hover:text-slate-900'
+                    }`}
+                  >
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              {isAuthenticated ? (
+                <>
+                  <span className="rounded-full bg-white/70 px-3 py-2 text-slate-600">{user?.email}</span>
+                  <NavLink className="btn-secondary" to="/account">
+                    Account
+                  </NavLink>
+                  <button className="btn-primary" onClick={logout} type="button">
+                    Log out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <NavLink className="btn-secondary" to="/login">
+                    Log in
+                  </NavLink>
+                  <NavLink className="btn-primary" to="/signup">
+                    Sign up
+                  </NavLink>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -57,4 +83,3 @@ function Header() {
 }
 
 export default Header;
-
