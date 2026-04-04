@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "npm install --prefix server",
+    "buildCommand": "npm install",
     "watchPatterns": [
       "server/**",
       "prisma/**",
@@ -12,8 +12,8 @@
     ]
   },
   "deploy": {
-    "preDeployCommand": "npm run prisma:migrate --prefix server",
-    "startCommand": "npm start --prefix server",
+    "preDeployCommand": "npm run prisma:deploy",
+    "startCommand": "npm start",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
