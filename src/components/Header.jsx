@@ -3,15 +3,15 @@ import { useAuth } from '../hooks/useAuth';
 import { isOcrEnabled } from '../utils/backendConfig';
 
 const navItems = [
-  { label: '홈', to: '/', match: (pathname) => pathname === '/' },
+  { label: '\uD648', to: '/', match: (pathname) => pathname === '/' },
   {
-    label: '재료 관리',
+    label: '\uC7AC\uB8CC \uAD00\uB9AC',
     to: '/ingredients',
     match: (pathname) => pathname === '/ingredients' || /^\/ingredients\/[^/]+\/edit$/.test(pathname)
   },
-  { label: '재료 추가', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
-  { label: '가져오기', to: '/import', match: (pathname) => pathname.startsWith('/import') },
-  { label: '레시피', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
+  { label: '\uC7AC\uB8CC \uCD94\uAC00', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
+  { label: '\uAC00\uC838\uC624\uAE30', to: '/import', match: (pathname) => pathname.startsWith('/import') },
+  { label: '\uB808\uC2DC\uD53C', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
 ];
 
 function Header() {
@@ -29,10 +29,12 @@ function Header() {
               <p className="kicker">FridgeMate</p>
               <div className="mt-1 space-y-1">
                 <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-[1.45rem]">
-                  실용적으로 관리하는 냉장고 · 팬트리 트래커
+                  {'\uC2E4\uC6A9\uC801\uC73C\uB85C \uAD00\uB9AC\uD558\uB294 \uB0C9\uC7A5\uACE0 \u0026 \uD32C\uD2B8\uB9AC \uD50C\uB798\uB108'}
                 </h1>
                 <p className="max-w-2xl text-sm leading-6 muted">
-                  재료를 정리하고 유통기한을 확인한 뒤, 지금 만들 수 있는 메뉴까지 빠르게 살펴보세요.
+                  {
+                    '\uC7AC\uB8CC\uB97C \uC815\uB9AC\uD558\uACE0 \uC720\uD1B5\uAE30\uD55C\uC744 \uD655\uC778\uD558\uBA70, \uC9C0\uAE08 \uB9CC\uB4E4 \uC218 \uC788\uB294 \uBA54\uB274\uAE4C\uC9C0 \uBE60\uB974\uAC8C \uD30C\uC545\uD574\uBCF4\uC138\uC694.'
+                  }
                 </p>
               </div>
             </div>
@@ -63,19 +65,19 @@ function Header() {
                   <>
                     <span className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600">{user?.email}</span>
                     <NavLink className="btn-secondary px-3.5 py-2" to="/account">
-                      계정
+                      {'\uACC4\uC815'}
                     </NavLink>
                     <button className="btn-primary px-3.5 py-2" onClick={logout} type="button">
-                      로그아웃
+                      {'\uB85C\uADF8\uC544\uC6C3'}
                     </button>
                   </>
                 ) : (
                   <>
                     <NavLink className="btn-secondary px-3.5 py-2" to="/login">
-                      로그인
+                      {'\uB85C\uADF8\uC778'}
                     </NavLink>
                     <NavLink className="btn-primary px-3.5 py-2" to="/signup">
-                      회원가입
+                      {'\uD68C\uC6D0\uAC00\uC785'}
                     </NavLink>
                   </>
                 )}

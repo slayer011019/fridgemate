@@ -64,8 +64,8 @@ function IngredientFormPage() {
       }
 
       navigate('/ingredients');
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : '재료를 저장하지 못했습니다.');
+    } catch (nextError) {
+      setSubmitError(nextError instanceof Error ? nextError.message : '\uC7AC\uB8CC\uB97C \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.');
     } finally {
       setSubmitting(false);
     }
@@ -94,8 +94,8 @@ function IngredientFormPage() {
         <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
           <section className="soft-panel space-y-4">
             <div>
-              <p className="kicker">기본 정보</p>
-              <h3 className="mt-2 text-lg font-semibold text-slate-900">재료 이름과 분류를 먼저 입력하세요</h3>
+              <p className="kicker">{'\uAE30\uBCF8 \uC815\uBCF4'}</p>
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">{'\uC7AC\uB8CC \uC774\uB984\uACFC \uBD84\uB958\uB97C \uBA3C\uC800 \uC785\uB825\uD574\uC8FC\uC138\uC694'}</h3>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -135,8 +135,8 @@ function IngredientFormPage() {
 
           <section className="soft-panel space-y-4">
             <div>
-              <p className="kicker">날짜와 메모</p>
-              <h3 className="mt-2 text-lg font-semibold text-slate-900">구매일과 유통기한을 필요한 만큼만 기록하세요</h3>
+              <p className="kicker">{'\uB0A0\uC9DC\uC640 \uBA54\uBAA8'}</p>
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">{'\uAD6C\uB9E4\uC77C\uACFC \uC720\uD1B5\uAE30\uD55C\uC744 \uD544\uC694\uD55C \uB9CC\uD07C\uB9CC \uAE30\uB85D\uD574\uC8FC\uC138\uC694'}</h3>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">

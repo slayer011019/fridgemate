@@ -37,22 +37,22 @@ function isSameStateMap(left = {}, right = {}) {
 
 function getSaveStatusLabel(status) {
   if (status === SAVE_STATUS.EDITING) {
-    return '입력 중';
+    return '\uC785\uB825 \uC911';
   }
 
   if (status === SAVE_STATUS.SAVING) {
-    return '저장 중';
+    return '\uC800\uC7A5 \uC911';
   }
 
   if (status === SAVE_STATUS.SAVED) {
-    return '저장됨';
+    return '\uC800\uC7A5\uB428';
   }
 
   if (status === SAVE_STATUS.ERROR) {
-    return '저장 실패';
+    return '\uC800\uC7A5 \uC2E4\uD328';
   }
 
-  return '자동 저장';
+  return '\uC790\uB3D9 \uC800\uC7A5';
 }
 
 function getSaveStatusClassName(status) {
@@ -85,44 +85,44 @@ const ShoppingListItemCard = memo(function ShoppingListItemCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-base font-semibold text-slate-900">{item.name}</p>
-            <span className="badge bg-slate-200 text-slate-700">재등록 필요</span>
+            <span className="badge bg-slate-200 text-slate-700">{'\uC7AC\uB4F1\uB85D \uD544\uC694'}</span>
           </div>
-          <p className="mt-1 text-sm muted">{item.category || '미분류'}</p>
+          <p className="mt-1 text-sm muted">{item.category || '\uBBF8\uBD84\uB958'}</p>
         </div>
         <p className={`text-xs font-medium ${getSaveStatusClassName(saveStatus)}`}>{getSaveStatusLabel(saveStatus)}</p>
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-[0.7fr_1.3fr]">
         <label className="space-y-1.5 text-sm font-medium text-slate-700">
-          다음 구매 수량
+          {'\uB2E4\uC74C \uAD6C\uB9E4 \uC218\uB7C9'}
           <input
             value={draft.quantity}
             onChange={(event) => onDraftChange(item.id, 'quantity', event.target.value)}
-            placeholder="예: 2개, 1봉"
+            placeholder={'\uC608: 2\uAC1C, 1\uBD09'}
           />
         </label>
 
         <label className="space-y-1.5 text-sm font-medium text-slate-700">
-          장보기 메모
+          {'\uC7A5\uBCF4\uAE30 \uBA54\uBAA8'}
           <textarea
             rows="2"
             value={draft.memo}
             onChange={(event) => onDraftChange(item.id, 'memo', event.target.value)}
-            placeholder="예: 할인하면 구매, 작은 사이즈 우선"
+            placeholder={'\uC608: \uD560\uC778\uD558\uBA74 \uAD6C\uB9E4, \uC791\uC740 \uC0AC\uC774\uC988 \uC6B0\uC120'}
           />
         </label>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className="btn-primary" onClick={() => onRestore(item)}>
-          다시 채워짐
+          {'\uB2E4\uC2DC \uCC44\uC6CC\uC9D0'}
         </button>
         <button
           type="button"
           className="inline-flex min-h-[2.5rem] items-center justify-center rounded-full bg-rose-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-600"
           onClick={() => onDelete(item.id)}
         >
-          완전 삭제
+          {'\uC644\uC804 \uC0AD\uC81C'}
         </button>
       </div>
     </div>
@@ -332,19 +332,23 @@ function ShoppingListPanel({ items, onDelete, onRestore, onRestoreAll, onSaveDet
     <section className="card bg-gradient-to-br from-amber-50/70 via-white/70 to-brand-50/50">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-1.5">
-          <p className="kicker">다시 사야 할 재료</p>
-          <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">장바구니처럼 모아두고 한 번에 다시 채워보세요</h3>
+          <p className="kicker">{'\uB2E4\uC2DC \uC0AC\uC57C \uD560 \uC7AC\uB8CC'}</p>
+          <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">
+            {'\uC7A5\uBC14\uAD6C\uB2C8\uCC98\uB7FC \uBAA8\uC544\uB450\uACE0 \uD55C \uBC88\uC5D0 \uB2E4\uC2DC \uCC44\uC6CC\uBCF4\uC138\uC694'}
+          </h3>
           <p className="max-w-2xl text-sm leading-6 muted">
-            소비 처리한 재료를 따로 모아두고, 다음 장보기 전에 수량과 메모만 가볍게 정리할 수 있어요.
+            {
+              '\uC18C\uBE44 \uCC98\uB9AC\uD55C \uC7AC\uB8CC\uB97C \uB530\uB85C \uBAA8\uC544\uB450\uACE0, \uB2E4\uC74C \uC7A5\uBCF4\uAE30 \uC804\uC5D0 \uC218\uB7C9\uACFC \uBA54\uBAA8\uB9CC \uAC00\uBCBC\uAC8C \uC815\uB9AC\uD560 \uC218 \uC788\uC5B4\uC694.'
+            }
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="badge bg-amber-100 text-amber-800">{`재등록 필요 ${items.length}개`}</span>
+          <span className="badge bg-amber-100 text-amber-800">{`\uC7AC\uB4F1\uB85D \uD544\uC694 ${items.length}\uAC1C`}</span>
           <button type="button" className="btn-secondary" onClick={onRestoreAll}>
-            모두 다시 채워짐
+            {'\uBAA8\uB450 \uB2E4\uC2DC \uCC44\uC6CC\uC9D0'}
           </button>
           <Link to="/ingredients/new" className="btn-secondary">
-            새 재료 추가
+            {'\uC0C8 \uC7AC\uB8CC \uCD94\uAC00'}
           </Link>
         </div>
       </div>

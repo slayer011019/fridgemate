@@ -11,37 +11,37 @@ export const RECIPE_STATUS = {
 };
 
 export const ingredientAliases = {
-  대파: ['파', '쪽파'],
-  김치: ['배추김치', '묵은지'],
-  밥: ['쌀밥', '공깃밥', '남은밥'],
-  계란: ['달걀', '계란 1판', '계란 10구'],
-  돼지고기: ['삼겹살', '목살', '앞다리살', '뒷다리살', '제육용 돼지고기'],
-  닭고기: ['닭다리살', '닭안심', '닭봉', '닭정육'],
-  참치캔: ['참치', '통조림 참치'],
-  어묵: ['오뎅'],
-  버섯: ['양송이버섯', '느타리버섯', '새송이버섯', '팽이버섯'],
-  파스타면: ['스파게티면', '파스타'],
-  우동면: ['냉동우동', '사누키우동'],
-  식빵: ['토스트 식빵', '빵'],
-  마요네즈: ['마요'],
-  '다진 마늘': ['마늘', '간마늘'],
-  식용유: ['포도씨유', '카놀라유', '해바라기유'],
-  올리브유: ['엑스트라버진 올리브유'],
-  카레가루: ['카레', '고형카레'],
-  국간장: ['조선간장'],
-  요거트: ['그릭요거트', '플레인요거트'],
-  떡: ['떡볶이떡'],
-  브로콜리: ['브로컬리'],
-  오이: ['백오이', '오이 1개'],
-  감자: ['알감자'],
-  애호박: ['호박'],
-  파프리카: ['빨간 파프리카', '노란 파프리카'],
-  양배추: ['양배추잎'],
-  당근: ['당근 1개'],
-  양파: ['양파 1개'],
-  두부: ['부침두부', '찌개두부', '연두부'],
-  치킨스톡: ['치킨 스톡'],
-  '파마산 치즈': ['파르미지아노', '파르메산 치즈']
+  '\uB300\uD30C': ['\uD30C', '\uCABD\uD30C'],
+  '\uAE40\uCE58': ['\uBC30\uCD94\uAE40\uCE58', '\uBB35\uC740\uC9C0'],
+  '\uBC25': ['\uC300\uBC25', '\uACF5\uAE43\uBC25', '\uB0A8\uC740\uBC25'],
+  '\uACC4\uB780': ['\uB2EC\uAC40', '\uACC4\uB780 1\uD310', '\uACC4\uB780 10\uAD6C'],
+  '\uB3FC\uC9C0\uACE0\uAE30': ['\uC0BC\uACB9\uC0B4', '\uBAA9\uC0B4', '\uC55E\uB2E4\uB9AC\uC0B4', '\uB4B7\uB2E4\uB9AC\uC0B4', '\uC81C\uC721\uC6A9 \uB3FC\uC9C0\uACE0\uAE30'],
+  '\uB2ED\uACE0\uAE30': ['\uB2ED\uB2E4\uB9AC\uC0B4', '\uB2ED\uC548\uC2EC', '\uB2ED\uBD09', '\uB2ED\uC815\uC721'],
+  '\uCC38\uCE58\uCEA4': ['\uCC38\uCE58', '\uD1B5\uC870\uB9BC \uCC38\uCE58'],
+  '\uC5B4\uBB35': ['\uC624\uB385'],
+  '\uBC84\uC12F': ['\uC591\uC1A1\uC774\uBC84\uC12F', '\uB290\uD0C0\uB9AC\uBC84\uC12F', '\uC0C8\uC1A1\uC774\uBC84\uC12F', '\uD33D\uC774\uBC84\uC12F'],
+  '\uD30C\uC2A4\uD0C0\uBA74': ['\uC2A4\uD30C\uAC8C\uD2F0\uBA74', '\uD30C\uC2A4\uD0C0'],
+  '\uC6B0\uB3D9\uBA74': ['\uB0C9\uB3D9\uC6B0\uB3D9', '\uC0AC\uB204\uD0A4\uC6B0\uB3D9'],
+  '\uC2DD\uBE75': ['\uD1A0\uC2A4\uD2B8 \uC2DD\uBE75', '\uBE75'],
+  '\uB9C8\uC694\uB124\uC988': ['\uB9C8\uC694'],
+  '\uB2E4\uC9C4 \uB9C8\uB298': ['\uB9C8\uB298', '\uAC04\uB9C8\uB298'],
+  '\uC2DD\uC6A9\uC720': ['\uD3EC\uB3C4\uC528\uC720', '\uCE74\uB180\uB77C\uC720', '\uD574\uBC14\uB77C\uAE30\uC720'],
+  '\uC62C\uB9AC\uBE0C\uC720': ['\uC5D1\uC2A4\uD2B8\uB77C\uBC84\uC9C4 \uC62C\uB9AC\uBE0C\uC720'],
+  '\uCE74\uB808\uAC00\uB8E8': ['\uCE74\uB808', '\uACE0\uD615\uCE74\uB808'],
+  '\uAD6D\uAC04\uC7A5': ['\uC870\uC120\uAC04\uC7A5'],
+  '\uC694\uAC70\uD2B8': ['\uADF8\uB9AD\uC694\uAC70\uD2B8', '\uD50C\uB808\uC778\uC694\uAC70\uD2B8'],
+  '\uB5A1': ['\uB5A1\uBCF6\uC774\uB5A1'],
+  '\uBE0C\uB85C\uCF5C\uB9AC': ['\uBE0C\uB85C\uCEE4\uB9AC'],
+  '\uC624\uC774': ['\uBC31\uC624\uC774', '\uC624\uC774 1\uAC1C'],
+  '\uAC10\uC790': ['\uC54C\uAC10\uC790'],
+  '\uC560\uD638\uBC15': ['\uD638\uBC15'],
+  '\uD30C\uD504\uB9AC\uCE74': ['\uBE68\uAC04 \uD30C\uD504\uB9AC\uCE74', '\uB178\uB780 \uD30C\uD504\uB9AC\uCE74'],
+  '\uC591\uBC30\uCD94': ['\uC591\uBC30\uCD94\uC78E'],
+  '\uB2F9\uADFC': ['\uB2F9\uADFC 1\uAC1C'],
+  '\uC591\uD30C': ['\uC591\uD30C 1\uAC1C'],
+  '\uB450\uBD80': ['\uBD80\uCE68\uB450\uBD80', '\uCC0C\uAC1C\uB450\uBD80', '\uC5F0\uB450\uBD80'],
+  '\uCE58\uD0A8\uC2A4\uD1A1': ['\uCE58\uD0A8 \uC2A4\uD1A1'],
+  '\uD30C\uB9C8\uC0B0 \uCE58\uC988': ['\uD30C\uB974\uBBF8\uC9C0\uC544\uB178', '\uD30C\uB974\uBA54\uC0B0 \uCE58\uC988']
 };
 
 function normalizeKey(value) {
@@ -121,27 +121,27 @@ function resolvePantryItems(options = {}) {
 
 function buildIngredientIndex(ingredients = [], pantryItems = []) {
   const index = ingredients.reduce(
-    (index, ingredient) => {
+    (result, ingredient) => {
       if (ingredient?.consumed) {
-        return index;
+        return result;
       }
 
       const normalizedName = normalizeIngredientName(ingredient?.name);
 
       if (!normalizedName) {
-        return index;
+        return result;
       }
 
-      index.availableSet.add(normalizedName);
+      result.availableSet.add(normalizedName);
 
       const expiresAt = ingredient?.expiresAt || ingredient?.expiryDate || null;
       const remainingDays = getRemainingDays(expiresAt);
 
       if (remainingDays !== null && remainingDays >= 0 && remainingDays <= EXPIRING_SOON_DAYS) {
-        index.urgentSet.add(normalizedName);
+        result.urgentSet.add(normalizedName);
       }
 
-      return index;
+      return result;
     },
     {
       availableSet: new Set(),
@@ -211,21 +211,21 @@ function evaluateRecipe(recipe, ingredientIndex) {
 
   let reason = '';
   if (canMakeNow) {
-    reason = '핵심 재료가 갖춰져 있어서 바로 만들기 좋아요.';
+    reason = '\uD575\uC2EC \uC7AC\uB8CC\uAC00 \uAC16\uCDB0\uC838 \uC788\uC5B4\uC11C \uBC14\uB85C \uB9CC\uB4E4\uAE30 \uC88B\uC544\uC694.';
   } else if (missingCore.length === 1) {
-    reason = `${missingCore[0]}만 보완하면 바로 도전하기 좋아요.`;
+    reason = `${missingCore[0]}\uB9CC \uBCF4\uC644\uD558\uBA74 \uBC14\uB85C \uB3C4\uC804\uD558\uAE30 \uC88B\uC544\uC694.`;
   } else if (urgentMatches.length) {
-    reason = `${urgentMatches[0]}처럼 빨리 써야 하는 재료를 먼저 활용하기 좋아요.`;
+    reason = `${urgentMatches[0]}\uCC98\uB7FC \uBE68\uB9AC \uC368\uC57C \uD558\uB294 \uC7AC\uB8CC\uB97C \uBA3C\uC800 \uD65C\uC6A9\uD558\uAE30 \uC88B\uC544\uC694.`;
   } else if (missingGroups.length) {
-    reason = `${missingGroups.join(', ')} 조건을 채우면 조합이 더 좋아져요.`;
+    reason = `${missingGroups.join(', ')} \uC870\uAC74\uC744 \uCC44\uC6B0\uBA74 \uC870\uD569\uC774 \uB354 \uC88B\uC544\uC838\uC694.`;
   } else {
-    reason = '핵심 재료를 조금 더 채우면 추천 점수가 빠르게 올라가요.';
+    reason = '\uD575\uC2EC \uC7AC\uB8CC\uB97C \uC870\uAE08 \uB354 \uCC44\uC6B0\uBA74 \uCD94\uCC9C \uC810\uC218\uAC00 \uBE60\uB974\uAC8C \uC62C\uB77C\uAC00\uC694.';
   }
 
   return {
     ...preparedRecipe,
     score,
-    scoreLabel: `${score}점`,
+    scoreLabel: `${score}\uC810`,
     missingCore,
     missingGroups,
     urgentMatches,

@@ -27,21 +27,24 @@ function ConnectionStatusToast() {
       nextNotices.push({
         id: 'offline',
         tone: 'danger',
-        title: '오프라인 상태',
-        description: 'API에 연결할 수 없어 잠시 로컬 인증 캐시를 사용하고 있어요.'
+        title: '\uC624\uD504\uB77C\uC778 \uC0C1\uD0DC',
+        description:
+          'API\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC5B4 \uC7A0\uC2DC \uB85C\uCEEC \uC778\uC99D \uCE90\uC2DC\uB97C \uC0AC\uC6A9\uD558\uACE0 \uC788\uC5B4\uC694.'
       });
     } else if (dataSource === 'indexeddb') {
       nextNotices.push({
         id: 'fallback',
         tone: 'warning',
-        title: '로컬 캐시 사용 중',
-        description: error || '서버 응답이 불안정해서 인증된 IndexedDB 캐시로 전환했어요.'
+        title: '\uB85C\uCEEC \uCE90\uC2DC \uC0AC\uC6A9 \uC911',
+        description:
+          error ||
+          '\uC11C\uBC84 \uC751\uB2F5\uC774 \uBD88\uC548\uC815\uD574\uC11C \uC778\uC99D \uC804\uC6A9 IndexedDB \uCE90\uC2DC\uB85C \uC804\uD658\uB410\uC5B4\uC694.'
       });
     } else if (error) {
       nextNotices.push({
         id: 'api-error',
         tone: 'danger',
-        title: '서버 요청 실패',
+        title: '\uC11C\uBC84 \uC694\uCCAD \uC2E4\uD328',
         description: error
       });
     }
@@ -50,8 +53,9 @@ function ConnectionStatusToast() {
       nextNotices.push({
         id: 'syncing',
         tone: 'info',
-        title: '동기화 중',
-        description: '최근 변경 사항을 로컬 인증 캐시에 함께 반영하고 있어요.'
+        title: '\uB3D9\uAE30\uD654 \uC911',
+        description:
+          '\uCD5C\uADFC \uBCC0\uACBD \uC0AC\uD56D\uC744 \uB85C\uCEEC \uC778\uC99D \uCE90\uC2DC\uC5D0\uB3C4 \uD568\uAED8 \uBC18\uC601\uD558\uACE0 \uC788\uC5B4\uC694.'
       });
     }
 

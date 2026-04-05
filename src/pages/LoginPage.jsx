@@ -37,7 +37,7 @@ function LoginPage() {
       await login(form);
       navigate(location.state?.from?.pathname || '/account', { replace: true });
     } catch (nextError) {
-      setError(nextError.message || '로그인에 실패했어요.');
+      setError(nextError.message || '\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.');
     } finally {
       setSubmitting(false);
     }
@@ -46,14 +46,16 @@ function LoginPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="인증"
-        title="계정에 로그인하고 서버 연동 작업 공간을 사용하세요"
-        description="게스트 모드는 그대로 유지되며, 로그인하면 사용자별 저장소와 계정 기반 데이터 흐름으로 전환됩니다."
+        eyebrow={'\uACC4\uC815'}
+        title={'\uACC4\uC815\uC73C\uB85C \uB85C\uADF8\uC778\uD558\uACE0 \uC11C\uBC84 \uC5F0\uB3D9 \uC791\uC5C5 \uACF5\uAC04\uC744 \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694'}
+        description={
+          '\uAC8C\uC2A4\uD2B8 \uBAA8\uB4DC\uB294 \uADF8\uB300\uB85C \uC720\uC9C0\uB418\uACE0, \uB85C\uADF8\uC778\uD558\uBA74 \uC0AC\uC6A9\uC790 \uACC4\uC815 \uC800\uC7A5\uC18C\uC640 \uC11C\uBC84 \uAE30\uBC18 \uB370\uC774\uD130 \uD750\uB984\uC73C\uB85C \uC804\uD658\uB429\uB2C8\uB2E4.'
+        }
       />
 
       {!backendEnabled ? (
         <div className="card border border-amber-200 bg-amber-50 text-sm text-amber-900">
-          현재는 로컬 전용 모드라서 로그인 기능을 사용할 수 없어요.
+          {'\uD604\uC7AC\uB294 \uB85C\uCEEC \uC804\uC6A9 \uBAA8\uB4DC\uC5EC\uC11C \uB85C\uADF8\uC778 \uAE30\uB2A5\uC744 \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC5B4\uC694.'}
         </div>
       ) : null}
 
@@ -62,22 +64,22 @@ function LoginPage() {
       <form className="card max-w-xl space-y-4" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
-            이메일
+            {'\uC774\uBA54\uC77C'}
             <input required name="email" type="email" value={form.email} onChange={handleChange} />
           </label>
 
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
-            비밀번호
+            {'\uBE44\uBC00\uBC88\uD638'}
             <input required name="password" type="password" value={form.password} onChange={handleChange} />
           </label>
         </div>
 
         <div className="flex flex-wrap gap-3 border-t border-white/70 pt-1">
           <button className="btn-primary" disabled={!backendEnabled || loading || submitting} type="submit">
-            {submitting ? '로그인 중...' : '로그인'}
+            {submitting ? '\uB85C\uADF8\uC778 \uC911...' : '\uB85C\uADF8\uC778'}
           </button>
           <Link className="btn-secondary" to="/signup">
-            회원가입
+            {'\uD68C\uC6D0\uAC00\uC785'}
           </Link>
         </div>
       </form>

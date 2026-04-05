@@ -17,10 +17,11 @@ import { parseImportText } from '../utils/importParser';
 import { extractTextFromImage } from '../utils/ocr';
 
 const IMPORT_PAGE_COPY = {
-  uploadFirstError: 'OCR을 시작하기 전에 이미지를 먼저 업로드해주세요.',
-  ocrFailed: 'OCR 처리에 실패했어요.',
-  noSelectedItems: '가져올 항목이 선택되지 않았어요. 최소 1개 이상 선택해주세요.',
-  importFailed: '가져오기에 실패했어요. 다시 시도해주세요.'
+  uploadFirstError: '\u004F\u0043\u0052\uC744 \uC2DC\uC791\uD558\uAE30 \uC804\uC5D0 \uC774\uBBF8\uC9C0\uB97C \uBA3C\uC800 \uC5C5\uB85C\uB4DC\uD574\uC8FC\uC138\uC694.',
+  ocrFailed: '\u004F\u0043\u0052 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.',
+  noSelectedItems:
+    '\uAC00\uC838\uC62C \uD56D\uBAA9\uC774 \uC120\uD0DD\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694. \uCD5C\uC18C 1\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.',
+  importFailed: '\uAC00\uC838\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694. \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
 };
 
 function ImportPage() {
@@ -110,7 +111,7 @@ function ImportPage() {
     try {
       saveImportCorrections(selectedRawItems);
       await addIngredients(selectedItems);
-      setImportMessage(`${selectedItems.length}개 항목을 가져왔어요.`);
+      setImportMessage(`${selectedItems.length}\uAC1C \uD56D\uBAA9\uC744 \uAC00\uC838\uC654\uC5B4\uC694.`);
       navigate('/ingredients');
     } catch (importError) {
       setImportMessage(importError.message || IMPORT_PAGE_COPY.importFailed);
@@ -120,12 +121,14 @@ function ImportPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="가져오기"
-        title="장보기 스크린샷에서 재료를 불러와보세요"
-        description="주문 내역이나 영수증 이미지를 업로드하고, OCR로 추출한 후보를 검토한 뒤 선택한 항목만 한 번에 등록할 수 있어요."
+        eyebrow={'\uAC00\uC838\uC624\uAE30'}
+        title={'\uC7A5\uBCF4\uAE30 \uC2A4\uD06C\uB9B0\uC0F7\uC5D0\uC11C \uC7AC\uB8CC\uB97C \uBD88\uB7EC\uC640\uBCF4\uC138\uC694'}
+        description={
+          '\uC8FC\uBB38 \uB0B4\uC5ED\uC774\uB098 \uC601\uC218\uC99D \uC774\uBBF8\uC9C0\uB97C \uC5C5\uB85C\uB4DC\uD558\uACE0, OCR\uB85C \uCD94\uCD9C\uD55C \uD6C4\uBCF4\uB97C \uAC80\uD1A0\uD55C \uB4A4 \uC120\uD0DD\uD55C \uD56D\uBAA9\uB9CC \uD55C \uBC88\uC5D0 \uB4F1\uB85D\uD560 \uC218 \uC788\uC5B4\uC694.'
+        }
         action={
           <Link to="/ingredients" className="btn-secondary">
-            재료 목록으로 돌아가기
+            {'\uC7AC\uB8CC \uBAA9\uB85D\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30'}
           </Link>
         }
       />
@@ -149,24 +152,26 @@ function ImportPage() {
 
       {status === 'idle' && !imageFile ? (
         <EmptyState
-          title="아직 업로드한 이미지가 없어요"
-          description="주문 내역 또는 영수증 스크린샷을 먼저 올려주세요."
+          title={'\uC544\uC9C1 \uC5C5\uB85C\uB4DC\uD55C \uC774\uBBF8\uC9C0\uAC00 \uC5C6\uC5B4\uC694'}
+          description={'\uC8FC\uBB38 \uB0B4\uC5ED \uB610\uB294 \uC601\uC218\uC99D \uC2A4\uD06C\uB9B0\uC0F7\uC744 \uBA3C\uC800 \uC62C\uB824\uC8FC\uC138\uC694.'}
         />
       ) : null}
 
       {status === 'success' && !parseResult.candidates.length ? (
         <EmptyState
-          title="쓸 만한 상품 항목을 찾지 못했어요"
-          description="OCR 결과가 메타 정보이거나 이미지 품질이 낮을 수 있어요. 상품명이 더 선명한 이미지로 다시 시도해보세요."
+          title={'\uC4F8 \uB9CC\uD55C \uC0C1\uD488 \uD56D\uBAA9\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694'}
+          description={
+            '\u004F\u0043\u0052 \uACB0\uACFC\uAC00 \uBA54\uD0C0 \uC815\uBCF4\uC774\uAC70\uB098 \uC774\uBBF8\uC9C0 \uD488\uC9C8\uC774 \uB0AE\uC744 \uC218 \uC788\uC5B4\uC694. \uC0C1\uD488\uBA85\uC774 \uB354 \uC120\uBA85\uD55C \uC774\uBBF8\uC9C0\uB85C \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uBCF4\uC138\uC694.'
+          }
         />
       ) : null}
 
       {status === 'success' ? (
         <section className="soft-panel flex flex-wrap gap-2 text-sm text-slate-700">
-          <span className="badge bg-emerald-100 text-emerald-700">{`후보 항목 ${parseResult.candidates.length}개`}</span>
-          <span className="badge bg-slate-100 text-slate-700">{`유효 문장 ${parseResult.usefulLines.length}개`}</span>
-          <span className="badge bg-slate-100 text-slate-700">{`제외 문장 ${parseResult.ignoredLines.length}개`}</span>
-          <span className="badge bg-slate-100 text-slate-700">{`템플릿 ${parseResult.template?.id || 'unknown'}`}</span>
+          <span className="badge bg-emerald-100 text-emerald-700">{`\uD6C4\uBCF4 \uD56D\uBAA9 ${parseResult.candidates.length}\uAC1C`}</span>
+          <span className="badge bg-slate-100 text-slate-700">{`\uC720\uD6A8 \uBB38\uC7A5 ${parseResult.usefulLines.length}\uAC1C`}</span>
+          <span className="badge bg-slate-100 text-slate-700">{`\uC81C\uC678 \uBB38\uC7A5 ${parseResult.ignoredLines.length}\uAC1C`}</span>
+          <span className="badge bg-slate-100 text-slate-700">{`\uD15C\uD50C\uB9BF ${parseResult.template?.id || 'unknown'}`}</span>
           {importMessage ? <span className="badge bg-brand-50 text-brand-700">{importMessage}</span> : null}
         </section>
       ) : null}

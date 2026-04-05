@@ -6,7 +6,7 @@ function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <div className="card text-sm muted">세션을 확인하는 중입니다...</div>;
+    return <div className="card text-sm muted">{'\uC138\uC158\uC744 \uD655\uC778\uD558\uB294 \uC911\uC785\uB2C8\uB2E4...'}</div>;
   }
 
   if (!isAuthenticated) {
