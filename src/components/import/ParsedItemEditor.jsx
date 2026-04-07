@@ -4,14 +4,14 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
   const selectedCount = items.filter((item) => item.selected).length;
 
   return (
-    <section className="card space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <section className="card space-y-3.5">
+      <div className="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="kicker">{'3. \uD6C4\uBCF4 \uAC80\uD1A0'}</p>
-          <h3 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">
+          <h3 className="mt-2 text-lg font-semibold text-slate-900 sm:text-[1.35rem]">
             {'\uAC00\uC838\uC624\uAE30 \uC804\uC5D0 \uD56D\uBAA9\uC744 \uD55C \uBC88 \uD655\uC778\uD574\uBCF4\uC138\uC694'}
           </h3>
-          <p className="mt-2 text-sm leading-6 muted">
+          <p className="mt-1.5 text-sm leading-5.5 muted">
             {
               '\uAC00\uC838\uC62C \uD56D\uBAA9\uB9CC \uC120\uD0DD\uD558\uACE0, \uC774\uB984\uACFC \uC218\uB7C9, \uCE74\uD14C\uACE0\uB9AC, \uBCF4\uAD00 \uBC29\uC2DD\uC744 \uAC00\uBCBC\uAC8C \uB2E4\uB4EC\uC5B4\uBCF4\uC138\uC694.'
             }
@@ -32,17 +32,17 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
         <span className="badge bg-white text-slate-600">{'\uBE60\uB974\uAC8C \uAC80\uD1A0\uD558\uACE0 \uD544\uC694\uD55C \uD56D\uBAA9\uB9CC \uAC00\uC838\uC624\uAE30'}</span>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {items.map((item) => (
-          <article key={item.id} className="rounded-[20px] border border-white/60 bg-white/65 p-3.5 shadow-sm">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.28fr)]">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <label className="flex min-w-0 items-center gap-3 text-sm font-medium text-slate-800">
+          <article key={item.id} className="rounded-[18px] border border-white/60 bg-white/65 p-3 shadow-sm">
+            <div className="grid gap-2.5 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-2.5">
+                  <label className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-slate-800">
                     <input type="checkbox" checked={item.selected} onChange={() => onToggleItem(item.id)} />
                     <span className="whitespace-nowrap">{'\uC774 \uD56D\uBAA9 \uAC00\uC838\uC624\uAE30'}</span>
                   </label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {item.learnedCorrection ? (
                       <span className="badge bg-amber-100 text-amber-700">{'\uC774\uC804 \uC218\uC815 \uC774\uB825 \uBC18\uC601'}</span>
                     ) : null}
@@ -50,8 +50,8 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                   </div>
                 </div>
 
-                <div className="rounded-[18px] bg-slate-50/80 p-3 text-sm text-slate-700">
-                  <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[16px] bg-slate-50/80 p-2.5 text-sm text-slate-700">
+                  <div className="grid gap-2.5 sm:grid-cols-2">
                     <div className="space-y-1">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uAC04\uC18C\uD654\uB41C \uC774\uB984'}</p>
                       <p className="font-medium text-slate-900">{item.displayName || item.normalizedName || item.name || '-'}</p>
@@ -64,18 +64,18 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <label className="space-y-1.5 text-sm font-medium text-slate-700">
+              <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uC774\uB984'}
                   <input value={item.name} onChange={(event) => onItemChange(item.id, 'name', event.target.value)} />
                 </label>
 
-                <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uC218\uB7C9'}
                   <input value={item.quantity} onChange={(event) => onItemChange(item.id, 'quantity', event.target.value)} />
                 </label>
 
-                <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uCE74\uD14C\uACE0\uB9AC'}
                   <select value={item.category} onChange={(event) => onItemChange(item.id, 'category', event.target.value)}>
                     {ingredientCategories.map((category) => (
@@ -86,7 +86,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                   </select>
                 </label>
 
-                <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uBCF4\uAD00 \uBC29\uC2DD'}
                   <select value={item.storageType} onChange={(event) => onItemChange(item.id, 'storageType', event.target.value)}>
                     {storageTypes.map((storageType) => (
@@ -97,7 +97,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                   </select>
                 </label>
 
-                <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uAD6C\uB9E4\uC77C'}
                   <input
                     type="date"
@@ -106,7 +106,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                   />
                 </label>
 
-                <label className="space-y-1.5 text-sm font-medium text-slate-700">
+                <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uC720\uD1B5\uAE30\uD55C'}
                   <input
                     type="date"
@@ -115,7 +115,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                   />
                 </label>
 
-                <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2 xl:col-span-3">
+                <label className="space-y-1 text-sm font-medium text-slate-700 md:col-span-2 xl:col-span-3">
                   {'\uBA54\uBAA8'}
                   <input
                     value={item.memo}
@@ -129,7 +129,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2.5">
         <button type="button" className="btn-primary" onClick={onImport}>
           {'\uC120\uD0DD\uD55C \uD56D\uBAA9 \uAC00\uC838\uC624\uAE30'}
         </button>

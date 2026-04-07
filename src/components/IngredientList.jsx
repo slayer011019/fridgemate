@@ -19,6 +19,9 @@ function getRemainingText(remainingDays) {
   return `${remainingDays}\uC77C \uB0A8\uC74C`;
 }
 
+const actionButtonClassName =
+  'inline-flex min-h-[2.15rem] items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm';
+
 const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onToggleConsumed }) {
   const remainingDays = getRemainingDays(ingredient.expiryDate);
   const expiryLabel = getExpiryLabel(remainingDays);
@@ -26,14 +29,14 @@ const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onTo
   const hasMemo = Boolean(String(ingredient.memo || '').trim());
 
   return (
-    <article className="glass-card p-3.5">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)_auto] xl:items-start">
-        <div className="min-w-0 space-y-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-base font-semibold text-slate-900">{ingredient.name}</h3>
+    <article className="glass-card p-3">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="truncate text-[0.96rem] font-semibold text-slate-900">{ingredient.name}</h3>
             <span className={`badge ${toneClass}`}>{expiryLabel}</span>
             {ingredient.consumed ? <span className="badge bg-slate-200 text-slate-700">{'\uC7AC\uB4F1\uB85D \uD544\uC694'}</span> : null}
-            {hasMemo ? <span className="badge bg-amber-100 text-amber-800">{'\uBA54\uBAA8 \uC788\uC74C'}</span> : null}
+            {hasMemo ? <span className="badge bg-amber-100 text-amber-800">{'\uBA54\uBAA8'}</span> : null}
           </div>
 
           <div className="flex flex-wrap gap-1.5">
@@ -42,32 +45,33 @@ const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onTo
             <span className="badge bg-white text-slate-600">{ingredient.quantity}</span>
           </div>
 
-          {hasMemo ? <p className="line-clamp-1 text-sm muted">{ingredient.memo}</p> : null}
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+            <span>{`\uAD6C\uB9E4\uC77C ${ingredient.purchaseDate || '-'}`}</span>
+            <span>{`\uC720\uD1B5\uAE30\uD55C ${ingredient.expiryDate || '\uBBF8\uC785\uB825'}`}</span>
+            <span className="font-medium text-slate-700">{getRemainingText(remainingDays)}</span>
+          </div>
+
+          {hasMemo ? <p className="line-clamp-1 text-xs muted">{ingredient.memo}</p> : null}
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-          <div className="rounded-[16px] border border-white/70 bg-white/70 px-3 py-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uAD6C\uB9E4\uC77C'}</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">{ingredient.purchaseDate || '-'}</p>
-          </div>
-          <div className="rounded-[16px] border border-white/70 bg-white/70 px-3 py-2.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uC720\uD1B5\uAE30\uD55C'}</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">{ingredient.expiryDate || '\uBBF8\uC785\uB825'}</p>
-            <p className="mt-1 text-xs muted">{getRemainingText(remainingDays)}</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 xl:flex-col xl:items-end">
-          <button type="button" className="btn-secondary px-3.5 py-2" onClick={() => onToggleConsumed(ingredient)}>
-            {ingredient.consumed ? '\uBCF4\uC720 \uC911\uC73C\uB85C \uBCC0\uACBD' : '\uC18C\uBE44 \uCC98\uB9AC'}
+        <div className="flex flex-wrap gap-1.5 xl:max-w-[8.5rem] xl:justify-end xl:self-end">
+          <button
+            type="button"
+            className={`${actionButtonClassName} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+            onClick={() => onToggleConsumed(ingredient)}
+          >
+            {ingredient.consumed ? '\uBCF4\uC720' : '\uC18C\uBE44'}
           </button>
-          <Link className="btn-secondary px-3.5 py-2" to={`/ingredients/${ingredient.id}/edit`}>
+          <Link
+            className={`${actionButtonClassName} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+            to={`/ingredients/${ingredient.id}/edit`}
+          >
             {'\uC218\uC815'}
           </Link>
           {!ingredient.consumed ? (
             <button
               type="button"
-              className="inline-flex min-h-[2.5rem] items-center justify-center rounded-full bg-rose-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-600"
+              className={`${actionButtonClassName} bg-rose-500 text-white hover:bg-rose-600`}
               onClick={() => onDelete(ingredient.id)}
             >
               {'\uC0AD\uC81C'}
@@ -85,7 +89,7 @@ function IngredientList({ ingredients, onDelete, onToggleConsumed }) {
   }
 
   return (
-    <section className="grid gap-2.5 xl:grid-cols-2">
+    <section className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-3">
       {ingredients.map((ingredient) => (
         <IngredientCard key={ingredient.id} ingredient={ingredient} onDelete={onDelete} onToggleConsumed={onToggleConsumed} />
       ))}

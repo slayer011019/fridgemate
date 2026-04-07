@@ -119,7 +119,7 @@ function ImportPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         eyebrow={'\uAC00\uC838\uC624\uAE30'}
         title={'\uC7A5\uBCF4\uAE30 \uC2A4\uD06C\uB9B0\uC0F7\uC5D0\uC11C \uC7AC\uB8CC\uB97C \uBD88\uB7EC\uC640\uBCF4\uC138\uC694'}
@@ -167,12 +167,16 @@ function ImportPage() {
       ) : null}
 
       {status === 'success' ? (
-        <section className="soft-panel flex flex-wrap gap-2 text-sm text-slate-700">
+        <section className="soft-panel grid gap-2 text-sm text-slate-700 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,auto))_minmax(0,1fr)] xl:items-center">
           <span className="badge bg-emerald-100 text-emerald-700">{`\uD6C4\uBCF4 \uD56D\uBAA9 ${parseResult.candidates.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uC720\uD6A8 \uBB38\uC7A5 ${parseResult.usefulLines.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uC81C\uC678 \uBB38\uC7A5 ${parseResult.ignoredLines.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uD15C\uD50C\uB9BF ${parseResult.template?.id || 'unknown'}`}</span>
-          {importMessage ? <span className="badge bg-brand-50 text-brand-700">{importMessage}</span> : null}
+          {importMessage ? (
+            <span className="rounded-2xl border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm font-medium text-brand-700 xl:justify-self-end">
+              {importMessage}
+            </span>
+          ) : null}
         </section>
       ) : null}
 
