@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import RecipeExternalLinks from './RecipeExternalLinks';
 import { joinIngredientLabels } from '../utils/displayText';
 
 function RecipeCard({ recipe }) {
@@ -82,6 +83,8 @@ function RecipeCard({ recipe }) {
             <p className="mt-1.5 text-sm leading-6 text-amber-900">{joinIngredientLabels(recipe.urgentMatches)}</p>
           </div>
         ) : null}
+
+        <RecipeExternalLinks title={recipe.title} />
       </div>
     </article>
   );

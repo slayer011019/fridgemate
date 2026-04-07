@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import PantryStaplesPanel from '../components/PantryStaplesPanel';
 import RecommendationSection from '../components/RecommendationSection';
+import RecipeExternalLinks from '../components/RecipeExternalLinks';
 import StatCard from '../components/StatCard';
 import { aiSuggestRecipes, RecipesApiError } from '../api/recipesApi';
 import { PANTRY_STATUS } from '../data/pantryStaples';
@@ -342,6 +343,8 @@ function RecipesPage() {
                       ))}
                     </div>
                   ) : null}
+
+                  <RecipeExternalLinks title={recipe.title} />
                 </div>
               </article>
             ))}
