@@ -79,20 +79,22 @@ function IngredientsPage() {
   }, [shoppingListItems, updateIngredient]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="재료 관리"
-        title="보유 중인 재료를 쉽고 정돈되게 살펴보세요"
-        description="냉장, 냉동, 팬트리로 나눠 보고 유통기한 순으로 정렬하면 무엇을 먼저 써야 할지 바로 파악할 수 있어요."
+        eyebrow={'\uC7AC\uB8CC \uAD00\uB9AC'}
+        title={'\uBCF4\uC720 \uC911\uC778 \uC7AC\uB8CC\uB97C \uC27D\uACE0 \uC815\uB3C8\uB418\uAC8C \uC0B4\uD3B4\uBCF4\uC138\uC694'}
+        description={
+          '\uB0C9\uC7A5, \uB0C9\uB3D9, \uD32C\uD2B8\uB9AC\uB85C \uB098\uB220 \uBCF4\uACE0 \uC720\uD1B5\uAE30\uD55C \uC21C\uC73C\uB85C \uC815\uB82C\uD558\uBA74 \uBB34\uC5C7\uC744 \uBA3C\uC800 \uC368\uC57C \uD560\uC9C0 \uBC14\uB85C \uD30C\uC545\uD560 \uC218 \uC788\uC5B4\uC694.'
+        }
         action={
           <>
             {ocrEnabled ? (
               <Link to="/import" className="btn-secondary">
-                스크린샷 불러오기
+                {'\uC2A4\uD06C\uB9B0\uC0F7 \uBD88\uB7EC\uC624\uAE30'}
               </Link>
             ) : null}
             <Link to="/ingredients/new" className="btn-primary">
-              재료 추가
+              {'\uC7AC\uB8CC \uCD94\uAC00'}
             </Link>
           </>
         }
@@ -105,13 +107,13 @@ function IngredientsPage() {
         onChange={handleFilterChange}
       />
 
-      <section className="soft-panel flex flex-col gap-3 text-sm text-slate-700 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <section className="flex flex-col gap-2 rounded-[20px] border border-white/70 bg-white/70 px-3 py-2.5 text-sm text-slate-700 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
-          <span className="badge bg-white text-slate-700">{`현재 보유 ${activeIngredientCount}개`}</span>
-          <span className="badge bg-white text-slate-700">{`필터 결과 ${filteredIngredients.length}개`}</span>
-          <span className="badge bg-amber-100 text-amber-800">{`재구매 후보 ${shoppingListItems.length}개`}</span>
+          <span className="badge bg-white text-slate-700">{`\uD604\uC7AC \uBCF4\uC720 ${activeIngredientCount}\uAC1C`}</span>
+          <span className="badge bg-white text-slate-700">{`\uD544\uD130 \uACB0\uACFC ${filteredIngredients.length}\uAC1C`}</span>
+          <span className="badge bg-amber-100 text-amber-800">{`\uC7AC\uAD6C\uB9E4 \uD6C4\uBCF4 ${shoppingListItems.length}\uAC1C`}</span>
         </div>
-        <p className="muted">가장 중요한 정보가 위쪽에 먼저 오도록 정렬해 두었어요.</p>
+        <p className="text-xs muted">{'\uAC00\uC7A5 \uC911\uC694\uD55C \uC815\uBCF4\uAC00 \uC55E\uCABD\uC5D0 \uC624\uB3C4\uB85D \uC815\uB82C\uD574\uB450\uC5C8\uC5B4\uC694.'}</p>
       </section>
 
       {!loading ? (
@@ -124,13 +126,13 @@ function IngredientsPage() {
         />
       ) : null}
 
-      {loading ? <div className="card text-sm muted">재료를 불러오는 중입니다...</div> : null}
+      {loading ? <div className="card text-sm muted">{'\uC7AC\uB8CC\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4...'}</div> : null}
       {error ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
 
       {!loading && !filteredIngredients.length ? (
         <EmptyState
-          title="현재 조건에 맞는 재료가 없어요"
-          description="필터를 바꾸거나 새 재료를 추가해서 목록을 채워보세요."
+          title={'\uD604\uC7AC \uC870\uAC74\uC5D0 \uB9DE\uB294 \uC7AC\uB8CC\uAC00 \uC5C6\uC5B4\uC694'}
+          description={'\uD544\uD130\uB97C \uBC14\uAFB8\uAC70\uB098 \uC0C8 \uC7AC\uB8CC\uB97C \uCD94\uAC00\uD574\uC11C \uBAA9\uB85D\uC744 \uCC44\uC6CC\uBCF4\uC138\uC694.'}
         />
       ) : null}
 
