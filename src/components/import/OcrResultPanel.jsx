@@ -1,5 +1,20 @@
 function OcrResultPanel({ status, progress, error, rawText, showRawText, onToggleRawText }) {
   const progressPercent = Math.round((progress || 0) * 100);
+  const isIdle = status === 'idle' && !rawText && !error;
+
+  if (isIdle) {
+    return (
+      <section className="soft-panel flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="kicker">{'2. OCR \uACB0\uACFC'}</p>
+          <p className="mt-1 text-sm text-slate-700">
+            {'\uC774\uBBF8\uC9C0\uB97C \uC62C\uB9AC\uACE0 OCR\uC744 \uC2E4\uD589\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uCD94\uCD9C \uACB0\uACFC\uAC00 \uBC14\uB85C \uD45C\uC2DC\uB429\uB2C8\uB2E4.'}
+          </p>
+        </div>
+        <span className="badge bg-slate-100 text-slate-600">{'\uB300\uAE30 \uC911'}</span>
+      </section>
+    );
+  }
 
   return (
     <section className="card space-y-3">
