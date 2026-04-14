@@ -23,6 +23,7 @@ Do not treat this repository as strict "v1 only" anymore.
 - Import correction learning
 - Shopping panel with auto-save
 - Optional Express + Prisma backend
+- JWT-based signup, login, logout, and session restore
 - API-first ingredient flow with IndexedDB fallback
 - Connection status toast and offline/fallback feedback
 - Vitest test suite
@@ -30,11 +31,10 @@ Do not treat this repository as strict "v1 only" anymore.
 
 ### Partial / incomplete
 - Full deployment setup and production operations
-- Authentication
-- Full two-way sync and conflict resolution
-- Timestamp-based merge using `updatedAt`
+- Auth UX hardening around expiry, fallback, and guest import polish
+- Full two-way sync uploads and delete conflict resolution
 - AI recipe suggestions require `ANTHROPIC_API_KEY`
-- CI exists, but lint cleanup is still in progress
+- Broad browser E2E coverage beyond core journeys
 
 ## Tech Stack
 - Frontend: React, Vite, JavaScript, Tailwind CSS
@@ -51,8 +51,9 @@ Do not treat this repository as strict "v1 only" anymore.
 - Successful API responses are mirrored into IndexedDB to keep the local cache warm.
 - Network failures and 5xx responses fall back to IndexedDB.
 - 4xx API errors must surface to the UI and roll back optimistic changes.
-- Current sync strategy is `last-write-wins`.
-- Planned sync upgrade: compare `updatedAt` timestamps before resolving conflicts.
+- Current sync strategy is `updatedAt-preferred`.
+- Clean local cache entries are dropped when the remote record no longer exists.
+- Newer local cached entries are kept as pending updates instead of being overwritten blindly.
 
 ## Completed Features
 - Home dashboard with expiry summary and recommendation preview
@@ -60,24 +61,24 @@ Do not treat this repository as strict "v1 only" anymore.
 - Ingredient create/edit form
 - OCR import page
 - Recipes page with pantry staple controls
+- Login, signup, account, and protected route flows
 - Express health, ingredient CRUD, and recipe recommendation routes
 - Optional AI suggestion route with rule-based fallback
 - Connection and syncing status feedback
-- Automated tests for date, recommendations, import parser, import learning, IndexedDB, and useIngredients
+- Automated tests for date, recommendations, import parser, import learning, IndexedDB, auth, and useIngredients
 
 ## Not Yet Done
 - Deployment to a stable public frontend/backend environment
-- Authentication and multi-user support
-- Real sync conflict handling with timestamps
-- End-to-end browser tests
-- Fully green lint and CI quality gate
+- Multi-user collaboration beyond single-account scoping
+- Real sync upload/delete conflict handling across reconnects
+- Expanded end-to-end browser coverage beyond core scenarios
 
 ## Next Milestone
 ### v2.0
 - Deploy frontend and backend
-- Finish lint cleanup and make CI reliably green
-- Implement timestamp-based sync conflict resolution
-- Add authentication
+- Keep CI reliably green across lint, unit, build, and core E2E
+- Implement sync upload/delete conflict resolution for pending authenticated writes
+- Polish auth recovery and guest import flows
 - Expand integration and UI test coverage
 
 ## Working Rules

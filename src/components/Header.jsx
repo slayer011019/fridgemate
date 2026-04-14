@@ -5,13 +5,13 @@ import { isOcrEnabled } from '../utils/backendConfig';
 const navItems = [
   { label: '\uD648', to: '/', match: (pathname) => pathname === '/' },
   {
-    label: '\uC7AC\uB8CC \uAD00\uB9AC',
+    label: '\uB0C9\uC7A5\uACE0 \uBCF4\uAE30',
     to: '/ingredients',
     match: (pathname) => pathname === '/ingredients' || /^\/ingredients\/[^/]+\/edit$/.test(pathname)
   },
-  { label: '\uC7AC\uB8CC \uCD94\uAC00', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
-  { label: '\uAC00\uC838\uC624\uAE30', to: '/import', match: (pathname) => pathname.startsWith('/import') },
-  { label: '\uB808\uC2DC\uD53C', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
+  { label: '\uC9C1\uC811 \uC785\uB825', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
+  { label: '\uC0AC\uC9C4\uC73C\uB85C \uB4F1\uB85D', to: '/import', match: (pathname) => pathname.startsWith('/import') },
+  { label: '\uBA54\uB274 \uCD94\uCC9C', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
 ];
 
 function Header() {

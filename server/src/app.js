@@ -4,7 +4,7 @@ import { authRoutes } from './routes/authRoutes.js';
 import { ingredientRoutes } from './routes/ingredientRoutes.js';
 import { recipeRoutes } from './routes/recipeRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
-import { isAllowedOrigin, serverConfig } from './config.js';
+import { isAllowedOrigin } from './config.js';
 import { requireAuth } from './middleware/requireAuth.js';
 
 export function createApp() {

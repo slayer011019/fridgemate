@@ -43,6 +43,10 @@ function createUnavailableAuthError() {
   return new Error('Authentication is unavailable while the app is running in local-only mode.');
 }
 
+function isAuthorizationError(error) {
+  return error?.status === 401 || error?.status === 403;
+}
+
 export function AuthProvider({ children }) {
   const backendEnabled = isBackendEnabled();
   const [session, setSession] = useState(() => (backendEnabled ? getStoredAuthSession() : null));
@@ -94,9 +98,17 @@ export function AuthProvider({ children }) {
       setError('');
       return nextSession;
     } catch (nextError) {
-      persistSession(null);
-      setError(nextError.message || 'The current session could not be restored.');
-      return null;
+      if (isAuthorizationError(nextError)) {
+        persistSession(null);
+        setError(nextError.message || 'Your session expired. Please log in again.');
+        return null;
+      }
+
+      persistSession(storedSession);
+      setError(
+        nextError.message || 'The server could not verify the current session, so FridgeMate is keeping the local session.'
+      );
+      return storedSession;
     } finally {
       setLoading(false);
     }
@@ -203,6 +215,7 @@ export function AuthProvider({ children }) {
       ...current,
       loading: true
     }));
+    setError('');
 
     try {
       const guestIngredients = await indexedDb.getAllIngredients({ scope: GUEST_STORAGE_SCOPE });
@@ -225,6 +238,9 @@ export function AuthProvider({ children }) {
       setGuestImportDecision(user.id, 'imported');
       setGuestImportPrompt(defaultGuestImportPrompt);
       return importedIngredients;
+    } catch (nextError) {
+      setError(nextError.message || 'Guest ingredients could not be imported.');
+      throw nextError;
     } finally {
       setGuestImportPrompt((current) => ({
         ...current,

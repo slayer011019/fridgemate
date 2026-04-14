@@ -55,9 +55,36 @@ describe('syncStrategy', () => {
     expect(resolvedIngredient.updatedAt).toBe('2026-04-04T12:00:00.000Z');
   });
 
+  it('drops a clean local ingredient when it no longer exists remotely', () => {
+    const resolvedIngredient = resolveIngredientConflict({
+      localIngredient: markIngredientAsSynced(createIngredient('stale-local')),
+      remoteIngredient: null
+    });
+
+    expect(resolvedIngredient).toBeNull();
+  });
+
+  it('keeps a newer local cached ingredient as a pending update when it is ahead of the remote copy', () => {
+    const resolvedIngredient = resolveIngredientConflict({
+      localIngredient: markIngredientAsSynced(
+        createIngredient('ahead-local', {
+          updatedAt: '2026-04-04T12:00:00.000Z',
+          lastSyncedAt: '2026-04-04T10:00:00.000Z'
+        })
+      ),
+      remoteIngredient: createIngredient('ahead-local', {
+        updatedAt: '2026-04-04T11:00:00.000Z'
+      })
+    });
+
+    expect(resolvedIngredient.syncState).toBe('pendingUpdate');
+    expect(resolvedIngredient.updatedAt).toBe('2026-04-04T12:00:00.000Z');
+  });
+
   it('builds a merged snapshot with pending uploads and downloads', async () => {
     const localIngredients = [
-      markIngredientAsPending(createIngredient('pending', { updatedAt: '2026-04-04T11:00:00.000Z' }), 'pendingCreate')
+      markIngredientAsPending(createIngredient('pending', { updatedAt: '2026-04-04T11:00:00.000Z' }), 'pendingCreate'),
+      markIngredientAsSynced(createIngredient('stale-local', { updatedAt: '2026-04-04T09:00:00.000Z' }))
     ];
     const remoteIngredients = [createIngredient('remote-only', { updatedAt: '2026-04-04T12:00:00.000Z' })];
 

@@ -37,10 +37,18 @@ function normalizeSyncIngredient(ingredient, overrides = {}) {
   };
 }
 
+function isPendingSyncState(syncState) {
+  return (
+    syncState === SYNC_STATE.PENDING_CREATE ||
+    syncState === SYNC_STATE.PENDING_UPDATE ||
+    syncState === SYNC_STATE.PENDING_DELETE
+  );
+}
+
 export function markIngredientAsSynced(ingredient) {
   return normalizeSyncIngredient(ingredient, {
     syncState: SYNC_STATE.CLEAN,
-    lastSyncedAt: ingredient?.updatedAt || new Date().toISOString()
+    lastSyncedAt: ingredient?.lastSyncedAt || ingredient?.updatedAt || new Date().toISOString()
   });
 }
 
@@ -60,15 +68,21 @@ export function resolveIngredientConflict({ localIngredient = null, remoteIngred
   }
 
   if (!remoteIngredient) {
-    return normalizeSyncIngredient(localIngredient);
+    if (localIngredient.syncState === SYNC_STATE.PENDING_DELETE) {
+      return null;
+    }
+
+    if (isPendingSyncState(localIngredient.syncState)) {
+      return normalizeSyncIngredient(localIngredient);
+    }
+
+    return null;
   }
 
   const localUpdatedAt = getComparableTimestamp(localIngredient.updatedAt);
   const remoteUpdatedAt = getComparableTimestamp(remoteIngredient.updatedAt);
-  const localIsPending =
-    localIngredient.syncState === SYNC_STATE.PENDING_CREATE ||
-    localIngredient.syncState === SYNC_STATE.PENDING_UPDATE ||
-    localIngredient.syncState === SYNC_STATE.PENDING_DELETE;
+  const localIsPending = isPendingSyncState(localIngredient.syncState);
+  const localLastSyncedAt = getComparableTimestamp(localIngredient.lastSyncedAt);
 
   if (remoteUpdatedAt > localUpdatedAt) {
     if (localIsPending) {
@@ -83,6 +97,10 @@ export function resolveIngredientConflict({ localIngredient = null, remoteIngred
 
   if (localIsPending) {
     return normalizeSyncIngredient(localIngredient);
+  }
+
+  if (localUpdatedAt > remoteUpdatedAt && localUpdatedAt > localLastSyncedAt) {
+    return markIngredientAsPending(localIngredient, SYNC_STATE.PENDING_UPDATE);
   }
 
   return markIngredientAsSynced(remoteIngredient);
@@ -126,11 +144,7 @@ export async function syncIngredientSnapshot({
       });
     }
 
-    if (
-      resolvedIngredient.syncState === SYNC_STATE.PENDING_CREATE ||
-      resolvedIngredient.syncState === SYNC_STATE.PENDING_UPDATE ||
-      resolvedIngredient.syncState === SYNC_STATE.PENDING_DELETE
-    ) {
+    if (isPendingSyncState(resolvedIngredient.syncState)) {
       pendingUploads.push(resolvedIngredient);
     }
 

@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useIngredients } from '../hooks/useIngredients';
 
 function AccountPage() {
-  const { dismissGuestImport, guestImportPrompt, importGuestIngredients, logout, storageScope, user } = useAuth();
+  const { dismissGuestImport, error, guestImportPrompt, importGuestIngredients, logout, storageScope, user } = useAuth();
   const { loadIngredients } = useIngredients();
 
   const handleImportGuestIngredients = async () => {
@@ -22,6 +22,8 @@ function AccountPage() {
       />
 
       <section className="card space-y-4">
+        {error ? <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</div> : null}
+
         <div className="grid gap-3 md:grid-cols-2">
           <div className="soft-panel">
             <p className="kicker">{'\uB85C\uADF8\uC778 \uC815\uBCF4'}</p>

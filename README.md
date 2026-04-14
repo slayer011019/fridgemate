@@ -14,7 +14,7 @@ Current product scope:
 - Authenticated mode with JWT-based login and user-scoped server persistence
 - Express + Prisma backend with PostgreSQL-backed ingredient storage
 
-The project is intentionally practical and understandable. It is not a full enterprise architecture, but it now has clearer boundaries so future features like authentication and user-based persistence can be added without rewriting the app.
+The project is intentionally practical and understandable. It is not a full enterprise architecture, but it now has clearer boundaries so authenticated persistence and local-first fallback can evolve without rewriting the app.
 
 ## Features
 
@@ -86,6 +86,7 @@ The project is intentionally practical and understandable. It is not a full ente
 
 - Vitest
 - React Testing Library
+- Playwright
 - ESLint
 - Prettier
 - GitHub Actions
@@ -214,7 +215,8 @@ The sync strategy is also slightly stronger than a naive last-write-wins approac
 
 - guest mode remains fully local
 - authenticated mode compares cached and remote items by `updatedAt`
-- newer remote items replace stale local cache entries
+- clean local items that disappear remotely are pruned from the cache
+- newer clean local cache entries are retained as pending updates instead of being overwritten blindly
 - pending local fallback writes are retained with sync metadata for future improvement
 
 ## Getting Started
@@ -270,6 +272,7 @@ http://localhost:4000/health
 ## Tests and Quality
 
 ```bash
+npm run lint
 npm run test:run
 npm run build
 ```
@@ -278,12 +281,26 @@ Optional:
 
 ```bash
 npm run test:coverage
-npm run lint
+npm run test:e2e
 ```
+
+Playwright E2E uses two dev-server projects:
+
+- `local-only`: no backend URL, verifies IndexedDB CRUD and OCR review flow
+- `api-mode`: relative `/api` base URL with mocked responses, verifies auth, API CRUD, and fallback behavior
 
 ## Suggested Next Improvements
 
 - Add conflict-aware sync uploads for pending authenticated writes
 - Move shared recipe data/logic into a dedicated `shared/` module if the backend becomes a permanent part of the app
-- Add component-level tests for page flows
+- Expand Playwright coverage beyond the core five user journeys
 - Add user-scoped pantry staple persistence so auth mode covers the full recipe context
+
+## Deployment
+
+1. Add a Railway PostgreSQL plugin and confirm `DATABASE_URL` is available to the backend service.
+2. Set Railway environment variables: `JWT_SECRET`, `ALLOWED_ORIGINS`, `CLIENT_ORIGIN`.
+3. Set the Vercel environment variable: `VITE_API_URL`.
+4. Push to GitHub so Railway and Vercel can deploy automatically.
+5. Verify the backend health check at `GET /health`.
+6. Run an end-to-end smoke test: sign up, log in, add an ingredient, then load recipe recommendations.

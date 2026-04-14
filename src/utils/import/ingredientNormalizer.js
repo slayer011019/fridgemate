@@ -236,7 +236,7 @@ function stripStopwords(text) {
 function normalizeProductTitle(displayName) {
   return normalizeSpaces(
     stripStopwords(String(displayName || ''))
-      .replace(/[\/,]+/g, ' ')
+      .replace(/[/,]+/g, ' ')
       .replace(/\b(?:대용량|행사|특가|묶음|세트)\b/gi, ' ')
   );
 }

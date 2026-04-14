@@ -11,15 +11,19 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Vitest coverage across recommendation logic, OCR parsing, IndexedDB, import learning, and `useIngredients`.
 - Global connection status feedback with online/offline and fallback notices.
 - Sync strategy scaffold documenting the current `last-write-wins` approach.
+- Playwright E2E scaffolding for local-only CRUD, auth, API fallback, and OCR review flows.
 
 ### Changed
 - Updated README and AGENTS documentation to match the current local-first + optional backend architecture.
 - Mirrored successful ingredient API reads and writes back into IndexedDB for fresher fallback data.
 - Routed pantry-owned staples into recommendation scoring instead of keeping them UI-only.
+- Tightened deployment guidance around environment variables, smoke checks, and core journey verification.
 
 ### Fixed
 - Recommendation scoring now treats owned pantry staples as available ingredients.
 - Fallback and syncing state now surface clearer user feedback in the UI.
+- Session restore now keeps authenticated local fallback available during transient server failures.
+- Sync reconciliation now drops stale clean cache entries and preserves newer local cache entries as pending updates.
 
 ## [1.5.0] - 2026-04-03
 ### Added

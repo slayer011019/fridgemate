@@ -49,6 +49,7 @@ tesseract-cache/
 # 테스트
 .vitest/
 test-results/
+playwright-report/
 
 # 번들 분석
 stats.html

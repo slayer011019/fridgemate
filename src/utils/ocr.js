@@ -1,5 +1,14 @@
 const DEFAULT_OCR_MODE = 'contrast';
 
+function getTestOcrOverride() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const override = window.__FRIDGEMATE_TEST__?.extractTextFromImage;
+  return typeof override === 'function' ? override : null;
+}
+
 function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
     const imageUrl = URL.createObjectURL(file);
@@ -156,6 +165,12 @@ function buildVariantList(image) {
 export async function extractTextFromImage(file, options = {}) {
   if (!file) {
     throw new Error('\uC120\uD0DD\uD55C \uC774\uBBF8\uC9C0\uAC00 \uC5C6\uC5B4\uC694.');
+  }
+
+  const testOverride = getTestOcrOverride();
+
+  if (testOverride) {
+    return testOverride(file, options);
   }
 
   const { onProgress } = options;
