@@ -1,6 +1,7 @@
 import { getRemainingDays } from '../../utils/date';
 
 export const defaultIngredientFilters = {
+  query: '',
   category: 'all',
   storageType: 'all',
   sortOrder: 'asc',
@@ -13,6 +14,11 @@ function getExpirySortValue(expiryDate) {
 }
 
 export function matchesIngredientFilters(ingredient, filters = defaultIngredientFilters) {
+  const normalizedQuery = String(filters.query || '').trim().toLowerCase();
+  const matchesQuery =
+    !normalizedQuery ||
+    String(ingredient.name || '').toLowerCase().includes(normalizedQuery) ||
+    String(ingredient.memo || '').toLowerCase().includes(normalizedQuery);
   const matchesCategory = filters.category === 'all' || ingredient.category === filters.category;
   const matchesStorage = filters.storageType === 'all' || ingredient.storageType === filters.storageType;
   const matchesStatus =
@@ -20,7 +26,7 @@ export function matchesIngredientFilters(ingredient, filters = defaultIngredient
     (filters.status === 'active' && !ingredient.consumed) ||
     (filters.status === 'consumed' && ingredient.consumed);
 
-  return matchesCategory && matchesStorage && matchesStatus;
+  return matchesQuery && matchesCategory && matchesStorage && matchesStatus;
 }
 
 export function sortIngredientsByExpiry(ingredients = [], sortOrder = 'asc') {

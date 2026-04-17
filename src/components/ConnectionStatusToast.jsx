@@ -67,7 +67,10 @@ function ConnectionStatusToast() {
   }
 
   return (
-    <div aria-live="polite" className="pointer-events-none fixed right-4 top-20 z-50 flex w-full max-w-sm flex-col gap-2.5">
+    <div
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-4 top-20 z-50 flex max-w-sm flex-col gap-2.5 sm:left-auto sm:right-4 sm:w-full"
+    >
       {notices.map((notice) => (
         <section
           key={notice.id}

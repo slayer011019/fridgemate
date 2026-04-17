@@ -42,7 +42,7 @@ export function buildUserStorageScope(userId) {
 export function getStoredAuthSession() {
   const session = readJson(AUTH_SESSION_KEY, null);
 
-  if (!session?.token || !session?.user?.id) {
+  if (!session?.user?.id) {
     return null;
   }
 
@@ -61,10 +61,6 @@ export function clearStoredAuthSession() {
   }
 
   storage.removeItem(AUTH_SESSION_KEY);
-}
-
-export function getAuthToken() {
-  return getStoredAuthSession()?.token || '';
 }
 
 function getGuestImportDecisionKey(userId) {

@@ -7,9 +7,7 @@ function OcrResultPanel({ status, progress, error, rawText, showRawText, onToggl
       <section className="soft-panel flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="kicker">{'2. OCR \uACB0\uACFC'}</p>
-          <p className="mt-1 text-sm text-slate-700">
-            {'\uC774\uBBF8\uC9C0\uB97C \uC62C\uB9AC\uACE0 OCR\uC744 \uC2E4\uD589\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uCD94\uCD9C \uACB0\uACFC\uAC00 \uBC14\uB85C \uD45C\uC2DC\uB429\uB2C8\uB2E4.'}
-          </p>
+          <p className="mt-1 text-sm text-slate-700">{'\uC774\uBBF8\uC9C0\uB97C \uC62C\uB9AC\uACE0 \uC2E4\uD589\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uC77D\uC740 \uACB0\uACFC\uAC00 \uB098\uC635\uB2C8\uB2E4.'}</p>
         </div>
         <span className="badge bg-slate-100 text-slate-600">{'\uB300\uAE30 \uC911'}</span>
       </section>
@@ -21,9 +19,7 @@ function OcrResultPanel({ status, progress, error, rawText, showRawText, onToggl
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="kicker">{'2. \uC77D\uC740 \uB0B4\uC6A9 \uD655\uC778'}</p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900 sm:text-[1.35rem]">
-            {'\uC571\uC774 \uCC3E\uC740 \uC7AC\uB8CC \uD6C4\uBCF4\uB97C \uD655\uC778\uD574\uC8FC\uC138\uC694'}
-          </h3>
+          <h3 className="mt-2 text-lg font-semibold text-slate-900 sm:text-[1.35rem]">{'\uC77D\uC740 \uACB0\uACFC\uB97C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694'}</h3>
         </div>
         {rawText ? (
           <button type="button" className="btn-secondary" onClick={onToggleRawText}>

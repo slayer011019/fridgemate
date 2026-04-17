@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { useIngredients } from '../hooks/useIngredients';
 import { defaultIngredientForm, ingredientCategories, storageTypes } from '../utils/ingredientOptions';
 
 function IngredientFormPage() {
   const navigate = useNavigate();
   const { ingredientId } = useParams();
+  const { trackEvent } = useAnalytics();
   const { addIngredient, clearError, error, findIngredient, updateIngredient } = useIngredients();
   const [form, setForm] = useState(defaultIngredientForm);
   const [loading, setLoading] = useState(Boolean(ingredientId));
@@ -61,6 +63,17 @@ function IngredientFormPage() {
         await updateIngredient(form);
       } else {
         await addIngredient(form);
+        trackEvent('ingredient_created', {
+          creation_method: 'manual',
+          category: form.category,
+          storage_type: form.storageType,
+          has_expiry_date: Boolean(form.expiryDate),
+          has_purchase_date: Boolean(form.purchaseDate),
+          quantity_present: Boolean(String(form.quantity || '').trim())
+        });
+        trackEvent('activation_completed', {
+          activation_path: 'manual_first_ingredient'
+        });
       }
 
       navigate('/ingredients');
@@ -72,12 +85,12 @@ function IngredientFormPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="section-shell">
       <PageHeader
         eyebrow={isEditMode ? '\uC7AC\uB8CC \uC218\uC815' : '\uC7AC\uB8CC \uCD94\uAC00'}
-        title={isEditMode ? '\uC7AC\uB8CC \uC815\uBCF4\uB97C \uCC28\uBD84\uD788 \uB2E4\uC2DC \uB2E4\uB4EC\uC5B4\uBCFC\uAE4C\uC694?' : '\uC0C8 \uC7AC\uB8CC\uB97C \uAE54\uB054\uD558\uAC8C \uB4F1\uB85D\uD574\uBCF4\uC138\uC694'}
+        title={isEditMode ? '\uC7AC\uB8CC \uC815\uBCF4\uB97C \uB2E4\uC2DC \uC815\uB9AC\uD558\uC138\uC694' : '\uC0C8 \uC7AC\uB8CC\uB97C \uAE30\uB85D\uD558\uC138\uC694'}
         description={
-          '\uC774\uB984, \uCE74\uD14C\uACE0\uB9AC, \uBCF4\uAD00 \uBC29\uC2DD, \uC218\uB7C9, \uB0A0\uC9DC, \uBA54\uBAA8\uB9CC \uC785\uB825\uD558\uBA74 \uD558\uB098\uC758 \uC7AC\uB8CC \uCE74\uB4DC\uAC00 \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4.'
+          '\uD544\uC218 \uC815\uBCF4\uB294 \uC774\uB984\uACFC \uC218\uB7C9\uC785\uB2C8\uB2E4. \uB0A0\uC9DC\uC640 \uBA54\uBAA8\uB294 \uD544\uC694\uD560 \uB54C\uB9CC \uCD94\uAC00\uD558\uC138\uC694.'
         }
         action={
           <Link to="/ingredients" className="btn-secondary">
@@ -95,17 +108,17 @@ function IngredientFormPage() {
           <section className="soft-panel space-y-4">
             <div>
               <p className="kicker">{'\uAE30\uBCF8 \uC815\uBCF4'}</p>
-              <h3 className="mt-2 text-lg font-semibold text-slate-900">{'\uC7AC\uB8CC \uC774\uB984\uACFC \uBD84\uB958\uB97C \uBA3C\uC800 \uC785\uB825\uD574\uC8FC\uC138\uC694'}</h3>
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">{'\uC774\uB984, \uC218\uB7C9, \uBD84\uB958\uB97C \uBA3C\uC800 \uC801\uC5B4\uC8FC\uC138\uC694'}</h3>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-1.5 text-sm font-medium text-slate-700">
-                {'\uC774\uB984'}
+                {'\uC774\uB984 *'}
                 <input name="name" value={form.name} onChange={handleChange} placeholder={'\uC6B0\uC720'} required />
               </label>
 
               <label className="space-y-1.5 text-sm font-medium text-slate-700">
-                {'\uC218\uB7C9'}
+                {'\uC218\uB7C9 *'}
                 <input name="quantity" value={form.quantity} onChange={handleChange} placeholder={'1\uD1B5'} required />
               </label>
 
@@ -135,8 +148,8 @@ function IngredientFormPage() {
 
           <section className="soft-panel space-y-4">
             <div>
-              <p className="kicker">{'\uB0A0\uC9DC\uC640 \uBA54\uBAA8'}</p>
-              <h3 className="mt-2 text-lg font-semibold text-slate-900">{'\uAD6C\uB9E4\uC77C\uACFC \uC720\uD1B5\uAE30\uD55C\uC744 \uD544\uC694\uD55C \uB9CC\uD07C\uB9CC \uAE30\uB85D\uD574\uC8FC\uC138\uC694'}</h3>
+              <p className="kicker">{'\uB0A0\uC9DC'}</p>
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">{'\uAD6C\uB9E4\uC77C\uACFC \uC720\uD1B5\uAE30\uD55C\uC744 \uD544\uC694\uD55C \uB9CC\uD07C\uB9CC \uAE30\uB85D\uD558\uC138\uC694'}</h3>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -151,7 +164,7 @@ function IngredientFormPage() {
               </label>
 
               <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
-                {'\uBA54\uBAA8'}
+                {'\uBA54\uBAA8 (\uC120\uD0DD)'}
                 <textarea
                   name="memo"
                   rows="4"

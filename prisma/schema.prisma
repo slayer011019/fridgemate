@@ -8,12 +8,29 @@ datasource db {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  passwordHash String
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  ingredients  Ingredient[]
+  id              String       @id @default(cuid())
+  email           String       @unique
+  emailNormalized String       @unique
+  passwordHash    String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  ingredients     Ingredient[]
+  authSessions    AuthSession[]
+}
+
+model AuthSession {
+  id                  String      @id @default(cuid())
+  tokenHash           String      @unique
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  replacedBySessionId String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  userId              String
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([userId, revokedAt])
 }
 
 model Ingredient {

@@ -12,12 +12,23 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Global connection status feedback with online/offline and fallback notices.
 - Sync strategy scaffold documenting the current `last-write-wins` approach.
 - Playwright E2E scaffolding for local-only CRUD, auth, API fallback, and OCR review flows.
+- Added `docs/BUSINESS_ROADMAP.md` to document product positioning, monetization, KPI focus, and exit options.
+- Added `docs/ANALYTICS_EVENTS.md` to define activation, OCR, retention, recommendation, and monetization event tracking.
+- Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
 - Updated README and AGENTS documentation to match the current local-first + optional backend architecture.
 - Mirrored successful ingredient API reads and writes back into IndexedDB for fresher fallback data.
 - Routed pantry-owned staples into recommendation scoring instead of keeping them UI-only.
 - Tightened deployment guidance around environment variables, smoke checks, and core journey verification.
+- Linked the business roadmap from the README so product and go-to-market direction are easier to find.
+- Linked the analytics event spec from the README so KPI instrumentation has a documented source of truth.
+- Hardened auth handling with normalized email uniqueness, shorter JWT defaults, logout token revocation, and rate-limited signup/login.
+- Added Redis-backed auth throttling and token revocation with in-memory fallback for single-instance development.
+- Auth security storage now falls back to memory if Redis becomes unavailable during runtime.
+- Switched auth to `httpOnly` access/refresh cookies with refresh-token rotation and frontend user-only session persistence.
+- Polished the app UI with a denser header, shorter page heroes, dashboard hierarchy cleanup, ingredient search, and more action-focused ingredient cards.
+- Simplified recipe, OCR import, and auth screen copy so the next step is clearer on mobile and desktop.
 
 ### Fixed
 - Recommendation scoring now treats owned pantry staples as available ingredients.

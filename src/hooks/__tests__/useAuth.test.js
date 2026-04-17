@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const authApiMocks = {
   signup: vi.fn(),
   login: vi.fn(),
-  getCurrentUser: vi.fn(),
+  refreshSession: vi.fn(),
   logout: vi.fn()
 };
 
@@ -21,7 +21,7 @@ const dbMocks = {
 vi.mock('../../api/authApi.js', () => ({
   signup: (...args) => authApiMocks.signup(...args),
   login: (...args) => authApiMocks.login(...args),
-  getCurrentUser: (...args) => authApiMocks.getCurrentUser(...args),
+  refreshSession: (...args) => authApiMocks.refreshSession(...args),
   logout: (...args) => authApiMocks.logout(...args)
 }));
 
@@ -52,16 +52,16 @@ describe('useAuth', () => {
     vi.clearAllMocks();
     window.localStorage.clear();
     authApiMocks.signup.mockResolvedValue({
-      token: 'signup-token',
       user: { id: 'user-1', email: 'signup@example.com' }
     });
     authApiMocks.login.mockResolvedValue({
-      token: 'login-token',
       user: { id: 'user-1', email: 'login@example.com' }
     });
-    authApiMocks.getCurrentUser.mockResolvedValue({
-      id: 'user-1',
-      email: 'restored@example.com'
+    authApiMocks.refreshSession.mockResolvedValue({
+      user: {
+        id: 'user-1',
+        email: 'restored@example.com'
+      }
     });
     authApiMocks.logout.mockResolvedValue(null);
     ingredientsApiMocks.saveIngredients.mockResolvedValue([]);
@@ -79,7 +79,6 @@ describe('useAuth', () => {
     window.localStorage.setItem(
       'fridgemate-auth-session',
       JSON.stringify({
-        token: 'stored-token',
         user: { id: 'user-1', email: 'stale@example.com' }
       })
     );
@@ -90,18 +89,17 @@ describe('useAuth', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(authApiMocks.getCurrentUser).toHaveBeenCalledTimes(1);
+    expect(authApiMocks.refreshSession).toHaveBeenCalledTimes(1);
     expect(result.current.isAuthenticated).toBe(true);
     expect(result.current.user.email).toBe('restored@example.com');
     expect(result.current.storageScope).toBe('user:user-1');
   });
 
   it('keeps the stored session when restoring fails because the server is temporarily unavailable', async () => {
-    authApiMocks.getCurrentUser.mockRejectedValue(new Error('API request could not reach the server.'));
+    authApiMocks.refreshSession.mockRejectedValue(new Error('API request could not reach the server.'));
     window.localStorage.setItem(
       'fridgemate-auth-session',
       JSON.stringify({
-        token: 'stored-token',
         user: { id: 'user-1', email: 'stale@example.com' }
       })
     );
@@ -120,11 +118,10 @@ describe('useAuth', () => {
   it('clears the stored session when restoring fails with an authorization error', async () => {
     const authError = new Error('Authentication is required.');
     authError.status = 401;
-    authApiMocks.getCurrentUser.mockRejectedValue(authError);
+    authApiMocks.refreshSession.mockRejectedValue(authError);
     window.localStorage.setItem(
       'fridgemate-auth-session',
       JSON.stringify({
-        token: 'stored-token',
         user: { id: 'user-1', email: 'stale@example.com' }
       })
     );
@@ -160,16 +157,17 @@ describe('useAuth', () => {
   });
 
   it('exposes a guest import prompt when guest ingredients exist', async () => {
-    authApiMocks.getCurrentUser.mockResolvedValue({
-      id: 'user-1',
-      email: 'restored@example.com'
+    authApiMocks.refreshSession.mockResolvedValue({
+      user: {
+        id: 'user-1',
+        email: 'restored@example.com'
+      }
     });
     dbMocks.getAllIngredients.mockResolvedValue([{ id: 'guest-1', name: 'guest-ingredient' }]);
 
     window.localStorage.setItem(
       'fridgemate-auth-session',
       JSON.stringify({
-        token: 'stored-token',
         user: { id: 'user-1', email: 'stale@example.com' }
       })
     );

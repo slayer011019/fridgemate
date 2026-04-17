@@ -29,13 +29,13 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
 
       <div className="soft-panel flex flex-wrap items-center justify-between gap-2 text-sm text-slate-700">
         <span>{`\uC804\uCCB4 ${items.length}\uAC1C \uC911 ${selectedCount}\uAC1C \uC120\uD0DD\uB428`}</span>
-        <span className="badge bg-white text-slate-600">{'\uBE60\uB974\uAC8C \uAC80\uD1A0\uD558\uACE0 \uD544\uC694\uD55C \uD56D\uBAA9\uB9CC \uAC00\uC838\uC624\uAE30'}</span>
+        <span className="badge bg-white text-slate-600">{'\uC120\uD0DD\uB41C \uD56D\uBAA9\uB9CC \uAC00\uC838\uC635\uB2C8\uB2E4'}</span>
       </div>
 
       <div className="space-y-2.5">
         {items.map((item) => (
           <article key={item.id} className="rounded-[18px] border border-white/60 bg-white/65 p-3 shadow-sm">
-            <div className="grid gap-2.5 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+            <div className="grid gap-2.5 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
               <div className="space-y-2.5">
                 <div className="flex flex-wrap items-start justify-between gap-2.5">
                   <label className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-slate-800">
@@ -64,7 +64,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                 </div>
               </div>
 
-              <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-2.5 md:grid-cols-2 2xl:grid-cols-3">
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uC774\uB984'}
                   <input value={item.name} onChange={(event) => onItemChange(item.id, 'name', event.target.value)} />
@@ -115,7 +115,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                   />
                 </label>
 
-                <label className="space-y-1 text-sm font-medium text-slate-700 md:col-span-2 xl:col-span-3">
+                <label className="space-y-1 text-sm font-medium text-slate-700 md:col-span-2 2xl:col-span-3">
                   {'\uBA54\uBAA8'}
                   <input
                     value={item.memo}

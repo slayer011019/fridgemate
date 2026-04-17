@@ -16,12 +16,16 @@ Current product scope:
 
 The project is intentionally practical and understandable. It is not a full enterprise architecture, but it now has clearer boundaries so authenticated persistence and local-first fallback can evolve without rewriting the app.
 
+For product strategy beyond the current feature set, see [docs/BUSINESS_ROADMAP.md](docs/BUSINESS_ROADMAP.md).
+For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/ANALYTICS_EVENTS.md).
+
 ## Features
 
 ### Ingredient management
 
 - Add, edit, delete, and mark ingredients as consumed
 - Track quantity, category, storage type, purchase date, expiry date, and notes
+- Search by ingredient name or notes
 - Filter by category and storage type
 - Sort by expiry date
 - Shopping panel for consumed items
@@ -43,11 +47,18 @@ The project is intentionally practical and understandable. It is not a full ente
 
 ### OCR import
 
-- Upload screenshot
+- Upload screenshot with a step-by-step review flow
 - Extract text in the browser with Tesseract.js
 - Parse shopping/order text into ingredient candidates
 - Review and selectively save parsed items
 - Learn user corrections for future imports
+
+### UI and usability
+
+- Condensed header and page hero layout for faster scanning on desktop and mobile
+- Dashboard cards prioritize urgent expiry work and next actions
+- Ingredient cards emphasize consume/restore first, with edit and delete as secondary actions
+- Recipe recommendation screen uses tighter summary blocks and compact pantry controls
 
 ### Local-first data flow
 
@@ -59,7 +70,7 @@ The project is intentionally practical and understandable. It is not a full ente
 
 ### Authentication and persistence
 
-- Sign up, log in, log out, and restore a persistent session with JWT bearer tokens
+- Sign up, log in, log out, and restore a persistent session with short-lived access tokens and rotating refresh tokens
 - Protect ingredient and recipe API access on the backend
 - Scope server-backed ingredients by user
 - Keep guest mode separate instead of forcing account creation
@@ -81,6 +92,7 @@ The project is intentionally practical and understandable. It is not a full ente
 - Prisma
 - PostgreSQL
 - JWT bearer auth with Node `crypto`
+- Redis-backed auth throttling and logout token revocation with memory fallback
 
 ### Testing and tooling
 
@@ -196,10 +208,19 @@ FridgeMate now supports two clear modes:
   - no account is required
   - no protected backend calls are made
 - Authenticated mode
-  - JWT bearer auth protects the API
+  - JWT-backed access cookies protect the API
+  - rotating refresh cookies restore the session and mint fresh access cookies
+  - access tokens carry issuer, audience, and token id claims
   - ingredients are scoped by `userId`
   - IndexedDB acts as a user-scoped local cache
   - successful server reads and writes mirror into the authenticated cache
+
+Current auth hardening notes:
+
+- signup and login are rate-limited by IP and normalized email
+- email uniqueness is enforced on a normalized database column
+- logout revokes the current token until it expires and revokes the refresh session in storage
+- access and refresh tokens are stored as `httpOnly` cookies, while the frontend keeps only the last known user snapshot locally
 
 This keeps the project simple enough for a portfolio app while making the data boundary easy to explain:
 
@@ -245,7 +266,16 @@ DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/fridgemate?schema=public
 PORT=4000
 ALLOWED_ORIGINS=http://localhost:5173
 JWT_SECRET=replace-this-in-production
-JWT_EXPIRES_IN=7d
+JWT_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=30d
+JWT_ISSUER=fridgemate-api
+JWT_AUDIENCE=fridgemate-client
+ACCESS_TOKEN_COOKIE_NAME=fridgemate_access
+REFRESH_TOKEN_COOKIE_NAME=fridgemate_refresh
+AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_SAME_SITE=Lax
+REDIS_URL=redis://localhost:6379
+AUTH_REDIS_PREFIX=fridgemate:auth
 ANTHROPIC_API_KEY=
 ```
 
@@ -276,6 +306,14 @@ npm run lint
 npm run test:run
 npm run build
 ```
+
+## Security Notes
+
+- Use a random `JWT_SECRET` of at least 32 bytes.
+- Keep `ALLOWED_ORIGINS` tight in production instead of broad wildcards.
+- Set `REDIS_URL` to share auth throttling and logout revocation across API instances. If Redis is unavailable at boot or fails during runtime, the server falls back to in-memory storage.
+- Keep `AUTH_COOKIE_SECURE=true` in production so auth cookies are sent only over HTTPS.
+- The SPA no longer stores auth tokens in `localStorage`; only the user snapshot is persisted for local-first recovery.
 
 Optional:
 

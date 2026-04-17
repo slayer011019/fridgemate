@@ -92,7 +92,7 @@ const ShoppingListItemCard = memo(function ShoppingListItemCard({
         <p className={`text-xs font-medium ${getSaveStatusClassName(saveStatus)}`}>{getSaveStatusLabel(saveStatus)}</p>
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-[0.7fr_1.3fr]">
+      <div className="mt-3 grid gap-3 md:grid-cols-[0.7fr_1.3fr]">
         <label className="space-y-1.5 text-sm font-medium text-slate-700">
           {'\uB2E4\uC74C \uAD6C\uB9E4 \uC218\uB7C9'}
           <input
@@ -332,15 +332,9 @@ function ShoppingListPanel({ items, onDelete, onRestore, onRestoreAll, onSaveDet
     <section className="card bg-gradient-to-br from-amber-50/70 via-white/70 to-brand-50/50">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-1.5">
-          <p className="kicker">{'\uB2E4\uC2DC \uC0AC\uC57C \uD560 \uC7AC\uB8CC'}</p>
-          <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">
-            {'\uC7A5\uBC14\uAD6C\uB2C8\uCC98\uB7FC \uBAA8\uC544\uB450\uACE0 \uD55C \uBC88\uC5D0 \uB2E4\uC2DC \uCC44\uC6CC\uBCF4\uC138\uC694'}
-          </h3>
-          <p className="max-w-2xl text-sm leading-6 muted">
-            {
-              '\uC18C\uBE44 \uCC98\uB9AC\uD55C \uC7AC\uB8CC\uB97C \uB530\uB85C \uBAA8\uC544\uB450\uACE0, \uB2E4\uC74C \uC7A5\uBCF4\uAE30 \uC804\uC5D0 \uC218\uB7C9\uACFC \uBA54\uBAA8\uB9CC \uAC00\uBCBC\uAC8C \uC815\uB9AC\uD560 \uC218 \uC788\uC5B4\uC694.'
-            }
-          </p>
+          <p className="kicker">{'\uC7AC\uAD6C\uB9E4 \uD6C4\uBCF4'}</p>
+          <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">{'\uC18C\uBE44 \uC644\uB8CC \uD56D\uBAA9\uC744 \uB2E4\uC74C \uC7A5\uBCF4\uAE30 \uBA54\uBAA8\uB85C \uC815\uB9AC\uD558\uC138\uC694'}</h3>
+          <p className="max-w-2xl text-sm leading-5.5 muted">{'\uC218\uB7C9\uACFC \uBA54\uBAA8\uB294 \uC790\uB3D9 \uC800\uC7A5\uB418\uBA70, \uD544\uC694\uD558\uBA74 \uBC14\uB85C \uBCF5\uAD6C\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <span className="badge bg-amber-100 text-amber-800">{`\uC7AC\uB4F1\uB85D \uD544\uC694 ${items.length}\uAC1C`}</span>
@@ -353,7 +347,7 @@ function ShoppingListPanel({ items, onDelete, onRestore, onRestoreAll, onSaveDet
         </div>
       </div>
 
-      <div className="mt-4 grid gap-2.5 xl:grid-cols-2">
+      <div className="mt-4 grid gap-2.5 lg:grid-cols-2">
         {sortedItems.map((item) => (
           <ShoppingListItemCard
             key={item.id}

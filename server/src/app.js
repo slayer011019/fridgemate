@@ -12,6 +12,7 @@ export function createApp() {
 
   app.use(
     cors({
+      credentials: true,
       origin(origin, callback) {
         if (isAllowedOrigin(origin)) {
           callback(null, true);
@@ -24,7 +25,7 @@ export function createApp() {
       }
     })
   );
-  app.use(express.json());
+  app.use(express.json({ limit: '16kb' }));
 
   app.get('/', (_request, response) => {
     response.json({

@@ -1,6 +1,10 @@
 import { createHttpError } from './httpError.js';
 
 const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 128;
+const MAX_EMAIL_LENGTH = 254;
+const COMMON_PASSWORD_PATTERNS = ['password', '123456', 'qwerty', 'letmein', 'admin'];
+const SPECIAL_CHARACTER_PATTERN = /[^A-Za-z0-9]/;
 
 export function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -18,13 +22,44 @@ export function assertValidSignupInput({ email, password }) {
     throw createHttpError(400, 'A valid email address is required.');
   }
 
+  if (email.length > MAX_EMAIL_LENGTH) {
+    throw createHttpError(400, 'Email address is too long.');
+  }
+
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw createHttpError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+  }
+
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    throw createHttpError(400, `Password must be at most ${MAX_PASSWORD_LENGTH} characters long.`);
+  }
+
+  if (!SPECIAL_CHARACTER_PATTERN.test(password)) {
+    throw createHttpError(400, 'Password must include at least one special character.');
+  }
+
+  const normalizedPassword = password.toLowerCase();
+  const emailLocalPart = email.split('@')[0];
+
+  if (emailLocalPart && normalizedPassword.includes(emailLocalPart)) {
+    throw createHttpError(400, 'Password must not contain your email name.');
+  }
+
+  if (COMMON_PASSWORD_PATTERNS.some((pattern) => normalizedPassword.includes(pattern))) {
+    throw createHttpError(400, 'Password is too easy to guess. Choose a stronger password.');
   }
 }
 
 export function assertValidLoginInput({ email, password }) {
   if (!email || !password) {
     throw createHttpError(400, 'Email and password are required.');
+  }
+
+  if (email.length > MAX_EMAIL_LENGTH) {
+    throw createHttpError(400, 'Email address is too long.');
+  }
+
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    throw createHttpError(400, 'Password is too long.');
   }
 }

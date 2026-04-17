@@ -11,6 +11,7 @@ import {
   updateImportItem
 } from '../features/import/importSelection';
 import { useIngredients } from '../hooks/useIngredients';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { applyImportCorrections, saveImportCorrections } from '../utils/import/importLearning';
 import { parseImportText } from '../utils/importParser';
 import { extractTextFromImage } from '../utils/ocr';
@@ -36,6 +37,7 @@ function ImportEmptyPanel({ title, description }) {
 function ImportPage() {
   const navigate = useNavigate();
   const { addIngredients } = useIngredients();
+  const { trackEvent } = useAnalytics();
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [ocrResult, setOcrResult] = useState(null);
@@ -67,6 +69,14 @@ function ImportPage() {
 
   const handleFileChange = (event) => {
     const nextFile = event.target.files?.[0];
+
+    if (nextFile) {
+      trackEvent('ocr_upload_started', {
+        file_type: nextFile.type || 'unknown',
+        source_screen: 'import'
+      });
+    }
+
     setImageFile(nextFile || null);
     setOcrResult(null);
     setItems([]);
@@ -94,6 +104,12 @@ function ImportPage() {
 
       setOcrResult(result);
       setStatus('success');
+      trackEvent('ocr_parse_completed', {
+        raw_text_length: result?.text?.length || 0,
+        parsed_item_count: parseImportText(result).candidates.length,
+        template_type: parseImportText(result).template?.id || 'unknown',
+        confidence_bucket: 'medium'
+      });
     } catch (ocrError) {
       setError(ocrError.message || IMPORT_PAGE_COPY.ocrFailed);
       setStatus('error');
@@ -118,8 +134,34 @@ function ImportPage() {
     }
 
     try {
+      trackEvent('ocr_review_completed', {
+        parsed_item_count: items.length,
+        selected_item_count: selectedItems.length,
+        edited_item_count: selectedRawItems.filter((item) => item.name !== item.originalName || item.quantity !== item.originalQuantity).length,
+        deleted_item_count: items.length - selectedItems.length
+      });
       saveImportCorrections(selectedRawItems);
       await addIngredients(selectedItems);
+      selectedItems.forEach((item) => {
+        trackEvent('ingredient_created', {
+          creation_method: 'ocr',
+          category: item.category,
+          storage_type: item.storageType,
+          has_expiry_date: Boolean(item.expiryDate),
+          has_purchase_date: Boolean(item.purchaseDate),
+          quantity_present: Boolean(String(item.quantity || '').trim())
+        });
+      });
+      trackEvent('ocr_import_saved', {
+        saved_item_count: selectedItems.length,
+        edited_before_save_count: selectedRawItems.filter(
+          (item) => item.name !== item.originalName || item.quantity !== item.originalQuantity
+        ).length,
+        session_first_import: true
+      });
+      trackEvent('activation_completed', {
+        activation_path: 'ocr_first_import'
+      });
       setImportMessage(`${selectedItems.length}\uAC1C \uD56D\uBAA9\uC744 \uAC00\uC838\uC654\uC5B4\uC694.`);
       navigate('/ingredients');
     } catch (importError) {
@@ -128,12 +170,12 @@ function ImportPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="section-shell">
       <PageHeader
         eyebrow={'\uC0AC\uC9C4 \uB4F1\uB85D'}
-        title={'\uC7A5\uBCF4\uAE30 \uC0AC\uC9C4\uC5D0\uC11C \uC7AC\uB8CC\uB97C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC544\uBCF4\uC138\uC694'}
+        title={'\uC0AC\uC9C4\uC5D0\uC11C \uC7AC\uB8CC \uD6C4\uBCF4\uB97C \uBA3C\uC800 \uAC00\uC838\uC624\uC138\uC694'}
         description={
-          '\uC8FC\uBB38 \uB0B4\uC5ED\uC774\uB098 \uC601\uC218\uC99D \uC0AC\uC9C4\uC744 \uC62C\uB9AC\uBA74 \uC571\uC774 \uC7AC\uB8CC \uD6C4\uBCF4\uB97C \uBA3C\uC800 \uCC3E\uC544\uC918\uC694. \uB0B4\uC6A9\uC744 \uD655\uC778\uD558\uACE0 \uD544\uC694\uD55C \uD56D\uBAA9\uB9CC \uACE0\uB974\uBA74 \uB3FC\uC694.'
+          '\uC5C5\uB85C\uB4DC, OCR, \uAC80\uD1A0, \uAC00\uC838\uC624\uAE30 \uC21C\uC11C\uB85C \uC9C4\uD589\uD558\uBA70, \uB9C8\uC9C0\uB9C9 \uB2E8\uACC4\uC5D0\uC11C \uD544\uC694\uD55C \uD56D\uBAA9\uB9CC \uACE0\uB97C \uC218 \uC788\uC2B5\uB2C8\uB2E4.'
         }
         action={
           <Link to="/ingredients" className="btn-secondary">

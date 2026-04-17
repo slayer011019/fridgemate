@@ -60,6 +60,11 @@ function validateRequiredEnvVars() {
 
 validateRequiredEnvVars();
 
+if (String(process.env.JWT_SECRET || '').trim().length < 32 && process.env.NODE_ENV !== 'test') {
+  console.error('JWT_SECRET must be at least 32 characters long.');
+  process.exit(1);
+}
+
 const configuredAllowedOrigins = splitEnvList(process.env.ALLOWED_ORIGINS);
 const fallbackAllowedOrigins = uniqueValues([process.env.CLIENT_ORIGIN, ...DEFAULT_ALLOWED_ORIGINS]);
 const allowedOrigins = configuredAllowedOrigins.length ? configuredAllowedOrigins : fallbackAllowedOrigins;
@@ -72,7 +77,16 @@ export const serverConfig = {
   allowedOrigins,
   databaseUrl: process.env.DATABASE_URL || '',
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
+  jwtIssuer: process.env.JWT_ISSUER || 'fridgemate-api',
+  jwtAudience: process.env.JWT_AUDIENCE || 'fridgemate-client',
+  refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '30d',
+  accessTokenCookieName: process.env.ACCESS_TOKEN_COOKIE_NAME || 'fridgemate_access',
+  refreshTokenCookieName: process.env.REFRESH_TOKEN_COOKIE_NAME || 'fridgemate_refresh',
+  authCookieSecure: String(process.env.AUTH_COOKIE_SECURE || process.env.NODE_ENV === 'production').toLowerCase() === 'true',
+  authCookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || 'Lax',
+  redisUrl: process.env.REDIS_URL || '',
+  authRedisPrefix: process.env.AUTH_REDIS_PREFIX || 'fridgemate:auth',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || ''
 };
 

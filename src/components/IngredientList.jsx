@@ -20,7 +20,7 @@ function getRemainingText(remainingDays) {
 }
 
 const actionButtonClassName =
-  'inline-flex min-h-[2.15rem] items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm';
+  'inline-flex min-h-[2.1rem] items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold';
 
 const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onToggleConsumed }) {
   const remainingDays = getRemainingDays(ingredient.expiryDate);
@@ -29,35 +29,35 @@ const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onTo
   const hasMemo = Boolean(String(ingredient.memo || '').trim());
 
   return (
-    <article className="glass-card p-3">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
-        <div className="min-w-0 space-y-2">
+    <article className="glass-card p-3.5">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0 space-y-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="truncate text-[0.96rem] font-semibold text-slate-900">{ingredient.name}</h3>
+            <h3 className="truncate text-[1rem] font-semibold text-slate-900">{ingredient.name}</h3>
             <span className={`badge ${toneClass}`}>{expiryLabel}</span>
             {ingredient.consumed ? <span className="badge bg-slate-200 text-slate-700">{'\uC7AC\uB4F1\uB85D \uD544\uC694'}</span> : null}
             {hasMemo ? <span className="badge bg-amber-100 text-amber-800">{'\uBA54\uBAA8'}</span> : null}
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="badge bg-white text-slate-700">{getRemainingText(remainingDays)}</span>
             <span className="badge bg-brand-50 text-brand-700">{getCategoryLabel(ingredient.category)}</span>
             <span className="badge bg-white text-slate-600">{getStorageLabel(ingredient.storageType)}</span>
             <span className="badge bg-white text-slate-600">{ingredient.quantity}</span>
           </div>
 
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-            <span>{`\uAD6C\uB9E4\uC77C ${ingredient.purchaseDate || '-'}`}</span>
             <span>{`\uC720\uD1B5\uAE30\uD55C ${ingredient.expiryDate || '\uBBF8\uC785\uB825'}`}</span>
-            <span className="font-medium text-slate-700">{getRemainingText(remainingDays)}</span>
+            {ingredient.purchaseDate ? <span>{`\uAD6C\uB9E4\uC77C ${ingredient.purchaseDate}`}</span> : null}
           </div>
 
-          {hasMemo ? <p className="line-clamp-1 text-xs muted">{ingredient.memo}</p> : null}
+          {hasMemo ? <p className="line-clamp-1 text-xs leading-5 muted">{ingredient.memo}</p> : null}
         </div>
 
-        <div className="flex flex-wrap gap-1.5 xl:max-w-[8.5rem] xl:justify-end xl:self-end">
+        <div className="flex flex-wrap gap-1.5 lg:max-w-[11.5rem] lg:justify-end">
           <button
             type="button"
-            className={`${actionButtonClassName} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+            className={`${actionButtonClassName} bg-brand-600 text-white shadow-sm shadow-brand-600/20 hover:bg-brand-700`}
             onClick={() => onToggleConsumed(ingredient)}
           >
             {ingredient.consumed ? '\uBCF4\uC720' : '\uC18C\uBE44'}
@@ -71,7 +71,7 @@ const IngredientCard = memo(function IngredientCard({ ingredient, onDelete, onTo
           {!ingredient.consumed ? (
             <button
               type="button"
-              className={`${actionButtonClassName} bg-rose-500 text-white hover:bg-rose-600`}
+              className={`${actionButtonClassName} text-rose-700 hover:bg-rose-50`}
               onClick={() => onDelete(ingredient.id)}
             >
               {'\uC0AD\uC81C'}
@@ -89,7 +89,7 @@ function IngredientList({ ingredients, onDelete, onToggleConsumed }) {
   }
 
   return (
-    <section className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-3">
+    <section className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
       {ingredients.map((ingredient) => (
         <IngredientCard key={ingredient.id} ingredient={ingredient} onDelete={onDelete} onToggleConsumed={onToggleConsumed} />
       ))}

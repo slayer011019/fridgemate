@@ -10,12 +10,15 @@ import {
   filterIngredients,
   getConsumedIngredients
 } from '../features/ingredients/ingredientSelectors';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { useIngredients } from '../hooks/useIngredients';
+import { getDaysToExpiryBucket } from '../utils/analytics';
 import { isOcrEnabled } from '../utils/backendConfig';
 import { ingredientCategories, storageTypes } from '../utils/ingredientOptions';
 
 function IngredientsPage() {
   const { ingredients, loading, error, removeIngredient, updateIngredient } = useIngredients();
+  const { trackEvent } = useAnalytics();
   const ocrEnabled = isOcrEnabled();
   const [filters, setFilters] = useState(defaultIngredientFilters);
 
@@ -34,11 +37,22 @@ function IngredientsPage() {
           ...ingredient,
           consumed: !ingredient.consumed
         });
+
+        if (ingredient.consumed) {
+          trackEvent('ingredient_restored', {
+            days_to_expiry_bucket: getDaysToExpiryBucket(ingredient.expiryDate)
+          });
+        } else {
+          trackEvent('ingredient_consumed', {
+            days_to_expiry_bucket: getDaysToExpiryBucket(ingredient.expiryDate),
+            source: 'ingredients_list'
+          });
+        }
       } catch {
         // Error state is surfaced from the hook.
       }
     },
-    [updateIngredient]
+    [trackEvent, updateIngredient]
   );
 
   const handleDelete = useCallback(
@@ -79,12 +93,12 @@ function IngredientsPage() {
   }, [shoppingListItems, updateIngredient]);
 
   return (
-    <div className="space-y-4">
+    <div className="section-shell">
       <PageHeader
         eyebrow={'\uC7AC\uB8CC \uAD00\uB9AC'}
-        title={'\uBCF4\uC720 \uC911\uC778 \uC7AC\uB8CC\uB97C \uC27D\uACE0 \uC815\uB3C8\uB418\uAC8C \uC0B4\uD3B4\uBCF4\uC138\uC694'}
+        title={'\uC7AC\uB8CC\uB97C \uBE60\uB974\uAC8C \uCC3E\uACE0, \uC9C0\uAE08 \uC4F0\uC2E4 \uAC83\uBD80\uD130 \uC815\uB9AC\uD558\uC138\uC694'}
         description={
-          '\uB0C9\uC7A5, \uB0C9\uB3D9, \uD32C\uD2B8\uB9AC\uB85C \uB098\uB220 \uBCF4\uACE0 \uC720\uD1B5\uAE30\uD55C \uC21C\uC73C\uB85C \uC815\uB82C\uD558\uBA74 \uBB34\uC5C7\uC744 \uBA3C\uC800 \uC368\uC57C \uD560\uC9C0 \uBC14\uB85C \uD30C\uC545\uD560 \uC218 \uC788\uC5B4\uC694.'
+          '\uAC80\uC0C9\uACFC \uD544\uD130\uB85C \uBC94\uC704\uB97C \uC904\uC774\uACE0, \uC720\uD1B5\uAE30\uD55C \uC784\uBC15 \uC21C\uC73C\uB85C \uBCF4\uBA74 \uBB34\uC5C7\uC744 \uBA3C\uC800 \uCC98\uB9AC\uD560\uC9C0 \uBC14\uB85C \uBCF4\uC785\uB2C8\uB2E4.'
         }
         action={
           <>
@@ -107,13 +121,13 @@ function IngredientsPage() {
         onChange={handleFilterChange}
       />
 
-      <section className="flex flex-col gap-2 rounded-[20px] border border-white/70 bg-white/70 px-3 py-2.5 text-sm text-slate-700 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          <span className="badge bg-white text-slate-700">{`\uD604\uC7AC \uBCF4\uC720 ${activeIngredientCount}\uAC1C`}</span>
-          <span className="badge bg-white text-slate-700">{`\uD544\uD130 \uACB0\uACFC ${filteredIngredients.length}\uAC1C`}</span>
-          <span className="badge bg-amber-100 text-amber-800">{`\uC7AC\uAD6C\uB9E4 \uD6C4\uBCF4 ${shoppingListItems.length}\uAC1C`}</span>
+      <section className="glass-card flex flex-col gap-3 px-4 py-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="summary-chip">{`\uBCF4\uC720 \uC911 ${activeIngredientCount}\uAC1C`}</span>
+          <span className="summary-chip">{`\uAC80\uC0C9 \uACB0\uACFC ${filteredIngredients.length}\uAC1C`}</span>
+          <span className="summary-chip">{`\uC7AC\uAD6C\uB9E4 \uD6C4\uBCF4 ${shoppingListItems.length}\uAC1C`}</span>
         </div>
-        <p className="text-xs muted">{'\uAC00\uC7A5 \uC911\uC694\uD55C \uC815\uBCF4\uAC00 \uC55E\uCABD\uC5D0 \uC624\uB3C4\uB85D \uC815\uB82C\uD574\uB450\uC5C8\uC5B4\uC694.'}</p>
+        <p className="text-xs muted">{'\uD575\uC2EC \uC561\uC158\uC740 \uC18C\uBE44 \uCC98\uB9AC, \uBCF4\uC870 \uC561\uC158\uC740 \uC218\uC815 \uC911\uC2EC\uC73C\uB85C \uBC30\uCE58\uD588\uC5B4\uC694.'}</p>
       </section>
 
       {!loading ? (

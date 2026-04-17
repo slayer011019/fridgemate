@@ -45,6 +45,19 @@ export function getCurrentUser() {
   return requestJson('/auth/me', {}, { authMode: 'required', errorClass: AuthApiError });
 }
 
+export function refreshSession() {
+  return requestJson(
+    '/auth/refresh',
+    {
+      method: 'POST'
+    },
+    {
+      authMode: 'never',
+      errorClass: AuthApiError
+    }
+  );
+}
+
 export function logout() {
   return requestJson(
     '/auth/logout',
