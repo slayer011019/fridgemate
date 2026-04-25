@@ -7,6 +7,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- OCR import candidates now include confidence and review metadata, with receipt garbage filtering for obvious non-product lines.
 - GitHub Actions CI workflow for lint, test, and build jobs with artifact upload.
 - Vitest coverage across recommendation logic, OCR parsing, IndexedDB, import learning, and `useIngredients`.
 - Global connection status feedback with online/offline and fallback notices.

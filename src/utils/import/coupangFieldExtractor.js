@@ -26,6 +26,7 @@ export function extractCoupangProductFields(row, index = 0) {
     normalizedName: normalizedProduct.normalizedName,
     specText,
     quantity: normalizedProduct.quantity,
+    matchedCanonical: normalizedProduct.matchedCanonical,
     category: normalizedProduct.category,
     storageType: normalizedProduct.storageType,
     rawRowText: buildRawRowText(row),

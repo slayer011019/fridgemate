@@ -282,7 +282,7 @@ function dedupeSpecs(specTokens = []) {
 
 export function buildQuantityText(specTokens = []) {
   const tokens = dedupeSpecs(specTokens);
-  return tokens.join(' / ') || '1개';
+  return tokens.length > 0 ? tokens.join(' / ') : null;
 }
 
 export function normalizeIngredientName(displayName) {
@@ -302,6 +302,7 @@ export function normalizeImportedIngredient(displayName, specTokens = []) {
     normalizedName,
     category: matchedRule?.category || CATEGORY_OTHER,
     storageType: storageFromTitle || matchedRule?.storageType || STORAGE_FRIDGE,
-    quantity: buildQuantityText(specTokens)
+    quantity: buildQuantityText(specTokens),
+    matchedCanonical: Boolean(matchedRule)
   };
 }

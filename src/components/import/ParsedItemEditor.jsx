@@ -1,5 +1,17 @@
 import { ingredientCategories, storageTypes } from '../../utils/ingredientOptions';
 
+function ConfidenceBadge({ confidence }) {
+  if (confidence >= 0.7) {
+    return <span className="badge bg-emerald-100 text-emerald-700">{'\uD655\uC778\uB428'}</span>;
+  }
+
+  if (confidence >= 0.5) {
+    return <span className="badge bg-amber-100 text-amber-800">{'\uAC80\uD1A0 \uAD8C\uC7A5'}</span>;
+  }
+
+  return <span className="badge bg-rose-100 text-rose-700">{'\uD655\uC778 \uD544\uC694'}</span>;
+}
+
 function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDeselectAll, onImport }) {
   const selectedCount = items.filter((item) => item.selected).length;
 
@@ -46,6 +58,9 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                     {item.learnedCorrection ? (
                       <span className="badge bg-amber-100 text-amber-700">{'\uC774\uC804 \uC218\uC815 \uC774\uB825 \uBC18\uC601'}</span>
                     ) : null}
+                    {item.needsReview ? (
+                      <span className="badge bg-amber-100 text-amber-700">{'\uC218\uB3D9 \uD655\uC778 \uD544\uC694'}</span>
+                    ) : null}
                     <span className="badge bg-brand-50 text-brand-700">{'\uC790\uB3D9 \uCD94\uCD9C\uB428'}</span>
                   </div>
                 </div>
@@ -54,7 +69,10 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     <div className="space-y-1">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uAC04\uC18C\uD654\uB41C \uC774\uB984'}</p>
-                      <p className="font-medium text-slate-900">{item.displayName || item.normalizedName || item.name || '-'}</p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <p className="truncate font-medium text-slate-900">{item.displayName || item.normalizedName || item.name || '-'}</p>
+                        <ConfidenceBadge confidence={item.confidence} />
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uCD94\uCD9C\uB41C \uC218\uB7C9'}</p>
@@ -72,7 +90,12 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
 
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uC218\uB7C9'}
-                  <input value={item.quantity} onChange={(event) => onItemChange(item.id, 'quantity', event.target.value)} />
+                  <input
+                    value={item.quantity || ''}
+                    placeholder={!item.quantity ? '\uC218\uB7C9 \uBBF8\uD655\uC778' : ''}
+                    className={!item.quantity ? 'border-amber-300' : undefined}
+                    onChange={(event) => onItemChange(item.id, 'quantity', event.target.value)}
+                  />
                 </label>
 
                 <label className="space-y-1 text-sm font-medium text-slate-700">
@@ -125,6 +148,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                 </label>
               </div>
             </div>
+            {item.rawLine ? <p className="mt-1 truncate text-xs text-slate-400">{item.rawLine}</p> : null}
           </article>
         ))}
       </div>

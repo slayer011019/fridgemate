@@ -1,5 +1,6 @@
 import { guessCategory, guessStorageType } from './importGuesser.js';
 import { normalizeImportedIngredient } from './ingredientNormalizer.js';
+import { isGarbageLine, isGarbageSuspect, scoreConfidence } from './receiptGarbageFilter.js';
 import { extractSpecTokens, normalizeDisplayName } from './titleNormalizer.js';
 
 function createCandidateId(prefix, index) {
@@ -16,7 +17,9 @@ function buildCandidate({
   category,
   storageType,
   rawLine,
-  today
+  today,
+  confidence = 0.3,
+  needsReview = false
 }) {
   return {
     id: createCandidateId(idPrefix, index),
@@ -26,7 +29,9 @@ function buildCandidate({
     specText,
     quantity,
     rawLine,
-    selected: true,
+    selected: confidence >= 0.5,
+    confidence,
+    needsReview,
     category,
     storageType,
     purchaseDate: today,
@@ -42,6 +47,10 @@ export function createTodayString() {
 }
 
 export function createFallbackCandidate(line, index, today) {
+  if (isGarbageLine(line)) {
+    return null;
+  }
+
   const specTokens = extractSpecTokens(line);
   const displayName = normalizeDisplayName(line);
 
@@ -53,6 +62,14 @@ export function createFallbackCandidate(line, index, today) {
   const category = normalizedProduct.category || guessCategory(normalizedProduct.normalizedName || normalizedProduct.displayName);
   const storageType =
     normalizedProduct.storageType || guessStorageType(normalizedProduct.normalizedName || normalizedProduct.displayName, category);
+  const hasQuantity = normalizedProduct.quantity !== null;
+  const confidence = scoreConfidence({
+    name: normalizedProduct.normalizedName,
+    hasQuantity,
+    matchedCanonical: normalizedProduct.matchedCanonical,
+    isGarbage: false,
+    isSuspect: isGarbageSuspect(line)
+  });
 
   return buildCandidate({
     idPrefix: 'fallback-candidate',
@@ -64,14 +81,28 @@ export function createFallbackCandidate(line, index, today) {
     category,
     storageType,
     rawLine: line,
-    today
+    today,
+    confidence,
+    needsReview: confidence < 0.5 || !hasQuantity
   });
 }
 
 export function createParsedProductCandidate(parsedProduct, index, today) {
+  if (isGarbageLine(parsedProduct.rawLine)) {
+    return null;
+  }
+
   const category = parsedProduct.category || guessCategory(parsedProduct.normalizedName || parsedProduct.name);
   const storageType =
     parsedProduct.storageType || guessStorageType(parsedProduct.normalizedName || parsedProduct.name, category);
+  const hasQuantity = parsedProduct.quantity !== null;
+  const confidence = scoreConfidence({
+    name: parsedProduct.normalizedName || parsedProduct.name,
+    hasQuantity,
+    matchedCanonical: parsedProduct.matchedCanonical,
+    isGarbage: false,
+    isSuspect: isGarbageSuspect(parsedProduct.rawLine)
+  });
 
   return buildCandidate({
     idPrefix: 'candidate',
@@ -83,6 +114,8 @@ export function createParsedProductCandidate(parsedProduct, index, today) {
     category,
     storageType,
     rawLine: parsedProduct.rawLine,
-    today
+    today,
+    confidence,
+    needsReview: confidence < 0.5 || !hasQuantity
   });
 }

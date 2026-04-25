@@ -14,7 +14,7 @@ import { useIngredients } from '../hooks/useIngredients';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { applyImportCorrections, saveImportCorrections } from '../utils/import/importLearning';
 import { parseImportText } from '../utils/importParser';
-import { extractTextFromImage } from '../utils/ocr';
+import { runOcrWithProvider } from '../utils/ocr/ocrService';
 
 const IMPORT_PAGE_COPY = {
   uploadFirstError: '\u004F\u0043\u0052\uC744 \uC2DC\uC791\uD558\uAE30 \uC804\uC5D0 \uC774\uBBF8\uC9C0\uB97C \uBA3C\uC800 \uC5C5\uB85C\uB4DC\uD574\uC8FC\uC138\uC694.',
@@ -98,7 +98,7 @@ function ImportPage() {
     setProgress(0);
 
     try {
-      const result = await extractTextFromImage(imageFile, {
+      const result = await runOcrWithProvider(imageFile, {
         onProgress: (value) => setProgress(value)
       });
 

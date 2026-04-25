@@ -43,7 +43,11 @@ export function parseImportText(source) {
     usefulLines.push(parsedProduct.rawRowText || parsedProduct.rawLine);
     row.entries.forEach((entry) => usedLineIndexes.add(entry.index));
 
-    candidates.push(createParsedProductCandidate(parsedProduct, index, today));
+    const candidate = createParsedProductCandidate(parsedProduct, index, today);
+
+    if (candidate) {
+      candidates.push(candidate);
+    }
   });
 
   const ignoredLines = classifiedLines
