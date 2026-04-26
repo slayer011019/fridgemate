@@ -107,7 +107,7 @@ function RecipesPage() {
           <div className="space-y-3">
             <div>
               <p className="kicker">{'\uC9C0\uAE08 \uC0C1\uD0DC \uC694\uC57D'}</p>
-              <h3 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">{'\uC77D\uC5B4\uC57C \uD560 \uC124\uBA85\uC740 \uC904\uC774\uACE0, \uD310\uB2E8 \uD3EC\uC778\uD2B8\uB9CC \uB0A8\uACBC\uC5B4\uC694'}</h3>
+              <h3 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">{'\uC9C0\uAE08 \uC7AC\uB8CC\uB85C \uBB34\uC5C7\uC744 \uD560 \uC218 \uC788\uB294\uC9C0 \uBCF4\uC5EC\uC918\uC694'}</h3>
             </div>
             <p className="text-sm leading-5.5 text-slate-700">{fridgeInsight}</p>
             {missingBasicIngredients.length ? (
@@ -125,7 +125,7 @@ function RecipesPage() {
             <div className="soft-panel">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uD604\uC7AC \uB4F1\uB85D \uC7AC\uB8CC'}</p>
               <p className="mt-2 text-xl font-semibold text-slate-900">{loading ? '...' : activeIngredientCount}</p>
-              <p className="mt-1 text-xs muted">{'\uC18C\uBE44 \uC911\uC778 \uC7AC\uB8CC \uAE30\uC900'}</p>
+              <p className="mt-1 text-xs muted">{'\uBCF4\uC720 \uC911\uC778 \uC7AC\uB8CC \uAE30\uC900'}</p>
             </div>
             <div className="soft-panel border-amber-100/70 bg-amber-50/70">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">{'\uC720\uD1B5\uAE30\uD55C \uC784\uBC15'}</p>
@@ -172,7 +172,7 @@ function RecipesPage() {
 
       <RecommendationSection
         title={'\uD558\uB098\uB9CC \uB354 \uC0AC\uBA74 \uB3FC\uC694'}
-        description={'\uD544\uC218 \uC7AC\uB8CC\uAC00 \uB531 1\uAC1C\uB9CC \uBD80\uC871\uD55C \uAC70\uC758 \uC644\uC131 \uC0C1\uD0DC\uC758 \uB808\uC2DC\uD53C\uB4E4\uC785\uB2C8\uB2E4.'}
+        description={'\uC774\uBBF8 \uAC00\uC9C4 \uC7AC\uB8CC\uAC00 \uC77C\uBD80 \uB9DE\uACE0, \uD544\uC218 \uC7AC\uB8CC\uAC00 \uB531 1\uAC1C\uB9CC \uBD80\uC871\uD55C \uB808\uC2DC\uD53C\uB4E4\uC785\uB2C8\uB2E4.'}
         recipes={buyOneRecommendations}
         onRecipeSelect={handleRecommendationSelect('buy_one_more')}
         emptyTitle={'\uC9C0\uAE08\uC740 \uD55C \uAC1C \uBD80\uC871\uD55C \uB808\uC2DC\uD53C\uAC00 \uC5C6\uC5B4\uC694'}

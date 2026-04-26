@@ -13,8 +13,12 @@ import { isBackendEnabled } from '../utils/backendConfig';
 import { getDashboardSummary } from '../utils/date';
 
 function getFridgeInsight({ activeIngredientCount, recommendationCoverage, expiringSoon }) {
+  if (!activeIngredientCount) {
+    return '등록된 재료가 아직 없어요. 기본 재료를 먼저 추가하면 바로 만들 수 있는 메뉴와 장보기 후보가 정리됩니다.';
+  }
+
   if (activeIngredientCount < 4) {
-    return '등록된 재료가 아직 적어서 추천 폭이 좁아요. 기본 재료 몇 가지만 채워도 결과가 훨씬 넓어져요.';
+    return '등록된 재료가 적어서 추천 폭이 좁아요. 자주 쓰는 기본 재료를 몇 가지만 더 채우면 후보가 늘어납니다.';
   }
 
   if (!recommendationCoverage) {
@@ -40,7 +44,7 @@ function buildSectionStats({ loading, readyRecommendations, buyOneRecommendation
       value: loading ? '...' : buyOneRecommendations.length,
       helper: loading
         ? '추천을 정리 중이에요'
-        : getSectionHelperText(buyOneRecommendations.length, '재료가 조금 더 필요해요', '한 두 개만 채우면 돼요', '장보기 효율이 좋아요')
+        : getSectionHelperText(buyOneRecommendations.length, '일부 재료가 맞는 후보만 보여줘요', '하나만 채우면 돼요', '장보기 효율이 좋아요')
     },
     useSoon: {
       value: loading ? '...' : useSoonRecommendations.length,

@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useIngredients } from '../hooks/useIngredients';
 
 function AccountPage() {
-  const { dismissGuestImport, error, guestImportPrompt, importGuestIngredients, logout, storageScope, user } = useAuth();
+  const { dismissGuestImport, error, guestImportPrompt, importGuestIngredients, logout, user } = useAuth();
   const { loadIngredients } = useIngredients();
 
   const handleImportGuestIngredients = async () => {
@@ -17,25 +17,17 @@ function AccountPage() {
         eyebrow={'\uACC4\uC815'}
         title={'\uACC4\uC815\uACFC \uC800\uC7A5 \uC0C1\uD0DC\uB97C \uD55C\uB208\uC5D0 \uD655\uC778\uD558\uC138\uC694'}
         description={
-          '\uD604\uC7AC \uB85C\uADF8\uC778 \uACC4\uC815, \uC801\uC6A9 \uC800\uC7A5 \uBC94\uC704, \uAC8C\uC2A4\uD2B8 \uB370\uC774\uD130 \uAC00\uC838\uC624\uAE30 \uC5EC\uBD80\uB97C \uC5EC\uAE30\uC11C \uAD00\uB9AC\uD569\uB2C8\uB2E4.'
+          '\uD604\uC7AC \uB85C\uADF8\uC778 \uACC4\uC815\uACFC \uAC8C\uC2A4\uD2B8 \uB370\uC774\uD130 \uAC00\uC838\uC624\uAE30 \uC5EC\uBD80\uB97C \uC5EC\uAE30\uC11C \uAD00\uB9AC\uD569\uB2C8\uB2E4.'
         }
       />
 
       <section className="card space-y-4">
         {error ? <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</div> : null}
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="soft-panel">
-            <p className="kicker">{'\uB85C\uADF8\uC778 \uC815\uBCF4'}</p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-900">{user?.email}</h3>
-            <p className="mt-2 text-sm leading-6 muted">{'\uD604\uC7AC \uB85C\uADF8\uC778\uD55C \uACC4\uC815\uC785\uB2C8\uB2E4.'}</p>
-          </div>
-
-          <div className="soft-panel">
-            <p className="kicker">{'\uD604\uC7AC \uC800\uC7A5 \uBC94\uC704'}</p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-900">{storageScope}</h3>
-            <p className="mt-2 text-sm leading-6 muted">{'\uC774 \uBC94\uC704\uC5D0 \uB9DE\uCDB0 \uC7AC\uB8CC \uB370\uC774\uD130\uB97C \uC77D\uACE0 \uC800\uC7A5\uD558\uACE0 \uC788\uC5B4\uC694.'}</p>
-          </div>
+        <div className="soft-panel">
+          <p className="kicker">{'\uB85C\uADF8\uC778 \uC815\uBCF4'}</p>
+          <h3 className="mt-2 text-lg font-semibold text-slate-900">{user?.email}</h3>
+          <p className="mt-2 text-sm leading-6 muted">{'\uD604\uC7AC \uB85C\uADF8\uC778\uD55C \uACC4\uC815\uC785\uB2C8\uB2E4.'}</p>
         </div>
 
         <div className="flex flex-wrap gap-3">

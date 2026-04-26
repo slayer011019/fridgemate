@@ -1,4 +1,4 @@
-import { PANTRY_STATUS, pantryStaples } from '../../data/pantryStaples';
+import { PANTRY_STATUS, pantryStaples } from '../../data/pantryStaples.js';
 
 export const ingredientAliases = {
   대파: ['파', '쪽파'],

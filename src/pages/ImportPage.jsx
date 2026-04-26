@@ -5,6 +5,7 @@ import OcrResultPanel from '../components/import/OcrResultPanel';
 import ParsedItemEditor from '../components/import/ParsedItemEditor';
 import UploadBox from '../components/import/UploadBox';
 import {
+  annotateDuplicateImportItems,
   setImportItemsSelected,
   toImportableItems,
   toggleImportItemSelection,
@@ -36,7 +37,7 @@ function ImportEmptyPanel({ title, description }) {
 
 function ImportPage() {
   const navigate = useNavigate();
-  const { addIngredients } = useIngredients();
+  const { ingredients, addIngredients, removeIngredient } = useIngredients();
   const { trackEvent } = useAnalytics();
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
@@ -64,8 +65,8 @@ function ImportPage() {
   const parseResult = useMemo(() => parseImportText(ocrResult), [ocrResult]);
 
   useEffect(() => {
-    setItems(applyImportCorrections(parseResult.candidates));
-  }, [parseResult]);
+    setItems(annotateDuplicateImportItems(applyImportCorrections(parseResult.candidates), ingredients));
+  }, [ingredients, parseResult]);
 
   const handleFileChange = (event) => {
     const nextFile = event.target.files?.[0];
@@ -117,7 +118,7 @@ function ImportPage() {
   };
 
   const handleItemChange = (id, field, value) => {
-    setItems((current) => updateImportItem(current, id, { [field]: value }));
+    setItems((current) => annotateDuplicateImportItems(updateImportItem(current, id, { [field]: value }), ingredients));
   };
 
   const handleToggleItem = (id) => {
@@ -141,6 +142,17 @@ function ImportPage() {
         deleted_item_count: items.length - selectedItems.length
       });
       saveImportCorrections(selectedRawItems);
+      const existingIdsToRemove = [
+        ...new Set(
+          selectedRawItems
+            .filter((item) => item.replaceExisting)
+            .flatMap((item) => item.duplicateExistingItems || [])
+            .map((item) => item.id)
+            .filter(Boolean)
+        )
+      ];
+
+      await Promise.all(existingIdsToRemove.map((id) => removeIngredient(id)));
       await addIngredients(selectedItems);
       selectedItems.forEach((item) => {
         trackEvent('ingredient_created', {
@@ -223,6 +235,7 @@ function ImportPage() {
           <span className="badge bg-slate-100 text-slate-700">{`\uC720\uD6A8 \uBB38\uC7A5 ${parseResult.usefulLines.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uC81C\uC678 \uBB38\uC7A5 ${parseResult.ignoredLines.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uD15C\uD50C\uB9BF ${parseResult.template?.id || 'unknown'}`}</span>
+          <span className="badge bg-white text-slate-500">{`source ${parseResult.sourceType || 'unknown'} ${Math.round((parseResult.sourceConfidence || 0) * 100)}%`}</span>
           {importMessage ? (
             <span className="rounded-2xl border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm font-medium text-brand-700 xl:justify-self-end">
               {importMessage}

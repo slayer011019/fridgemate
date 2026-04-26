@@ -7,7 +7,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- OCR import now detects source type before parsing and routes Coupang, Kurly, receipt, and generic shopping text separately.
+- Receipt OCR parsing now extracts grocery item rows from mobile and mart receipts before falling back to generic OCR parsing.
 - OCR import candidates now include confidence and review metadata, with receipt garbage filtering for obvious non-product lines.
+- Frontend Sentry initialization behind `VITE_SENTRY_DSN` for optional production error monitoring.
 - GitHub Actions CI workflow for lint, test, and build jobs with artifact upload.
 - Vitest coverage across recommendation logic, OCR parsing, IndexedDB, import learning, and `useIngredients`.
 - Global connection status feedback with online/offline and fallback notices.
@@ -18,6 +21,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Moved header account actions to the top-right area, restyled ingredient filters as a category toolbar, and made the manual memo field auto-grow.
+- Removed the internal storage scope display from the account page.
+- Added Prisma `directUrl` configuration and Supabase pooler examples for hosted PostgreSQL connections.
 - Updated README and AGENTS documentation to match the current local-first + optional backend architecture.
 - Mirrored successful ingredient API reads and writes back into IndexedDB for fresher fallback data.
 - Routed pantry-owned staples into recommendation scoring instead of keeping them UI-only.
@@ -32,6 +38,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Simplified recipe, OCR import, and auth screen copy so the next step is clearer on mobile and desktop.
 
 ### Fixed
+- Recipe recommendations no longer count recipes as "buy one more" when no core ingredients are currently owned.
 - Recommendation scoring now treats owned pantry staples as available ingredients.
 - Fallback and syncing state now surface clearer user feedback in the UI.
 - Session restore now keeps authenticated local fallback available during transient server failures.

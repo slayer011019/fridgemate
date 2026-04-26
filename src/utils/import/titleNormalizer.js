@@ -16,7 +16,8 @@ const SPACED_NOISE_PATTERNS = [
 ];
 
 const PRICE_PATTERN = /\d{1,3}(?:,\d{3})*\uC6D0/g;
-const SPEC_PATTERN = /(\d+(?:\.\d+)?\s*(?:g|kg|ml|l|L)|\d+\s*(?:\uAC1C\uC785|\uC785|\uAC1C|\uBD09|\uD329|\uBC15\uC2A4|\uAD6C|\uC190|\uC1A1\uC774|\uC7A5|\uD310))/gi;
+const SPEC_PATTERN =
+  /(\d+(?:\.\d+)?\s*(?:kg|㎏|킬로그램|킬로|키로|g|그램|ml|㎖|mL|l|L|ℓ|리터)|\d+\s*(?:\uAC1C\uC785|\uC785|\uAC1C|\uBD09|\uD329|\uBC15\uC2A4|\uAD6C|\uC190|\uC1A1\uC774|\uC7A5|\uD310|\uB9DD|\uB2E8|\uADFC|\uD3EC\uAE30|\uBB36\uC74C|\uBCD1|\uCE94))/gi;
 
 const OCR_JUNK_PATTERNS = [
   /\b[A-Z]{1,6}\d*[A-Z0-9]*\b/g,
@@ -87,7 +88,14 @@ export function mergeSpacedHangulTokens(text) {
 
 export function extractSpecTokens(...sources) {
   const specs = sources.flatMap((source) => {
-    return [...String(source || '').matchAll(SPEC_PATTERN)].map((match) => match[0].replace(/\s+/g, ''));
+    return [...String(source || '').matchAll(SPEC_PATTERN)].map((match) =>
+      match[0]
+        .replace(/\s+/g, '')
+        .replace(/㎏|킬로그램|킬로|키로/gi, 'kg')
+        .replace(/그램/gi, 'g')
+        .replace(/㎖/g, 'ml')
+        .replace(/ℓ|리터/gi, 'L')
+    );
   });
 
   return [...new Set(specs.filter(Boolean))];

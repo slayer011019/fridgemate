@@ -46,9 +46,9 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
 
       <div className="space-y-2.5">
         {items.map((item) => (
-          <article key={item.id} className="rounded-[18px] border border-white/60 bg-white/65 p-3 shadow-sm">
-            <div className="grid gap-2.5 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
-              <div className="space-y-2.5">
+          <article key={item.id} className="rounded-[16px] border border-white/60 bg-white/65 p-2.5 shadow-sm sm:p-3">
+            <div className="grid gap-2.5 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+              <div className="space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2.5">
                   <label className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-slate-800">
                     <input type="checkbox" checked={item.selected} onChange={() => onToggleItem(item.id)} />
@@ -61,11 +61,27 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                     {item.needsReview ? (
                       <span className="badge bg-amber-100 text-amber-700">{'\uC218\uB3D9 \uD655\uC778 \uD544\uC694'}</span>
                     ) : null}
+                    {item.duplicateInImport ? (
+                      <span className="badge bg-rose-100 text-rose-700">{'\uAC00\uC838\uC624\uAE30 \uC911\uBCF5'}</span>
+                    ) : null}
+                    {item.duplicateExistingItems?.length ? (
+                      <span className="badge bg-slate-100 text-slate-700">{'\uAE30\uC874 \uD56D\uBAA9 \uC788\uC74C'}</span>
+                    ) : null}
                     <span className="badge bg-brand-50 text-brand-700">{'\uC790\uB3D9 \uCD94\uCD9C\uB428'}</span>
                   </div>
                 </div>
+                {item.duplicateExistingItems?.length ? (
+                  <label className="flex items-center gap-2 rounded-[14px] bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-800">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(item.replaceExisting)}
+                      onChange={(event) => onItemChange(item.id, 'replaceExisting', event.target.checked)}
+                    />
+                    <span className="truncate">{`\uAE30\uC874 ${item.duplicateExistingItems.length}\uAC1C \uD56D\uBAA9 \uC0AD\uC81C \uD6C4 \uAC00\uC838\uC624\uAE30`}</span>
+                  </label>
+                ) : null}
 
-                <div className="rounded-[16px] bg-slate-50/80 p-2.5 text-sm text-slate-700">
+                <div className="rounded-[14px] bg-slate-50/80 p-2 text-sm text-slate-700">
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     <div className="space-y-1">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uAC04\uC18C\uD654\uB41C \uC774\uB984'}</p>
@@ -79,10 +95,13 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                       <p className="font-medium text-slate-900">{item.specText || item.quantity || '-'}</p>
                     </div>
                   </div>
+                  {item.originalText || item.rawLine ? (
+                    <p className="mt-2 truncate text-xs text-slate-400">{item.originalText || item.rawLine}</p>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="grid gap-2.5 md:grid-cols-2 2xl:grid-cols-3">
+              <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   {'\uC774\uB984'}
                   <input value={item.name} onChange={(event) => onItemChange(item.id, 'name', event.target.value)} />
@@ -95,6 +114,15 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                     placeholder={!item.quantity ? '\uC218\uB7C9 \uBBF8\uD655\uC778' : ''}
                     className={!item.quantity ? 'border-amber-300' : undefined}
                     onChange={(event) => onItemChange(item.id, 'quantity', event.target.value)}
+                  />
+                </label>
+
+                <label className="space-y-1 text-sm font-medium text-slate-700">
+                  {'\uB2E8\uC704'}
+                  <input
+                    value={item.unit || ''}
+                    placeholder={'\uAC1C, \uC785, \uBD09'}
+                    onChange={(event) => onItemChange(item.id, 'unit', event.target.value)}
                   />
                 </label>
 
@@ -138,7 +166,7 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                   />
                 </label>
 
-                <label className="space-y-1 text-sm font-medium text-slate-700 md:col-span-2 2xl:col-span-3">
+                <label className="space-y-1 text-sm font-medium text-slate-700 md:col-span-2">
                   {'\uBA54\uBAA8'}
                   <input
                     value={item.memo}
@@ -148,14 +176,13 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                 </label>
               </div>
             </div>
-            {item.rawLine ? <p className="mt-1 truncate text-xs text-slate-400">{item.rawLine}</p> : null}
           </article>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-2.5">
         <button type="button" className="btn-primary" onClick={onImport}>
-          {'\uC120\uD0DD\uD55C \uD56D\uBAA9 \uAC00\uC838\uC624\uAE30'}
+          {'\uC120\uD0DD \uD56D\uBAA9 \uC800\uC7A5'}
         </button>
       </div>
     </section>

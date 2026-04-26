@@ -32,7 +32,11 @@ export function splitRecommendationsByReadiness(recommendations = []) {
         return groups;
       }
 
-      if (recommendation.missingCore.length === 1) {
+      const matchedCoreCount = Array.isArray(recommendation.matchedCore)
+        ? recommendation.matchedCore.length
+        : Number(recommendation.matchedCount || 0);
+
+      if (recommendation.missingCore.length === 1 && matchedCoreCount > 0) {
         groups.buyOneMore.push(recommendation);
         return groups;
       }

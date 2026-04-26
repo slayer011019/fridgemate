@@ -256,6 +256,12 @@ Set `VITE_API_URL=` in `.env` so the app runs in local-only mode.
 npm run dev
 ```
 
+To enable frontend error monitoring, also set:
+
+```env
+VITE_SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
+```
+
 ### Frontend + backend mode
 
 Set the API URL and database connection in `.env`.
@@ -263,6 +269,7 @@ Set the API URL and database connection in `.env`.
 ```env
 VITE_API_URL=http://localhost:4000/api
 DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/fridgemate?schema=public
+DIRECT_URL=postgresql://USER:PASSWORD@localhost:5432/fridgemate?schema=public
 PORT=4000
 ALLOWED_ORIGINS=http://localhost:5173
 JWT_SECRET=replace-this-in-production
@@ -277,6 +284,13 @@ AUTH_COOKIE_SAME_SITE=Lax
 REDIS_URL=redis://localhost:6379
 AUTH_REDIS_PREFIX=fridgemate:auth
 ANTHROPIC_API_KEY=
+```
+
+For Supabase, use the pooler URL for runtime database traffic and the direct/session URL for Prisma migrations:
+
+```env
+DATABASE_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres"
 ```
 
 Then run:
@@ -338,7 +352,7 @@ Playwright E2E uses two dev-server projects:
 
 1. Add a Railway PostgreSQL plugin and confirm `DATABASE_URL` is available to the backend service.
 2. Set Railway environment variables: `JWT_SECRET`, `ALLOWED_ORIGINS`, `CLIENT_ORIGIN`.
-3. Set the Vercel environment variable: `VITE_API_URL`.
+3. Set the Vercel environment variables: `VITE_API_URL`, `VITE_SENTRY_DSN` if Sentry monitoring is enabled.
 4. Push to GitHub so Railway and Vercel can deploy automatically.
 5. Verify the backend health check at `GET /health`.
 6. Run an end-to-end smoke test: sign up, log in, add an ingredient, then load recipe recommendations.

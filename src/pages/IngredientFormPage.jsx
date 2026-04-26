@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { useAnalytics } from '../hooks/useAnalytics';
@@ -14,7 +14,17 @@ function IngredientFormPage() {
   const [loading, setLoading] = useState(Boolean(ingredientId));
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const memoRef = useRef(null);
   const isEditMode = Boolean(ingredientId);
+
+  useEffect(() => {
+    if (!memoRef.current) {
+      return;
+    }
+
+    memoRef.current.style.height = 'auto';
+    memoRef.current.style.height = `${memoRef.current.scrollHeight}px`;
+  }, [form.memo]);
 
   useEffect(() => {
     if (!ingredientId) {
@@ -166,8 +176,10 @@ function IngredientFormPage() {
               <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
                 {'\uBA54\uBAA8 (\uC120\uD0DD)'}
                 <textarea
+                  ref={memoRef}
                   name="memo"
-                  rows="4"
+                  rows={1}
+                  className="min-h-[2.7rem] resize-none overflow-hidden"
                   value={form.memo}
                   onChange={handleChange}
                   placeholder={'\uBCF4\uAD00 \uD301\uC774\uB098 \uC0AC\uC6A9 \uC608\uC815 \uBA54\uBAA8'}

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseImportText } from '../importParser.js';
+import { detectOcrSourceType } from '../import/ocrSourceDetector.js';
 
 const FIXED_NOW = new Date(Date.UTC(2026, 2, 18, 12, 0, 0, 0));
 const TODAY = '2026-03-18';
@@ -44,6 +45,49 @@ const EMPTY_TEXT = '';
 const NUMERIC_ONLY_TEXT = '12345\n67890';
 const NOISY_OCR_TEXT = '@@@ ### ==== 12345 !!!';
 const UNKNOWN_GENERIC_TEXT = 'Fresh onion 1kg\nTotal: 3000';
+const MART_RECEIPT_SAMPLE_A = [
+  '트레이더스 홀세일 클럽 위례점',
+  '206-86-50913 한채양 (031)8097-1234',
+  '경기도 하남시 위례대로 200',
+  '[구매]2026-04-24 16:15 POS:0305-5662',
+  '상품명 단가 수량 금액',
+  '돌얼음2.5kg 3,180 1 3,180',
+  '8801114106921',
+  '* 풀무원 국산두컵두부 5,480 1 5,480',
+  '8801114152331',
+  '* 미국산냉장초이스갈비 38,960 1 38,960',
+  '1265720389674',
+  '아인슈타인베이글2봉 8,980 1 8,980',
+  '8809901602687',
+  '필라델피아 크림치즈 8,780 1 8,780',
+  '8801037008197',
+  '총 품목 수량 5',
+  '합계 65,380',
+  '결제대상금액 65,380'
+].join('\n');
+const MART_RECEIPT_SAMPLE_B = [
+  '상품명 단가 수량 금액',
+  '오뚜기 옛날 참기름 13,780 1 13,780',
+  '8801045440354',
+  '신세계포인트적립할인 -3,800',
+  '프라임 버터 450g*2입 10,980 1 10,980',
+  '8801207160229',
+  '* 미국산냉장초이스갈비 51,880 1 51,880',
+  '1265720518844',
+  '총 품목 수량 3',
+  '합계 72,840'
+].join('\n');
+const KURLY_ORDER_TEXT = [
+  'Kurly',
+  '주문 내역 상세',
+  '샛별배송',
+  'KF365 무항생제 특란 10구',
+  '6,980원',
+  '친환경 양파 1kg',
+  '4,980원',
+  '전체 상품 다시 담기',
+  '컬리캐시 적립'
+].join('\n');
 
 describe('parseImportText', () => {
   beforeEach(() => {
@@ -132,6 +176,23 @@ describe('parseImportText', () => {
     });
   });
 
+  describe('OCR source detection routing', () => {
+    it('detects Coupang, Kurly, and receipt source types before parsing', () => {
+      expect(detectOcrSourceType(COUPANG_BASIC_TEXT).sourceType).toBe('coupang_order');
+      expect(detectOcrSourceType(KURLY_ORDER_TEXT).sourceType).toBe('kurly_order');
+      expect(detectOcrSourceType(MART_RECEIPT_SAMPLE_A).sourceType).toBe('receipt');
+    });
+
+    it('routes Kurly order text to the Kurly parser', () => {
+      const result = parseImportText(KURLY_ORDER_TEXT);
+
+      expect(result.sourceType).toBe('kurly_order');
+      expect(result.template.id).toBe('kurly-order');
+      expect(result.candidates.map((candidate) => candidate.displayName)).toEqual(['계란', '양파']);
+      expect(result.ignoredLines).toEqual(expect.arrayContaining(['Kurly', '6,980원', '전체 상품 다시 담기']));
+    });
+  });
+
   describe('line classification and row composition', () => {
     it('distinguishes product lines from non-product lines', () => {
       const result = parseImportText(COUPANG_WITH_NON_PRODUCT_LINES_TEXT);
@@ -211,12 +272,69 @@ describe('parseImportText', () => {
       expect(result.candidates[0].quantity).toBe('1kg');
     });
 
+    it('extracts common OCR unit variants', () => {
+      const quantities = ['양파 1㎏', '대파 1단', '감자 2키로'].map((text) => parseImportText(text).candidates[0]?.quantity);
+
+      expect(quantities).toEqual(['1kg', '1단', '2kg']);
+    });
+
     it('keeps unknown generic multi-line text in fallback mode without creating invalid candidates', () => {
       const result = parseImportText(UNKNOWN_GENERIC_TEXT);
 
       expect(result.template.id).toBe('generic-text');
       expect(result.candidates).toEqual([]);
       expect(result.ignoredLines).toEqual(['Fresh onion 1kg', 'Total: 3000']);
+    });
+  });
+
+  describe('mart receipt OCR parsing', () => {
+    it('extracts only product rows from a noisy mobile mart receipt', () => {
+      const result = parseImportText(MART_RECEIPT_SAMPLE_A);
+
+      expect(result.template.id).toBe('receipt-ocr');
+      expect(result.candidates.map((candidate) => candidate.name)).toEqual([
+        '돌얼음2.5kg',
+        '풀무원 국산두컵두부',
+        '미국산냉장초이스갈비',
+        '아인슈타인베이글2봉',
+        '필라델피아 크림치즈'
+      ]);
+      expect(result.candidates.map((candidate) => candidate.simplifiedName)).toEqual([
+        '얼음',
+        '두부',
+        '소갈비',
+        '베이글',
+        '크림치즈'
+      ]);
+      expect(result.candidates[0]).toMatchObject({
+        weightOrVolume: '2.5kg',
+        storageType: '냉동',
+        source: 'receipt_ocr'
+      });
+      expect(result.ignoredLines).toEqual(
+        expect.arrayContaining(['8801114106921', '합계 65,380', '결제대상금액 65,380'])
+      );
+    });
+
+    it('ignores discount lines and preserves count and weight from receipt product names', () => {
+      const result = parseImportText(MART_RECEIPT_SAMPLE_B);
+
+      expect(result.template.id).toBe('receipt-ocr');
+      expect(result.candidates.map((candidate) => candidate.name)).toEqual([
+        '오뚜기 옛날 참기름',
+        '프라임 버터 450g*2입',
+        '미국산냉장초이스갈비'
+      ]);
+      expect(result.candidates[1]).toMatchObject({
+        simplifiedName: '버터',
+        quantity: '2입 / 450g',
+        unit: '입',
+        weightOrVolume: '450g',
+        category: '유제품',
+        storageType: '냉장',
+        selected: true
+      });
+      expect(result.candidates.map((candidate) => candidate.originalText)).not.toContain('신세계포인트적립할인 -3,800');
     });
   });
 });

@@ -7,10 +7,11 @@ import {
   createTodayString
 } from './import/importCandidates.js';
 import { detectImportTemplate } from './import/detectTemplate.js';
+import { parseKurlyOrder } from './import/kurlyParser.js';
+import { detectOcrSourceType, OCR_SOURCE_TYPES } from './import/ocrSourceDetector.js';
+import { parseReceiptText } from './import/receiptParser.js';
 
-export function parseImportText(source) {
-  const today = createTodayString();
-  const normalizedSource = typeof source === 'string' ? { text: source } : source || {};
+export function parseCoupangOrder(normalizedSource, today, sourceDetection) {
   const template = detectImportTemplate({
     rawText: normalizedSource.text || '',
     lineItems: normalizedSource.lineItems || []
@@ -80,6 +81,60 @@ export function parseImportText(source) {
     candidates,
     classifiedLines,
     rows,
-    template
+    template,
+    sourceType: sourceDetection.sourceType,
+    sourceConfidence: sourceDetection.confidence,
+    sourceScores: sourceDetection.scores
   };
+}
+
+export function parseReceiptOcr(normalizedSource, today, sourceDetection) {
+  const receiptResult = parseReceiptText(normalizedSource.text || '', today);
+
+  return {
+    ...receiptResult,
+    classifiedLines: [],
+    rows: [],
+    template: receiptResult.template,
+    sourceType: sourceDetection.sourceType,
+    sourceConfidence: sourceDetection.confidence,
+    sourceScores: sourceDetection.scores
+  };
+}
+
+export function parseGenericShoppingOrder(normalizedSource, today, sourceDetection) {
+  const genericDetection = {
+    ...sourceDetection,
+    sourceType:
+      sourceDetection.sourceType === OCR_SOURCE_TYPES.UNKNOWN
+        ? OCR_SOURCE_TYPES.UNKNOWN
+        : OCR_SOURCE_TYPES.GENERIC_SHOPPING_ORDER
+  };
+
+  return parseCoupangOrder(normalizedSource, today, genericDetection);
+}
+
+export function parseImportText(source) {
+  const today = createTodayString();
+  const normalizedSource = typeof source === 'string' ? { text: source } : source || {};
+  const sourceDetection = detectOcrSourceType(normalizedSource.text || '');
+
+  if (sourceDetection.sourceType === OCR_SOURCE_TYPES.RECEIPT) {
+    return parseReceiptOcr(normalizedSource, today, sourceDetection);
+  }
+
+  if (sourceDetection.sourceType === OCR_SOURCE_TYPES.KURLY_ORDER) {
+    return {
+      ...parseKurlyOrder(normalizedSource.text || '', today),
+      sourceType: sourceDetection.sourceType,
+      sourceConfidence: sourceDetection.confidence,
+      sourceScores: sourceDetection.scores
+    };
+  }
+
+  if (sourceDetection.sourceType === OCR_SOURCE_TYPES.COUPANG_ORDER) {
+    return parseCoupangOrder(normalizedSource, today, sourceDetection);
+  }
+
+  return parseGenericShoppingOrder(normalizedSource, today, sourceDetection);
 }
