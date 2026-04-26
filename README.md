@@ -14,7 +14,10 @@ Current product scope:
 - Authenticated mode with JWT-based login and user-scoped server persistence
 - Express + Prisma backend with PostgreSQL-backed ingredient storage
 
-The project is intentionally practical and understandable. It is not a full enterprise architecture, but it now has clearer boundaries so future features like authentication and user-based persistence can be added without rewriting the app.
+The project is intentionally practical and understandable. It is not a full enterprise architecture, but it now has clearer boundaries so authenticated persistence and local-first fallback can evolve without rewriting the app.
+
+For product strategy beyond the current feature set, see [docs/BUSINESS_ROADMAP.md](docs/BUSINESS_ROADMAP.md).
+For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/ANALYTICS_EVENTS.md).
 
 ## Features
 
@@ -22,6 +25,7 @@ The project is intentionally practical and understandable. It is not a full ente
 
 - Add, edit, delete, and mark ingredients as consumed
 - Track quantity, category, storage type, purchase date, expiry date, and notes
+- Search by ingredient name or notes
 - Filter by category and storage type
 - Sort by expiry date
 - Shopping panel for consumed items
@@ -43,11 +47,18 @@ The project is intentionally practical and understandable. It is not a full ente
 
 ### OCR import
 
-- Upload screenshot
+- Upload screenshot with a step-by-step review flow
 - Extract text in the browser with Tesseract.js
 - Parse shopping/order text into ingredient candidates
 - Review and selectively save parsed items
 - Learn user corrections for future imports
+
+### UI and usability
+
+- Condensed header and page hero layout for faster scanning on desktop and mobile
+- Dashboard cards prioritize urgent expiry work and next actions
+- Ingredient cards emphasize consume/restore first, with edit and delete as secondary actions
+- Recipe recommendation screen uses tighter summary blocks and compact pantry controls
 
 ### Local-first data flow
 
@@ -59,7 +70,7 @@ The project is intentionally practical and understandable. It is not a full ente
 
 ### Authentication and persistence
 
-- Sign up, log in, log out, and restore a persistent session with JWT bearer tokens
+- Sign up, log in, log out, and restore a persistent session with short-lived access tokens and rotating refresh tokens
 - Protect ingredient and recipe API access on the backend
 - Scope server-backed ingredients by user
 - Keep guest mode separate instead of forcing account creation
@@ -81,11 +92,13 @@ The project is intentionally practical and understandable. It is not a full ente
 - Prisma
 - PostgreSQL
 - JWT bearer auth with Node `crypto`
+- Redis-backed auth throttling and logout token revocation with memory fallback
 
 ### Testing and tooling
 
 - Vitest
 - React Testing Library
+- Playwright
 - ESLint
 - Prettier
 - GitHub Actions
@@ -195,10 +208,19 @@ FridgeMate now supports two clear modes:
   - no account is required
   - no protected backend calls are made
 - Authenticated mode
-  - JWT bearer auth protects the API
+  - JWT-backed access cookies protect the API
+  - rotating refresh cookies restore the session and mint fresh access cookies
+  - access tokens carry issuer, audience, and token id claims
   - ingredients are scoped by `userId`
   - IndexedDB acts as a user-scoped local cache
   - successful server reads and writes mirror into the authenticated cache
+
+Current auth hardening notes:
+
+- signup and login are rate-limited by IP and normalized email
+- email uniqueness is enforced on a normalized database column
+- logout revokes the current token until it expires and revokes the refresh session in storage
+- access and refresh tokens are stored as `httpOnly` cookies, while the frontend keeps only the last known user snapshot locally
 
 This keeps the project simple enough for a portfolio app while making the data boundary easy to explain:
 
@@ -214,7 +236,8 @@ The sync strategy is also slightly stronger than a naive last-write-wins approac
 
 - guest mode remains fully local
 - authenticated mode compares cached and remote items by `updatedAt`
-- newer remote items replace stale local cache entries
+- clean local items that disappear remotely are pruned from the cache
+- newer clean local cache entries are retained as pending updates instead of being overwritten blindly
 - pending local fallback writes are retained with sync metadata for future improvement
 
 ## Getting Started
@@ -233,6 +256,12 @@ Set `VITE_API_URL=` in `.env` so the app runs in local-only mode.
 npm run dev
 ```
 
+To enable frontend error monitoring, also set:
+
+```env
+VITE_SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
+```
+
 ### Frontend + backend mode
 
 Set the API URL and database connection in `.env`.
@@ -240,11 +269,28 @@ Set the API URL and database connection in `.env`.
 ```env
 VITE_API_URL=http://localhost:4000/api
 DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/fridgemate?schema=public
+DIRECT_URL=postgresql://USER:PASSWORD@localhost:5432/fridgemate?schema=public
 PORT=4000
 ALLOWED_ORIGINS=http://localhost:5173
 JWT_SECRET=replace-this-in-production
-JWT_EXPIRES_IN=7d
+JWT_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=30d
+JWT_ISSUER=fridgemate-api
+JWT_AUDIENCE=fridgemate-client
+ACCESS_TOKEN_COOKIE_NAME=fridgemate_access
+REFRESH_TOKEN_COOKIE_NAME=fridgemate_refresh
+AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_SAME_SITE=Lax
+REDIS_URL=redis://localhost:6379
+AUTH_REDIS_PREFIX=fridgemate:auth
 ANTHROPIC_API_KEY=
+```
+
+For Supabase, use the pooler URL for runtime database traffic and the direct/session URL for Prisma migrations:
+
+```env
+DATABASE_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres"
 ```
 
 Then run:
@@ -270,20 +316,43 @@ http://localhost:4000/health
 ## Tests and Quality
 
 ```bash
+npm run lint
 npm run test:run
 npm run build
 ```
+
+## Security Notes
+
+- Use a random `JWT_SECRET` of at least 32 bytes.
+- Keep `ALLOWED_ORIGINS` tight in production instead of broad wildcards.
+- Set `REDIS_URL` to share auth throttling and logout revocation across API instances. If Redis is unavailable at boot or fails during runtime, the server falls back to in-memory storage.
+- Keep `AUTH_COOKIE_SECURE=true` in production so auth cookies are sent only over HTTPS.
+- The SPA no longer stores auth tokens in `localStorage`; only the user snapshot is persisted for local-first recovery.
 
 Optional:
 
 ```bash
 npm run test:coverage
-npm run lint
+npm run test:e2e
 ```
+
+Playwright E2E uses two dev-server projects:
+
+- `local-only`: no backend URL, verifies IndexedDB CRUD and OCR review flow
+- `api-mode`: relative `/api` base URL with mocked responses, verifies auth, API CRUD, and fallback behavior
 
 ## Suggested Next Improvements
 
 - Add conflict-aware sync uploads for pending authenticated writes
 - Move shared recipe data/logic into a dedicated `shared/` module if the backend becomes a permanent part of the app
-- Add component-level tests for page flows
+- Expand Playwright coverage beyond the core five user journeys
 - Add user-scoped pantry staple persistence so auth mode covers the full recipe context
+
+## Deployment
+
+1. Add a Railway PostgreSQL plugin and confirm `DATABASE_URL` is available to the backend service.
+2. Set Railway environment variables: `JWT_SECRET`, `ALLOWED_ORIGINS`, `CLIENT_ORIGIN`.
+3. Set the Vercel environment variables: `VITE_API_URL`, `VITE_SENTRY_DSN` if Sentry monitoring is enabled.
+4. Push to GitHub so Railway and Vercel can deploy automatically.
+5. Verify the backend health check at `GET /health`.
+6. Run an end-to-end smoke test: sign up, log in, add an ingredient, then load recipe recommendations.

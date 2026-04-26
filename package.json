@@ -14,6 +14,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "server": "node server/src/index.js",
     "start": "node server/src/index.js",
     "prisma:validate": "prisma validate",
@@ -24,15 +25,18 @@
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
+    "@sentry/react": "^10.49.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.1",
+    "redis": "^5.12.1",
     "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -48,7 +52,7 @@
     "jsdom": "^29.0.1",
     "postcss": "^8.4.49",
     "prettier": "^3.8.1",
-    "prisma": "^6.6.0",
+    "prisma": "^6.19.3",
     "tailwindcss": "^3.4.17",
     "vite": "^8.0.3",
     "vitest": "^4.1.2"

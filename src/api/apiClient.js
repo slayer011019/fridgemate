@@ -1,4 +1,3 @@
-import { getAuthToken } from '../features/auth/authStorage';
 import { apiBaseUrl } from '../utils/backendConfig';
 
 export class ApiClientError extends Error {
@@ -11,15 +10,20 @@ export class ApiClientError extends Error {
   }
 }
 
-function buildHeaders(headers = {}, authMode = 'auto') {
-  const nextHeaders = { ...headers };
-  const token = getAuthToken();
+function buildHeaders(headers = {}) {
+  return { ...headers };
+}
 
-  if (authMode !== 'never' && token) {
-    nextHeaders.Authorization = `Bearer ${token}`;
+async function tryRefreshAuthSession() {
+  try {
+    const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
-
-  return nextHeaders;
 }
 
 export async function requestJson(
@@ -27,27 +31,34 @@ export async function requestJson(
   options = {},
   { authMode = 'auto', errorClass = ApiClientError, allowNoContent = false } = {}
 ) {
-  const token = getAuthToken();
-
-  if (authMode === 'required' && !token) {
-    throw new errorClass('Authentication is required.', {
-      status: 401,
-      path
-    });
-  }
-
   let response;
 
   try {
     response = await fetch(`${apiBaseUrl}${path}`, {
       ...options,
-      headers: buildHeaders(options.headers, authMode)
+      credentials: 'include',
+      headers: buildHeaders(options.headers)
     });
   } catch (error) {
     throw new errorClass('API request could not reach the server.', {
       path,
       cause: error
     });
+  }
+
+  if (!response.ok && response.status === 401 && authMode === 'required' && !options.__skipRefreshRetry) {
+    const refreshed = await tryRefreshAuthSession();
+
+    if (refreshed) {
+      return requestJson(
+        path,
+        {
+          ...options,
+          __skipRefreshRetry: true
+        },
+        { authMode, errorClass, allowNoContent }
+      );
+    }
   }
 
   if (!response.ok) {

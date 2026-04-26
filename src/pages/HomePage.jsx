@@ -1,42 +1,56 @@
-import { useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import RecipeCard from '../components/RecipeCard';
 import StatCard from '../components/StatCard';
-import { seedRecipes } from '../data/seedRecipes';
-import { getUpcomingIngredients } from '../features/ingredients/ingredientSelectors';
-import { useIngredients } from '../hooks/useIngredients';
-import { usePantryStaples } from '../hooks/usePantryStaples';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { useHomePageModel } from '../hooks/useHomePageModel';
 import { isOcrEnabled } from '../utils/backendConfig';
 import { getCategoryLabel, getStorageLabel } from '../utils/displayText';
-import { getDashboardSummary, getExpiryLabel, getRemainingDays } from '../utils/date';
-import { getTopRecommendations } from '../utils/recommendations';
+import { getExpiryLabel, getRemainingDays } from '../utils/date';
 
 function HomePage() {
-  const { ingredients, loading } = useIngredients();
-  const { pantryOwnership } = usePantryStaples();
   const ocrEnabled = isOcrEnabled();
-  const summary = useMemo(() => getDashboardSummary(ingredients), [ingredients]);
-  const topRecommendations = useMemo(
-    () => getTopRecommendations(seedRecipes, ingredients, 3, { pantryOwnership }),
-    [ingredients, pantryOwnership]
-  );
-  const upcomingItems = useMemo(() => getUpcomingIngredients(ingredients, 4), [ingredients]);
+  const { trackEvent } = useAnalytics();
+  const lastViewSignatureRef = useRef('');
+  const { loading, summary, topRecommendations, upcomingItems, urgentCount } = useHomePageModel();
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    const nextSignature = [summary.total, urgentCount, topRecommendations.length].join(':');
+
+    if (lastViewSignatureRef.current === nextSignature) {
+      return;
+    }
+
+    lastViewSignatureRef.current = nextSignature;
+    trackEvent('recommendations_viewed', {
+      screen: 'home',
+      available_ingredient_count: summary.total,
+      expiring_soon_count: urgentCount,
+      ready_count: topRecommendations.length,
+      buy_one_more_count: 0,
+      use_soon_count: 0
+    });
+  }, [loading, summary.total, topRecommendations.length, trackEvent, urgentCount]);
 
   return (
-    <div className="space-y-5">
+    <div className="section-shell">
       <PageHeader
         eyebrow={'\uB300\uC2DC\uBCF4\uB4DC'}
-        title={'\uC624\uB298\uC758 \uB0C9\uC7A5\uACE0\uB97C \uC0B0\uB73B\uD558\uAC8C \uC815\uB9AC\uD574\uBCFC\uAE4C\uC694?'}
+        title={'\uC624\uB298 \uCC98\uB9AC\uD560 \uC7AC\uB8CC\uC640 \uB9CC\uB4E4 \uC218 \uC788\uB294 \uBA54\uB274\uB97C \uD55C\uBC88\uC5D0 \uBCF4\uC138\uC694'}
         description={
-          '\uB0C9\uC7A5\uACE0 \uC18D \uC7AC\uB8CC \uD604\uD669\uACFC \uC720\uD1B5\uAE30\uD55C \uC704\uD5D8, \uADF8\uB9AC\uACE0 \uC9C0\uAE08 \uB9CC\uB4E4 \uC218 \uC788\uB294 \uB808\uC2DC\uD53C\uAE4C\uC9C0 \uD558\uB098\uC758 \uD750\uB984\uC73C\uB85C \uBCF4\uC5EC\uC90D\uB2C8\uB2E4.'
+          '\uC720\uD1B5\uAE30\uD55C \uC784\uBC15, \uC7AC\uB8CC \uCD94\uAC00, \uCD94\uCC9C \uD655\uC778\uAE4C\uC9C0 \uC790\uC8FC \uD558\uB294 \uC791\uC5C5\uB9CC \uC55E\uCABD\uC5D0 \uBAA8\uC544\uB450\uC5C8\uC5B4\uC694.'
         }
         action={
           <>
             {ocrEnabled ? (
               <Link to="/import" className="btn-secondary">
-                {'\uC2A4\uD06C\uB9B0\uC0F7 \uBD88\uB7EC\uC624\uAE30'}
+                {'\uC0AC\uC9C4 \uAC00\uC838\uC624\uAE30'}
               </Link>
             ) : null}
             <Link to="/ingredients/new" className="btn-primary">
@@ -46,19 +60,33 @@ function HomePage() {
         }
       />
 
-      <section className="grid gap-3 md:grid-cols-3">
-        <StatCard label={'\uC804\uCCB4 \uC7AC\uB8CC'} value={loading ? '...' : summary.total} />
-        <StatCard label={'\uACE7 \uB9CC\uB8CC'} value={loading ? '...' : summary.expiringSoon} tone="warning" />
-        <StatCard label={'\uC774\uBBF8 \uC9C0\uB0A8'} value={loading ? '...' : summary.expired} tone="danger" />
+      <section className="stats-grid">
+        <StatCard
+          label={'\uC804\uCCB4 \uC7AC\uB8CC'}
+          value={loading ? '...' : summary.total}
+          helper={'\uD604\uC7AC \uBCF4\uC720 \uC911\uC778 \uD56D\uBAA9 \uAE30\uC900'}
+        />
+        <StatCard
+          label={'\uC6B0\uC120 \uCC98\uB9AC'}
+          value={loading ? '...' : urgentCount}
+          tone="warning"
+          helper={'\uACE7 \uB9CC\uB8CC + \uC774\uBBF8 \uC9C0\uB09C \uD56D\uBAA9'}
+        />
+        <StatCard
+          label={'\uC624\uB298 \uD560 \uC77C'}
+          value={loading ? '...' : topRecommendations.length}
+          tone="default"
+          helper={'\uBC14\uB85C \uBCFC \uB9CC\uD55C \uCD94\uCC9C \uBA54\uB274'}
+        />
       </section>
 
       <section className="card">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="kicker">{'\uBA3C\uC800 \uC368\uC57C \uD560 \uC7AC\uB8CC'}</p>
+            <p className="kicker">{'\uC624\uB298 \uBA3C\uC800 \uBCFC \uBAA9\uB85D'}</p>
             <h3 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">{'\uC720\uD1B5\uAE30\uD55C \uC784\uBC15 \uB9AC\uC2A4\uD2B8'}</h3>
-            <p className="mt-2 text-sm leading-6 muted">
-              {'\uB2F9\uC7A5 \uC18C\uBE44\uD558\uBA74 \uC88B\uC740 \uC7AC\uB8CC\uB97C \uBA3C\uC800 \uBCF4\uC5EC\uC918 \uC7A5\uBCF4\uAE30\uC640 \uC694\uB9AC \uC21C\uC11C\uB97C \uC815\uB9AC\uD574\uC90D\uB2C8\uB2E4.'}
+            <p className="mt-2 text-sm leading-5.5 muted">
+              {'\uACE7 \uC368\uC57C \uD558\uB294 \uC7AC\uB8CC\uB97C \uC55E\uCABD\uC5D0 \uC815\uB82C\uD574 \uC18C\uBE44 \uC21C\uC11C\uB97C \uBE60\uB974\uAC8C \uC815\uD558\uAC8C \uD569\uB2C8\uB2E4.'}
             </p>
           </div>
           <Link to="/ingredients" className="btn-secondary">
@@ -66,7 +94,7 @@ function HomePage() {
           </Link>
         </div>
 
-        <div className="mt-4 grid gap-2.5 lg:grid-cols-2">
+        <div className="content-grid-2 mt-4 gap-2.5">
           {!loading && !upcomingItems.length ? (
             <EmptyState
               title={'\uC544\uC9C1 \uC800\uC7A5\uB41C \uC7AC\uB8CC\uAC00 \uC5C6\uC5B4\uC694'}
@@ -91,10 +119,10 @@ function HomePage() {
       <section className="card">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="kicker">{'\uC624\uB298\uC758 \uC694\uB9AC \uD78C\uD2B8'}</p>
+            <p className="kicker">{'\uC624\uB298 \uACE0\uB97C \uBA54\uB274'}</p>
             <h3 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">{'\uCD94\uCC9C \uB808\uC2DC\uD53C \uBBF8\uB9AC\uBCF4\uAE30'}</h3>
-            <p className="mt-2 text-sm leading-6 muted">
-              {'\uC7AC\uB8CC \uBAA9\uB85D\uC774 \uBC14\uB00C\uBA74 \uCD94\uCC9C \uACB0\uACFC\uB3C4 \uC790\uB3D9\uC73C\uB85C \uD568\uAED8 \uC5C5\uB370\uC774\uD2B8\uB429\uB2C8\uB2E4.'}
+            <p className="mt-2 text-sm leading-5.5 muted">
+              {'\uBC14\uB85C \uD560 \uC218 \uC788\uB294 \uAC83\uBD80\uD130 \uBBF8\uB9AC \uBCF4\uACE0, \uC0C1\uC138 \uD310\uB2E8\uC740 \uB808\uC2DC\uD53C \uD398\uC774\uC9C0\uC5D0\uC11C \uC774\uC5B4\uAC00\uC138\uC694.'}
             </p>
           </div>
           <Link to="/recipes" className="btn-secondary">
@@ -110,7 +138,7 @@ function HomePage() {
             />
           ) : null}
 
-          <div className="grid gap-3 xl:grid-cols-3">
+          <div className="content-grid-3">
             {topRecommendations.map((recipe) => (
               <RecipeCard key={recipe.id} recipe={recipe} />
             ))}

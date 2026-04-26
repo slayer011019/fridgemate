@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { useAuth } from '../hooks/useAuth';
 
 const defaultForm = {
@@ -11,6 +12,7 @@ const defaultForm = {
 function SignupPage() {
   const navigate = useNavigate();
   const { backendEnabled, isAuthenticated, loading, signup } = useAuth();
+  const { trackEvent } = useAnalytics();
   const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -34,6 +36,9 @@ function SignupPage() {
 
     try {
       await signup(form);
+      trackEvent('signup_completed', {
+        source_screen: 'signup'
+      });
       navigate('/account', { replace: true });
     } catch (nextError) {
       setError(nextError.message || '\uD68C\uC6D0\uAC00\uC785\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.');
@@ -43,12 +48,12 @@ function SignupPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="section-shell">
       <PageHeader
         eyebrow={'\uACC4\uC815'}
-        title={'\uACC4\uC815\uC744 \uB9CC\uB4E4\uACE0 \uC0AC\uC6A9\uC790 \uC804\uC6A9 \uC800\uC7A5\uC18C\uB97C \uC2DC\uC791\uD574\uBCF4\uC138\uC694'}
+        title={'\uACC4\uC815\uC744 \uB9CC\uB4E4\uACE0 \uB0B4 \uC800\uC7A5\uC18C\uB97C \uC2DC\uC791\uD558\uC138\uC694'}
         description={
-          '\uAC8C\uC2A4\uD2B8 \uBAA8\uB4DC\uB294 \uADF8\uB300\uB85C \uB450\uACE0, \uB85C\uADF8\uC778 \uC774\uD6C4 \uD655\uC7A5\uB41C \uAE30\uB2A5\uC744 \uC704\uD55C \uAE54\uB054\uD55C \uD655\uC7A5 \uACBD\uB85C\uB97C \uB9C8\uB828\uD55C \uAD6C\uC870\uC785\uB2C8\uB2E4.'
+          '\uD68C\uC6D0\uAC00\uC785 \uD6C4\uC5D0\uB294 \uACC4\uC815 \uAE30\uBC18 \uC7AC\uB8CC \uD750\uB984\uACFC \uC138\uC158 \uBCF5\uC6D0\uC744 \uC0AC\uC6A9\uD558\uAC8C \uB429\uB2C8\uB2E4.'
         }
       />
 
@@ -61,6 +66,10 @@ function SignupPage() {
       {error ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
 
       <form className="card max-w-xl space-y-4" onSubmit={handleSubmit}>
+        <div className="flex flex-wrap gap-2">
+          <span className="summary-chip">{backendEnabled ? '\uACC4\uC815 \uC0DD\uC131 \uAC00\uB2A5' : '\uB85C\uCEEC \uC804\uC6A9 \uBAA8\uB4DC'}</span>
+          <span className="summary-chip">{'\uBE44\uBC00\uBC88\uD638 8\uC790 + \uD2B9\uC218\uBB38\uC790'}</span>
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
             {'\uC774\uBA54\uC77C'}
@@ -69,7 +78,10 @@ function SignupPage() {
 
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
             {'\uBE44\uBC00\uBC88\uD638'}
-            <input required minLength={8} name="password" type="password" value={form.password} onChange={handleChange} />
+            <input required minLength={8} maxLength={128} name="password" type="password" value={form.password} onChange={handleChange} />
+            <span className="block text-xs font-normal text-slate-500">
+              {'8\uC790 \uC774\uC0C1, \uD2B9\uC218\uBB38\uC790 \uD3EC\uD568, \uC774\uBA54\uC77C \uC77C\uBD80\uB098 \uC26C\uC6B4 \uD328\uD134\uC744 \uD53C\uD55C \uBE44\uBC00\uBC88\uD638\uB97C \uC0AC\uC6A9\uD574\uC8FC\uC138\uC694.'}
+            </span>
           </label>
         </div>
 

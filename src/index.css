@@ -15,9 +15,14 @@
     --fm-brand-soft: #e5efe2;
     --fm-warning: #f0bf74;
     --fm-danger: #df8f86;
+    --fm-shadow-soft: 0 12px 28px rgba(88, 104, 79, 0.08);
+    --fm-shadow-hover: 0 16px 32px rgba(88, 104, 79, 0.12);
   }
 
   html {
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
     @apply scroll-smooth;
   }
 
@@ -27,7 +32,11 @@
       radial-gradient(circle at top right, rgba(255, 231, 195, 0.38), transparent 24rem),
       linear-gradient(180deg, #fbf8f2 0%, #f6f2e8 100%);
     color: var(--fm-text);
-    font-family: "Trebuchet MS", "Noto Sans KR", sans-serif;
+    font-family: "Avenir Next", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+    overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
     @apply min-h-screen;
   }
 
@@ -38,8 +47,8 @@
   input,
   select,
   textarea {
-    border-color: var(--fm-line);
-    background-color: rgba(255, 255, 255, 0.82);
+    border-color: rgba(126, 163, 130, 0.22);
+    background-color: rgba(255, 255, 255, 0.9);
     color: var(--fm-text);
     @apply w-full rounded-xl border px-3.5 py-2.5 text-sm shadow-sm outline-none transition duration-200;
   }
@@ -59,8 +68,8 @@
 @layer components {
   .glass-card {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 252, 247, 0.82));
-    border-color: var(--fm-line);
-    box-shadow: 0 10px 26px rgba(103, 118, 94, 0.08);
+    border-color: rgba(126, 163, 130, 0.16);
+    box-shadow: var(--fm-shadow-soft);
     @apply rounded-[22px] border backdrop-blur-sm;
   }
 
@@ -70,8 +79,8 @@
 
   .soft-panel {
     @apply rounded-[18px] border p-3.5;
-    border-color: rgba(126, 163, 130, 0.14);
-    background: rgba(250, 247, 241, 0.76);
+    border-color: rgba(126, 163, 130, 0.16);
+    background: rgba(250, 247, 241, 0.82);
   }
 
   .btn-primary {
@@ -87,7 +96,7 @@
 
   .btn-secondary {
     border-color: rgba(126, 163, 130, 0.18);
-    background: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.82);
     color: var(--fm-text);
     @apply inline-flex min-h-[2.5rem] items-center justify-center rounded-full border px-4 py-2.5 text-sm font-semibold;
   }
@@ -111,5 +120,90 @@
 
   .muted {
     color: var(--fm-text-soft);
+  }
+
+  .section-shell {
+    @apply space-y-4 sm:space-y-5;
+  }
+
+  .app-frame {
+    @apply mx-auto flex w-full flex-col gap-4 px-4 pb-8 pt-3 sm:gap-5 sm:px-6 sm:pt-4;
+    max-width: 100%;
+  }
+
+  .app-header-frame {
+    @apply mx-auto w-full px-4 sm:px-6;
+    max-width: 100%;
+  }
+
+  .stats-grid {
+    @apply grid gap-3 sm:grid-cols-2;
+  }
+
+  .content-grid-2 {
+    @apply grid gap-3 md:grid-cols-2;
+  }
+
+  .content-grid-3 {
+    @apply grid gap-3 md:grid-cols-2;
+  }
+
+  .adaptive-split {
+    @apply grid gap-4;
+  }
+
+  .summary-chip {
+    @apply inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold;
+    border-color: rgba(126, 163, 130, 0.16);
+    background: rgba(255, 255, 255, 0.84);
+    color: var(--fm-text);
+  }
+
+  .touch-pan-x {
+    touch-action: pan-x;
+  }
+}
+
+@media (min-width: 1280px) {
+  @layer components {
+    .app-frame {
+      max-width: 96rem;
+      padding-left: 2.5rem;
+      padding-right: 2.5rem;
+    }
+
+    .app-header-frame {
+      max-width: 96rem;
+      padding-left: 2.5rem;
+      padding-right: 2.5rem;
+    }
+
+    .stats-grid {
+      @apply grid-cols-3;
+    }
+
+    .content-grid-3 {
+      @apply grid-cols-3;
+    }
+
+    .adaptive-split {
+      grid-template-columns: minmax(0, 1.2fr) minmax(20rem, 0.8fr);
+    }
+  }
+}
+
+@media (min-width: 1536px) {
+  @layer components {
+    .app-frame {
+      max-width: 108rem;
+      padding-left: 3rem;
+      padding-right: 3rem;
+    }
+
+    .app-header-frame {
+      max-width: 108rem;
+      padding-left: 3rem;
+      padding-right: 3rem;
+    }
   }
 }

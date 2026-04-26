@@ -1,18 +1,21 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import * as authApi from '../api/authApi';
-import * as ingredientsApi from '../api/ingredientsApi';
-import * as indexedDb from '../db/indexedDB';
 import {
   buildUserStorageScope,
-  clearStoredAuthSession,
-  getGuestImportDecision,
   getStoredAuthSession,
   GUEST_STORAGE_SCOPE,
-  saveStoredAuthSession,
-  setGuestImportDecision
 } from '../features/auth/authStorage';
+import {
+  loginWithSession,
+  logoutSession,
+  refreshStoredSession,
+  signupWithSession
+} from '../features/auth/authSessionService';
+import {
+  dismissGuestImportPrompt,
+  importGuestIngredientsForUser,
+  inspectGuestImportPrompt
+} from '../features/auth/guestImportService';
 import { isBackendEnabled } from '../utils/backendConfig';
-import { markIngredientAsSynced } from '../utils/syncStrategy';
 
 const defaultGuestImportPrompt = {
   available: false,
@@ -39,109 +42,44 @@ const defaultAuthContext = {
 
 const AuthContext = createContext(defaultAuthContext);
 
-function createUnavailableAuthError() {
-  return new Error('Authentication is unavailable while the app is running in local-only mode.');
-}
-
 export function AuthProvider({ children }) {
   const backendEnabled = isBackendEnabled();
   const [session, setSession] = useState(() => (backendEnabled ? getStoredAuthSession() : null));
-  const [loading, setLoading] = useState(() => backendEnabled && Boolean(getStoredAuthSession()?.token));
+  const [loading, setLoading] = useState(() => backendEnabled);
   const [error, setError] = useState('');
   const [guestImportPrompt, setGuestImportPrompt] = useState(defaultGuestImportPrompt);
 
   const user = session?.user || null;
-  const token = session?.token || '';
-  const isAuthenticated = Boolean(user?.id && token);
-  const storageScope = isAuthenticated ? buildUserStorageScope(user.id) : GUEST_STORAGE_SCOPE;
-
-  const persistSession = useCallback((nextSession) => {
-    if (nextSession?.token && nextSession?.user?.id) {
-      saveStoredAuthSession(nextSession);
-      setSession(nextSession);
-      return;
-    }
-
-    clearStoredAuthSession();
-    setSession(null);
-  }, []);
+  const token = '';
+  const isAuthenticated = Boolean(user?.id);
+  const storageScope = user?.id ? buildUserStorageScope(user.id) : GUEST_STORAGE_SCOPE;
 
   const refreshSession = useCallback(async () => {
-    if (!backendEnabled) {
-      persistSession(null);
-      setLoading(false);
-      return null;
-    }
-
-    const storedSession = getStoredAuthSession();
-
-    if (!storedSession?.token) {
-      persistSession(null);
-      setLoading(false);
-      return null;
-    }
-
-    setLoading(true);
-
-    try {
-      const nextUser = await authApi.getCurrentUser();
-      const nextSession = {
-        token: storedSession.token,
-        user: nextUser
-      };
-
-      persistSession(nextSession);
-      setError('');
-      return nextSession;
-    } catch (nextError) {
-      persistSession(null);
-      setError(nextError.message || 'The current session could not be restored.');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [backendEnabled, persistSession]);
+    return refreshStoredSession({
+      backendEnabled,
+      setSession,
+      setLoading,
+      setError
+    });
+  }, [backendEnabled]);
 
   useEffect(() => {
-    if (!backendEnabled) {
-      persistSession(null);
-      setLoading(false);
-      return;
-    }
-
     refreshSession();
-  }, [backendEnabled, persistSession, refreshSession]);
+  }, [backendEnabled, refreshSession]);
 
   useEffect(() => {
     let isMounted = true;
 
-    if (!isAuthenticated) {
-      setGuestImportPrompt(defaultGuestImportPrompt);
-      return undefined;
-    }
-
-    const inspectGuestIngredients = async () => {
-      const decision = getGuestImportDecision(user.id);
-
-      if (decision) {
+    inspectGuestImportPrompt({
+      isAuthenticated,
+      user,
+      setGuestImportPrompt: (nextValue) => {
         if (isMounted) {
-          setGuestImportPrompt(defaultGuestImportPrompt);
+          setGuestImportPrompt(nextValue);
         }
-        return;
-      }
-
-      const guestIngredients = await indexedDb.getAllIngredients({ scope: GUEST_STORAGE_SCOPE });
-
-      if (isMounted) {
-        setGuestImportPrompt({
-          available: guestIngredients.length > 0,
-          count: guestIngredients.length,
-          loading: false
-        });
-      }
-    };
-
-    inspectGuestIngredients().catch(() => {
+      },
+      defaultGuestImportPrompt
+    }).catch(() => {
       if (isMounted) {
         setGuestImportPrompt(defaultGuestImportPrompt);
       }
@@ -154,93 +92,60 @@ export function AuthProvider({ children }) {
 
   const signup = useCallback(
     async (credentials) => {
-      if (!backendEnabled) {
-        throw createUnavailableAuthError();
-      }
-
-      const nextSession = await authApi.signup(credentials);
-      persistSession(nextSession);
-      setError('');
-      return nextSession;
+      return signupWithSession(credentials, {
+        backendEnabled,
+        setSession,
+        setError
+      });
     },
-    [backendEnabled, persistSession]
+    [backendEnabled]
   );
 
   const login = useCallback(
     async (credentials) => {
-      if (!backendEnabled) {
-        throw createUnavailableAuthError();
-      }
-
-      const nextSession = await authApi.login(credentials);
-      persistSession(nextSession);
-      setError('');
-      return nextSession;
+      return loginWithSession(credentials, {
+        backendEnabled,
+        setSession,
+        setError
+      });
     },
-    [backendEnabled, persistSession]
+    [backendEnabled]
   );
 
-  const logout = useCallback(async () => {
-    try {
-      if (backendEnabled && token) {
-        await authApi.logout();
-      }
-    } catch {
-      // Local logout should still succeed even if the server is unavailable.
-    } finally {
-      persistSession(null);
-      setGuestImportPrompt(defaultGuestImportPrompt);
-      setError('');
-    }
-  }, [backendEnabled, persistSession, token]);
+  const logout = useCallback(
+    async () =>
+      logoutSession({
+        backendEnabled,
+        token,
+        setSession,
+        setGuestImportPrompt,
+        setError,
+        defaultGuestImportPrompt
+      }),
+    [backendEnabled, token]
+  );
 
-  const importGuestIngredients = useCallback(async () => {
-    if (!backendEnabled || !user?.id) {
-      throw createUnavailableAuthError();
-    }
+  const importGuestIngredients = useCallback(
+    async () =>
+      importGuestIngredientsForUser({
+        backendEnabled,
+        user,
+        setGuestImportPrompt,
+        setError,
+        defaultGuestImportPrompt
+      }),
+    [backendEnabled, user]
+  );
 
-    setGuestImportPrompt((current) => ({
-      ...current,
-      loading: true
-    }));
-
-    try {
-      const guestIngredients = await indexedDb.getAllIngredients({ scope: GUEST_STORAGE_SCOPE });
-
-      if (!guestIngredients.length) {
-        setGuestImportDecision(user.id, 'imported');
-        setGuestImportPrompt(defaultGuestImportPrompt);
-        return [];
-      }
-
-      const importedIngredients = await ingredientsApi.saveIngredients(
-        guestIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ingredient)
-      );
-
-      await indexedDb.replaceIngredients(
-        importedIngredients.map((ingredient) => markIngredientAsSynced(ingredient)),
-        { scope: buildUserStorageScope(user.id) }
-      );
-
-      setGuestImportDecision(user.id, 'imported');
-      setGuestImportPrompt(defaultGuestImportPrompt);
-      return importedIngredients;
-    } finally {
-      setGuestImportPrompt((current) => ({
-        ...current,
-        loading: false
-      }));
-    }
-  }, [backendEnabled, user]);
-
-  const dismissGuestImport = useCallback(() => {
-    if (!user?.id) {
-      return;
-    }
-
-    setGuestImportDecision(user.id, 'dismissed');
-    setGuestImportPrompt(defaultGuestImportPrompt);
-  }, [user]);
+  const dismissGuestImport = useCallback(
+    () =>
+      dismissGuestImportPrompt({
+        user,
+        setGuestImportPrompt,
+        defaultGuestImportPrompt
+      }),
+    [user]
+  );
 
   const value = useMemo(
     () => ({

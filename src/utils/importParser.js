@@ -1,50 +1,17 @@
 import { classifyCoupangLines } from './import/coupangLineClassifier.js';
 import { buildCoupangRows } from './import/coupangRowBuilder.js';
 import { extractCoupangProductFields } from './import/coupangFieldExtractor.js';
+import {
+  createFallbackCandidate,
+  createParsedProductCandidate,
+  createTodayString
+} from './import/importCandidates.js';
 import { detectImportTemplate } from './import/detectTemplate.js';
-import { guessCategory, guessStorageType } from './import/importGuesser.js';
-import { normalizeImportedIngredient } from './import/ingredientNormalizer.js';
-import { extractSpecTokens, normalizeDisplayName } from './import/titleNormalizer.js';
+import { parseKurlyOrder } from './import/kurlyParser.js';
+import { detectOcrSourceType, OCR_SOURCE_TYPES } from './import/ocrSourceDetector.js';
+import { parseReceiptText } from './import/receiptParser.js';
 
-function createTodayString() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function createCandidateFromText(line, index, today) {
-  const specTokens = extractSpecTokens(line);
-  const displayName = normalizeDisplayName(line);
-
-  if (!displayName || displayName.length < 2) {
-    return null;
-  }
-
-  const normalizedProduct = normalizeImportedIngredient(displayName, specTokens);
-  const category = normalizedProduct.category || guessCategory(normalizedProduct.normalizedName || normalizedProduct.displayName);
-  const storageType =
-    normalizedProduct.storageType || guessStorageType(normalizedProduct.normalizedName || normalizedProduct.displayName, category);
-
-  return {
-    id: `fallback-candidate-${index}-${crypto.randomUUID()}`,
-    name: normalizedProduct.displayName,
-    displayName: normalizedProduct.displayName,
-    normalizedName: normalizedProduct.normalizedName,
-    specText: specTokens.join(', ') || normalizedProduct.quantity,
-    quantity: normalizedProduct.quantity,
-    rawLine: line,
-    selected: true,
-    category,
-    storageType,
-    purchaseDate: today,
-    expiryDate: '',
-    memo: '',
-    consumed: false,
-    sourceLine: line
-  };
-}
-
-export function parseImportText(source) {
-  const today = createTodayString();
-  const normalizedSource = typeof source === 'string' ? { text: source } : source || {};
+export function parseCoupangOrder(normalizedSource, today, sourceDetection) {
   const template = detectImportTemplate({
     rawText: normalizedSource.text || '',
     lineItems: normalizedSource.lineItems || []
@@ -77,27 +44,11 @@ export function parseImportText(source) {
     usefulLines.push(parsedProduct.rawRowText || parsedProduct.rawLine);
     row.entries.forEach((entry) => usedLineIndexes.add(entry.index));
 
-    const category = parsedProduct.category || guessCategory(parsedProduct.normalizedName || parsedProduct.name);
-    const storageType =
-      parsedProduct.storageType || guessStorageType(parsedProduct.normalizedName || parsedProduct.name, category);
+    const candidate = createParsedProductCandidate(parsedProduct, index, today);
 
-    candidates.push({
-      id: `candidate-${index}-${crypto.randomUUID()}`,
-      name: parsedProduct.displayName || parsedProduct.name,
-      displayName: parsedProduct.displayName || parsedProduct.name,
-      normalizedName: parsedProduct.normalizedName || parsedProduct.name,
-      specText: parsedProduct.specText,
-      quantity: parsedProduct.quantity,
-      rawLine: parsedProduct.rawLine,
-      selected: true,
-      category,
-      storageType,
-      purchaseDate: today,
-      expiryDate: '',
-      memo: '',
-      consumed: false,
-      sourceLine: parsedProduct.rawLine
-    });
+    if (candidate) {
+      candidates.push(candidate);
+    }
   });
 
   const ignoredLines = classifiedLines
@@ -106,7 +57,7 @@ export function parseImportText(source) {
 
   if (!candidates.length) {
     ignoredLines.forEach((line, index) => {
-      const fallbackCandidate = createCandidateFromText(line, index, today);
+      const fallbackCandidate = createFallbackCandidate(line, index, today);
 
       if (!fallbackCandidate) {
         return;
@@ -130,6 +81,60 @@ export function parseImportText(source) {
     candidates,
     classifiedLines,
     rows,
-    template
+    template,
+    sourceType: sourceDetection.sourceType,
+    sourceConfidence: sourceDetection.confidence,
+    sourceScores: sourceDetection.scores
   };
+}
+
+export function parseReceiptOcr(normalizedSource, today, sourceDetection) {
+  const receiptResult = parseReceiptText(normalizedSource.text || '', today);
+
+  return {
+    ...receiptResult,
+    classifiedLines: [],
+    rows: [],
+    template: receiptResult.template,
+    sourceType: sourceDetection.sourceType,
+    sourceConfidence: sourceDetection.confidence,
+    sourceScores: sourceDetection.scores
+  };
+}
+
+export function parseGenericShoppingOrder(normalizedSource, today, sourceDetection) {
+  const genericDetection = {
+    ...sourceDetection,
+    sourceType:
+      sourceDetection.sourceType === OCR_SOURCE_TYPES.UNKNOWN
+        ? OCR_SOURCE_TYPES.UNKNOWN
+        : OCR_SOURCE_TYPES.GENERIC_SHOPPING_ORDER
+  };
+
+  return parseCoupangOrder(normalizedSource, today, genericDetection);
+}
+
+export function parseImportText(source) {
+  const today = createTodayString();
+  const normalizedSource = typeof source === 'string' ? { text: source } : source || {};
+  const sourceDetection = detectOcrSourceType(normalizedSource.text || '');
+
+  if (sourceDetection.sourceType === OCR_SOURCE_TYPES.RECEIPT) {
+    return parseReceiptOcr(normalizedSource, today, sourceDetection);
+  }
+
+  if (sourceDetection.sourceType === OCR_SOURCE_TYPES.KURLY_ORDER) {
+    return {
+      ...parseKurlyOrder(normalizedSource.text || '', today),
+      sourceType: sourceDetection.sourceType,
+      sourceConfidence: sourceDetection.confidence,
+      sourceScores: sourceDetection.scores
+    };
+  }
+
+  if (sourceDetection.sourceType === OCR_SOURCE_TYPES.COUPANG_ORDER) {
+    return parseCoupangOrder(normalizedSource, today, sourceDetection);
+  }
+
+  return parseGenericShoppingOrder(normalizedSource, today, sourceDetection);
 }

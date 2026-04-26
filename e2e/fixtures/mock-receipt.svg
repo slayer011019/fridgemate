@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="240" viewBox="0 0 480 240">
+  <rect width="480" height="240" fill="#fffdf7" />
+  <text x="24" y="52" font-family="Arial, sans-serif" font-size="24" fill="#1f2937">FridgeMate Mock Receipt</text>
+  <text x="24" y="104" font-family="Arial, sans-serif" font-size="20" fill="#111827">두부 1모</text>
+  <text x="24" y="144" font-family="Arial, sans-serif" font-size="20" fill="#111827">우유 1L</text>
+</svg>

@@ -6,6 +6,7 @@ function RecommendationSection({
   title,
   description,
   recipes,
+  onRecipeSelect,
   emptyTitle,
   emptyDescription,
   emptyActionLabel,
@@ -57,7 +58,7 @@ function RecommendationSection({
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {recipes.map((recipe) => (
-            <RecipeCard key={recipe.id} recipe={recipe} />
+            <RecipeCard key={recipe.id} recipe={recipe} onSelect={onRecipeSelect} />
           ))}
         </div>
       )}

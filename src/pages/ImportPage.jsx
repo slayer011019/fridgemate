@@ -5,15 +5,17 @@ import OcrResultPanel from '../components/import/OcrResultPanel';
 import ParsedItemEditor from '../components/import/ParsedItemEditor';
 import UploadBox from '../components/import/UploadBox';
 import {
+  annotateDuplicateImportItems,
   setImportItemsSelected,
   toImportableItems,
   toggleImportItemSelection,
   updateImportItem
 } from '../features/import/importSelection';
 import { useIngredients } from '../hooks/useIngredients';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { applyImportCorrections, saveImportCorrections } from '../utils/import/importLearning';
 import { parseImportText } from '../utils/importParser';
-import { extractTextFromImage } from '../utils/ocr';
+import { runOcrWithProvider } from '../utils/ocr/ocrService';
 
 const IMPORT_PAGE_COPY = {
   uploadFirstError: '\u004F\u0043\u0052\uC744 \uC2DC\uC791\uD558\uAE30 \uC804\uC5D0 \uC774\uBBF8\uC9C0\uB97C \uBA3C\uC800 \uC5C5\uB85C\uB4DC\uD574\uC8FC\uC138\uC694.',
@@ -35,7 +37,8 @@ function ImportEmptyPanel({ title, description }) {
 
 function ImportPage() {
   const navigate = useNavigate();
-  const { addIngredients } = useIngredients();
+  const { ingredients, addIngredients, removeIngredient } = useIngredients();
+  const { trackEvent } = useAnalytics();
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [ocrResult, setOcrResult] = useState(null);
@@ -62,11 +65,19 @@ function ImportPage() {
   const parseResult = useMemo(() => parseImportText(ocrResult), [ocrResult]);
 
   useEffect(() => {
-    setItems(applyImportCorrections(parseResult.candidates));
-  }, [parseResult]);
+    setItems(annotateDuplicateImportItems(applyImportCorrections(parseResult.candidates), ingredients));
+  }, [ingredients, parseResult]);
 
   const handleFileChange = (event) => {
     const nextFile = event.target.files?.[0];
+
+    if (nextFile) {
+      trackEvent('ocr_upload_started', {
+        file_type: nextFile.type || 'unknown',
+        source_screen: 'import'
+      });
+    }
+
     setImageFile(nextFile || null);
     setOcrResult(null);
     setItems([]);
@@ -88,12 +99,18 @@ function ImportPage() {
     setProgress(0);
 
     try {
-      const result = await extractTextFromImage(imageFile, {
+      const result = await runOcrWithProvider(imageFile, {
         onProgress: (value) => setProgress(value)
       });
 
       setOcrResult(result);
       setStatus('success');
+      trackEvent('ocr_parse_completed', {
+        raw_text_length: result?.text?.length || 0,
+        parsed_item_count: parseImportText(result).candidates.length,
+        template_type: parseImportText(result).template?.id || 'unknown',
+        confidence_bucket: 'medium'
+      });
     } catch (ocrError) {
       setError(ocrError.message || IMPORT_PAGE_COPY.ocrFailed);
       setStatus('error');
@@ -101,7 +118,7 @@ function ImportPage() {
   };
 
   const handleItemChange = (id, field, value) => {
-    setItems((current) => updateImportItem(current, id, { [field]: value }));
+    setItems((current) => annotateDuplicateImportItems(updateImportItem(current, id, { [field]: value }), ingredients));
   };
 
   const handleToggleItem = (id) => {
@@ -118,8 +135,45 @@ function ImportPage() {
     }
 
     try {
+      trackEvent('ocr_review_completed', {
+        parsed_item_count: items.length,
+        selected_item_count: selectedItems.length,
+        edited_item_count: selectedRawItems.filter((item) => item.name !== item.originalName || item.quantity !== item.originalQuantity).length,
+        deleted_item_count: items.length - selectedItems.length
+      });
       saveImportCorrections(selectedRawItems);
+      const existingIdsToRemove = [
+        ...new Set(
+          selectedRawItems
+            .filter((item) => item.replaceExisting)
+            .flatMap((item) => item.duplicateExistingItems || [])
+            .map((item) => item.id)
+            .filter(Boolean)
+        )
+      ];
+
+      await Promise.all(existingIdsToRemove.map((id) => removeIngredient(id)));
       await addIngredients(selectedItems);
+      selectedItems.forEach((item) => {
+        trackEvent('ingredient_created', {
+          creation_method: 'ocr',
+          category: item.category,
+          storage_type: item.storageType,
+          has_expiry_date: Boolean(item.expiryDate),
+          has_purchase_date: Boolean(item.purchaseDate),
+          quantity_present: Boolean(String(item.quantity || '').trim())
+        });
+      });
+      trackEvent('ocr_import_saved', {
+        saved_item_count: selectedItems.length,
+        edited_before_save_count: selectedRawItems.filter(
+          (item) => item.name !== item.originalName || item.quantity !== item.originalQuantity
+        ).length,
+        session_first_import: true
+      });
+      trackEvent('activation_completed', {
+        activation_path: 'ocr_first_import'
+      });
       setImportMessage(`${selectedItems.length}\uAC1C \uD56D\uBAA9\uC744 \uAC00\uC838\uC654\uC5B4\uC694.`);
       navigate('/ingredients');
     } catch (importError) {
@@ -128,16 +182,16 @@ function ImportPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="section-shell">
       <PageHeader
-        eyebrow={'\uAC00\uC838\uC624\uAE30'}
-        title={'\uC7A5\uBCF4\uAE30 \uC2A4\uD06C\uB9B0\uC0F7\uC5D0\uC11C \uC7AC\uB8CC\uB97C \uBD88\uB7EC\uC640\uBCF4\uC138\uC694'}
+        eyebrow={'\uC0AC\uC9C4 \uB4F1\uB85D'}
+        title={'\uC0AC\uC9C4\uC5D0\uC11C \uC7AC\uB8CC \uD6C4\uBCF4\uB97C \uBA3C\uC800 \uAC00\uC838\uC624\uC138\uC694'}
         description={
-          '\uC8FC\uBB38 \uB0B4\uC5ED\uC774\uB098 \uC601\uC218\uC99D \uC774\uBBF8\uC9C0\uB97C \uC5C5\uB85C\uB4DC\uD558\uACE0, OCR\uB85C \uCD94\uCD9C\uD55C \uD6C4\uBCF4\uB97C \uAC80\uD1A0\uD55C \uB4A4 \uC120\uD0DD\uD55C \uD56D\uBAA9\uB9CC \uD55C \uBC88\uC5D0 \uB4F1\uB85D\uD560 \uC218 \uC788\uC5B4\uC694.'
+          '\uC5C5\uB85C\uB4DC, OCR, \uAC80\uD1A0, \uAC00\uC838\uC624\uAE30 \uC21C\uC11C\uB85C \uC9C4\uD589\uD558\uBA70, \uB9C8\uC9C0\uB9C9 \uB2E8\uACC4\uC5D0\uC11C \uD544\uC694\uD55C \uD56D\uBAA9\uB9CC \uACE0\uB97C \uC218 \uC788\uC2B5\uB2C8\uB2E4.'
         }
         action={
           <Link to="/ingredients" className="btn-secondary">
-            {'\uC7AC\uB8CC \uBAA9\uB85D\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30'}
+            {'\uB0C9\uC7A5\uACE0 \uBCF4\uAE30'}
           </Link>
         }
       />
@@ -181,6 +235,7 @@ function ImportPage() {
           <span className="badge bg-slate-100 text-slate-700">{`\uC720\uD6A8 \uBB38\uC7A5 ${parseResult.usefulLines.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uC81C\uC678 \uBB38\uC7A5 ${parseResult.ignoredLines.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uD15C\uD50C\uB9BF ${parseResult.template?.id || 'unknown'}`}</span>
+          <span className="badge bg-white text-slate-500">{`source ${parseResult.sourceType || 'unknown'} ${Math.round((parseResult.sourceConfidence || 0) * 100)}%`}</span>
           {importMessage ? (
             <span className="rounded-2xl border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm font-medium text-brand-700 xl:justify-self-end">
               {importMessage}

@@ -2,13 +2,31 @@ import { memo } from 'react';
 import RecipeExternalLinks from './RecipeExternalLinks';
 import { joinIngredientLabels } from '../utils/displayText';
 
-function RecipeCard({ recipe }) {
+function RecipeCard({ recipe, onSelect }) {
   const matchedIngredients = recipe.matchedIngredients || recipe.matchedCore || [];
   const missingIngredients = recipe.missingIngredients || recipe.missingCore || [];
   const totalCoreCount = recipe.totalRequiredIngredients ?? recipe.coreIngredients?.length ?? recipe.ingredients?.length ?? 0;
+  const isInteractive = typeof onSelect === 'function';
+
+  const handleKeyDown = (event) => {
+    if (!isInteractive) {
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(recipe);
+    }
+  };
 
   return (
-    <article className="card overflow-hidden">
+    <article
+      className={`card overflow-hidden ${isInteractive ? 'cursor-pointer' : ''}`}
+      onClick={isInteractive ? () => onSelect(recipe) : undefined}
+      onKeyDown={handleKeyDown}
+      role={isInteractive ? 'button' : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+    >
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-1.5">
@@ -53,23 +71,18 @@ function RecipeCard({ recipe }) {
           </div>
         </div>
 
-        <div className="grid gap-2 lg:grid-cols-3">
+        <div className="grid gap-2 lg:grid-cols-2">
           <div className="soft-panel">
             <p className="text-sm font-semibold text-slate-900">{'\uD575\uC2EC \uC7AC\uB8CC'}</p>
             <p className="mt-1.5 text-sm leading-6 muted">{joinIngredientLabels(recipe.coreIngredients || recipe.ingredients || [])}</p>
           </div>
 
           <div className="soft-panel">
-            <p className="text-sm font-semibold text-slate-900">{'\uC120\uD0DD \uC7AC\uB8CC'}</p>
+            <p className="text-sm font-semibold text-slate-900">{'\uBCF4\uC870 \uC7AC\uB8CC \u002F \uAE30\uBCF8 \uC591\uB150'}</p>
             <p className="mt-1.5 text-sm leading-6 muted">
-              {recipe.optionalIngredients.length ? joinIngredientLabels(recipe.optionalIngredients) : '\uC5C6\uC74C'}
-            </p>
-          </div>
-
-          <div className="soft-panel">
-            <p className="text-sm font-semibold text-slate-900">{'\uAE30\uBCF8 \uC591\uB150 \u002F \uD32C\uD2B8\uB9AC'}</p>
-            <p className="mt-1.5 text-sm leading-6 muted">
-              {recipe.pantryIngredients.length ? joinIngredientLabels(recipe.pantryIngredients) : '\uC5C6\uC74C'}
+              {[...(recipe.optionalIngredients || []), ...(recipe.pantryIngredients || [])].length
+                ? joinIngredientLabels([...(recipe.optionalIngredients || []), ...(recipe.pantryIngredients || [])])
+                : '\uC5C6\uC74C'}
             </p>
             {recipe.missingGroups?.length ? (
               <p className="mt-2 text-xs text-rose-700">{`${recipe.missingGroups.join(', ')} \uC870\uAC74\uC740 \uC544\uC9C1 \uBD80\uC871\uD574\uC694`}</p>

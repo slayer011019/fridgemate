@@ -4,7 +4,7 @@ import { authRoutes } from './routes/authRoutes.js';
 import { ingredientRoutes } from './routes/ingredientRoutes.js';
 import { recipeRoutes } from './routes/recipeRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
-import { isAllowedOrigin, serverConfig } from './config.js';
+import { isAllowedOrigin } from './config.js';
 import { requireAuth } from './middleware/requireAuth.js';
 
 export function createApp() {
@@ -12,6 +12,7 @@ export function createApp() {
 
   app.use(
     cors({
+      credentials: true,
       origin(origin, callback) {
         if (isAllowedOrigin(origin)) {
           callback(null, true);
@@ -24,7 +25,7 @@ export function createApp() {
       }
     })
   );
-  app.use(express.json());
+  app.use(express.json({ limit: '16kb' }));
 
   app.get('/', (_request, response) => {
     response.json({

@@ -1,3 +1,5 @@
+import { normalizeIngredientName as normalizeDomainIngredientName } from '../../features/ingredients/ingredientDomain.js';
+
 const CATEGORY_OTHER = '기타';
 const STORAGE_FRIDGE = '냉장';
 const STORAGE_FREEZER = '냉동';
@@ -236,7 +238,7 @@ function stripStopwords(text) {
 function normalizeProductTitle(displayName) {
   return normalizeSpaces(
     stripStopwords(String(displayName || ''))
-      .replace(/[\/,]+/g, ' ')
+      .replace(/[/,]+/g, ' ')
       .replace(/\b(?:대용량|행사|특가|묶음|세트)\b/gi, ' ')
   );
 }
@@ -280,11 +282,11 @@ function dedupeSpecs(specTokens = []) {
 
 export function buildQuantityText(specTokens = []) {
   const tokens = dedupeSpecs(specTokens);
-  return tokens.join(' / ') || '1개';
+  return tokens.length > 0 ? tokens.join(' / ') : null;
 }
 
 export function normalizeIngredientName(displayName) {
-  return normalizeImportedIngredient(displayName).normalizedName;
+  return normalizeDomainIngredientName(normalizeImportedIngredient(displayName).normalizedName);
 }
 
 export function normalizeImportedIngredient(displayName, specTokens = []) {
@@ -292,7 +294,7 @@ export function normalizeImportedIngredient(displayName, specTokens = []) {
   const rawTitle = normalizeSpaces(displayName);
   const cleanedTitle = normalizeProductTitle(displayName);
   const matchedRule = findRule(rawTitle) || findRule(cleanedTitle);
-  const normalizedName = matchedRule?.normalizedName || cleanedTitle || rawTitle;
+  const normalizedName = normalizeDomainIngredientName(matchedRule?.normalizedName || cleanedTitle || rawTitle);
 
   return {
     originalName: rawTitle,
@@ -300,6 +302,7 @@ export function normalizeImportedIngredient(displayName, specTokens = []) {
     normalizedName,
     category: matchedRule?.category || CATEGORY_OTHER,
     storageType: storageFromTitle || matchedRule?.storageType || STORAGE_FRIDGE,
-    quantity: buildQuantityText(specTokens)
+    quantity: buildQuantityText(specTokens),
+    matchedCanonical: Boolean(matchedRule)
   };
 }

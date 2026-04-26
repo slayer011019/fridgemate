@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-function parseExpirySeconds(value) {
+export function parseExpirySeconds(value) {
   const normalized = String(value || '7d').trim();
   const match = normalized.match(/^(\d+)([smhd])$/i);
 
@@ -36,13 +36,15 @@ function sign(unsignedToken, secret) {
   return createHmac('sha256', secret).update(unsignedToken).digest('base64url');
 }
 
-export function createAccessToken(payload, { secret, expiresIn }) {
+export function createAccessToken(payload, { secret, expiresIn, issuer, audience }) {
   const now = Math.floor(Date.now() / 1000);
   const expirationSeconds = parseExpirySeconds(expiresIn);
   const header = encodeBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = encodeBase64Url(
     JSON.stringify({
       ...payload,
+      iss: issuer,
+      aud: audience,
       iat: now,
       exp: now + expirationSeconds
     })
@@ -53,7 +55,7 @@ export function createAccessToken(payload, { secret, expiresIn }) {
   return `${unsignedToken}.${signature}`;
 }
 
-export function verifyAccessToken(token, { secret }) {
+export function verifyAccessToken(token, { secret, issuer, audience }) {
   const [header, body, signature] = String(token || '').split('.');
 
   if (!header || !body || !signature) {
@@ -78,6 +80,14 @@ export function verifyAccessToken(token, { secret }) {
     const now = Math.floor(Date.now() / 1000);
 
     if (typeof payload.exp === 'number' && payload.exp < now) {
+      return null;
+    }
+
+    if (issuer && payload.iss !== issuer) {
+      return null;
+    }
+
+    if (audience && payload.aud !== audience) {
       return null;
     }
 

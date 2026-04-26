@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { useAuth } from '../hooks/useAuth';
 
 const defaultForm = {
@@ -12,6 +13,7 @@ function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { backendEnabled, isAuthenticated, loading, login } = useAuth();
+  const { trackEvent } = useAnalytics();
   const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -35,6 +37,10 @@ function LoginPage() {
 
     try {
       await login(form);
+      trackEvent('login_completed', {
+        restored_session: false,
+        source_screen: 'login'
+      });
       navigate(location.state?.from?.pathname || '/account', { replace: true });
     } catch (nextError) {
       setError(nextError.message || '\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.');
@@ -44,12 +50,12 @@ function LoginPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="section-shell">
       <PageHeader
         eyebrow={'\uACC4\uC815'}
-        title={'\uACC4\uC815\uC73C\uB85C \uB85C\uADF8\uC778\uD558\uACE0 \uC11C\uBC84 \uC5F0\uB3D9 \uC791\uC5C5 \uACF5\uAC04\uC744 \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694'}
+        title={'\uACC4\uC815\uC73C\uB85C \uB85C\uADF8\uC778\uD558\uACE0 \uC11C\uBC84 \uC5F0\uB3D9 \uBAA8\uB4DC\uB85C \uC804\uD658\uD558\uC138\uC694'}
         description={
-          '\uAC8C\uC2A4\uD2B8 \uBAA8\uB4DC\uB294 \uADF8\uB300\uB85C \uC720\uC9C0\uB418\uACE0, \uB85C\uADF8\uC778\uD558\uBA74 \uC0AC\uC6A9\uC790 \uACC4\uC815 \uC800\uC7A5\uC18C\uC640 \uC11C\uBC84 \uAE30\uBC18 \uB370\uC774\uD130 \uD750\uB984\uC73C\uB85C \uC804\uD658\uB429\uB2C8\uB2E4.'
+          '\uB85C\uADF8\uC778 \uD6C4\uC5D0\uB294 \uACC4\uC815 \uAE30\uBC18 \uC800\uC7A5\uC18C\uC640 API \uD750\uB984\uC744 \uC0AC\uC6A9\uD569\uB2C8\uB2E4.'
         }
       />
 
@@ -62,6 +68,10 @@ function LoginPage() {
       {error ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
 
       <form className="card max-w-xl space-y-4" onSubmit={handleSubmit}>
+        <div className="flex flex-wrap gap-2">
+          <span className="summary-chip">{backendEnabled ? '\uC11C\uBC84 \uC5F0\uB3D9 \uAC00\uB2A5' : '\uB85C\uCEEC \uC804\uC6A9 \uBAA8\uB4DC'}</span>
+          <span className="summary-chip">{'\uAC8C\uC2A4\uD2B8 \uB370\uC774\uD130\uB294 \uBCC4\uB3C4 \uC720\uC9C0'}</span>
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
             {'\uC774\uBA54\uC77C'}
