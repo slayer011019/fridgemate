@@ -45,7 +45,7 @@ export function saveIngredient(ingredient) {
 
 export function saveIngredients(ingredients) {
   return requestJson(
-    '/ingredients/bulk',
+    '/ingredients/sync',
     {
       method: 'POST',
       headers: {

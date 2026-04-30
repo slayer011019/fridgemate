@@ -76,10 +76,11 @@ For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/AN
 ### Local-first data flow
 
 - Works without a backend by using IndexedDB
-- Uses the API when the user is authenticated
-- Falls back to IndexedDB on network or 5xx API failures for authenticated sessions
+- Ingredient add, edit, consume/restore, and delete actions write to IndexedDB first
 - Keeps guest and authenticated caches in separate IndexedDB scopes
-- Mirrors successful API reads and writes into the authenticated local cache
+- Authenticated users can manually sync from the account page
+- Manual sync sends the current local ingredient snapshot to the server and replaces the server copy
+- Deleting an ingredient does not call the server until the user manually syncs
 
 ### Authentication and persistence
 
@@ -88,6 +89,7 @@ For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/AN
 - Scope server-backed ingredients by user
 - Keep guest mode separate instead of forcing account creation
 - Offer a manual "import guest ingredients" step after login instead of auto-merging local data
+- Keep guest import and server sync as separate actions
 
 ## Tech Stack
 
@@ -185,11 +187,16 @@ UI action
   -> page component
   -> useIngredients hook
   -> ingredientRepository
-     -> API first when backend is enabled
-     -> IndexedDB only when backend is disabled
-     -> IndexedDB fallback on network / 5xx API failure
+     -> IndexedDB save/update/delete
+     -> mark syncStatus as dirty
   -> React state update
-  -> mirror successful API data into IndexedDB
+
+Account page sync button
+  -> syncIngredientsToServer()
+  -> read current IndexedDB snapshot
+  -> POST /api/ingredients/sync
+  -> replace the server ingredient list with the local list
+  -> mark syncStatus as synced or error
 ```
 
 ### Recommendation flow
@@ -225,8 +232,9 @@ FridgeMate now supports two clear modes:
   - rotating refresh cookies restore the session and mint fresh access cookies
   - access tokens carry issuer, audience, and token id claims
   - ingredients are scoped by `userId`
-  - IndexedDB acts as a user-scoped local cache
-  - successful server reads and writes mirror into the authenticated cache
+  - IndexedDB remains the day-to-day source of truth on the device
+  - the account page exposes a manual "server sync" action for authenticated users
+  - guest ingredient import copies local guest items into the authenticated IndexedDB scope without uploading them automatically
 
 Current auth hardening notes:
 
@@ -245,13 +253,13 @@ Route
   -> Prisma query scoped by userId
 ```
 
-The sync strategy is also slightly stronger than a naive last-write-wins approach:
+Current manual sync is intentionally simple:
 
 - guest mode remains fully local
-- authenticated mode compares cached and remote items by `updatedAt`
-- clean local items that disappear remotely are pruned from the cache
-- newer clean local cache entries are retained as pending updates instead of being overwritten blindly
-- pending local fallback writes are retained with sync metadata for future improvement
+- local IndexedDB changes are marked dirty in the frontend state
+- `lastSyncedAt` is stored in `localStorage` under `fridgemate-last-synced-at`
+- `/api/ingredients/sync` replaces the user's server ingredient list with the current local list
+- this is a last-write-wins MVP strategy; future sync can extend the same boundary with `updatedAt`-based merge and delete conflict handling
 
 ## Getting Started
 

@@ -1,6 +1,4 @@
-import * as ingredientsApi from '../../api/ingredientsApi';
 import * as indexedDb from '../../db/indexedDB';
-import { markIngredientAsSynced } from '../../utils/syncStrategy';
 import {
   buildUserStorageScope,
   getGuestImportDecision,
@@ -56,14 +54,9 @@ export async function importGuestIngredientsForUser({
       return [];
     }
 
-    const importedIngredients = await ingredientsApi.saveIngredients(
-      guestIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ingredient)
-    );
+    const importedIngredients = guestIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ingredient);
 
-    await indexedDb.replaceIngredients(
-      importedIngredients.map((ingredient) => markIngredientAsSynced(ingredient)),
-      { scope: buildUserStorageScope(user.id) }
-    );
+    await indexedDb.replaceIngredients(importedIngredients, { scope: buildUserStorageScope(user.id) });
 
     setGuestImportDecision(user.id, 'imported');
     setGuestImportPrompt(defaultGuestImportPrompt);

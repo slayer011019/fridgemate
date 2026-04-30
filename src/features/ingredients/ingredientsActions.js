@@ -2,12 +2,10 @@ import {
   findIngredientInRepository,
   ingredientCache,
   loadIngredientsFromRepository,
-  removeIngredientFromRepository,
-  saveIngredientInRepository,
-  saveIngredientsInRepository
+  syncIngredientsToServerInRepository
 } from './ingredientRepository';
 import { buildScopeOptions, createEmptySyncSummary, getScopeState } from './ingredientsScopeState';
-import { markIngredientAsSynced, SYNC_STATE, syncIngredientSnapshot } from '../../utils/syncStrategy';
+import { markIngredientAsSynced, syncIngredientSnapshot } from '../../utils/syncStrategy';
 
 const FALLBACK_WARNING_MESSAGE =
   'The API connection is unstable, so FridgeMate is temporarily using the authenticated local cache.';
@@ -172,52 +170,41 @@ export function createLoadIngredientsAction({
 
 export function createCrudActions({
   storageScope,
-  useApi,
   ingredientsRef,
   commitIngredients,
   commitSyncSummary,
   runRepositoryCommand,
-  startSync,
-  finishSync
+  markDirty
 }) {
-  const clearSyncSummary = () => commitSyncSummary(createEmptySyncSummary(), storageScope);
+  const saveLocalIngredient = async (ingredient) => {
+    await ingredientCache.save(ingredient, buildScopeOptions(storageScope));
+    commitSyncSummary(createEmptySyncSummary(), storageScope);
+    markDirty();
+  };
+
+  const saveLocalIngredients = async (ingredients) => {
+    await ingredientCache.saveMany(ingredients, buildScopeOptions(storageScope));
+    commitSyncSummary(createEmptySyncSummary(), storageScope);
+    markDirty();
+  };
+
+  const removeLocalIngredient = async (id) => {
+    await ingredientCache.remove(id, buildScopeOptions(storageScope));
+    commitSyncSummary(createEmptySyncSummary(), storageScope);
+    markDirty();
+  };
 
   return {
     async addIngredient(ingredient) {
       const optimisticIngredient = ensureIngredientId({ ...ingredient });
       commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
-      startSync();
 
       try {
-        const { result: savedIngredient, source } = await runRepositoryCommand('addIngredient', () =>
-          saveIngredientInRepository({
-            ingredient: optimisticIngredient,
-            scope: storageScope,
-            useApi,
-            pendingSyncState: SYNC_STATE.PENDING_CREATE
-          })
-        );
-
-        const committedIngredient =
-          source === 'api' && savedIngredient ? markIngredientAsSynced(savedIngredient) : savedIngredient;
-
-        if (source === 'api' && committedIngredient) {
-          await syncIndexedDbCache('addIngredient', () =>
-            ingredientCache.save(committedIngredient, buildScopeOptions(storageScope))
-          );
-          clearSyncSummary();
-        }
-
-        if (committedIngredient) {
-          commitIngredients((current) => upsertIngredient(current, committedIngredient));
-        }
-
-        return committedIngredient || optimisticIngredient;
+        await saveLocalIngredient(optimisticIngredient);
+        return optimisticIngredient;
       } catch (nextError) {
         commitIngredients((current) => current.filter((item) => item.id !== optimisticIngredient.id));
         throw nextError;
-      } finally {
-        finishSync();
       }
     },
 
@@ -227,33 +214,10 @@ export function createCrudActions({
       const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
 
       commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
-      startSync();
 
       try {
-        const { result: updatedIngredient, source } = await runRepositoryCommand('updateIngredient', () =>
-          saveIngredientInRepository({
-            ingredient: optimisticIngredient,
-            scope: storageScope,
-            useApi,
-            pendingSyncState: SYNC_STATE.PENDING_UPDATE
-          })
-        );
-
-        const committedIngredient =
-          source === 'api' && updatedIngredient ? markIngredientAsSynced(updatedIngredient) : updatedIngredient;
-
-        if (source === 'api' && committedIngredient) {
-          await syncIndexedDbCache('updateIngredient', () =>
-            ingredientCache.save(committedIngredient, buildScopeOptions(storageScope))
-          );
-          clearSyncSummary();
-        }
-
-        if (committedIngredient) {
-          commitIngredients((current) => upsertIngredient(current, committedIngredient));
-        }
-
-        return committedIngredient || optimisticIngredient;
+        await saveLocalIngredient(optimisticIngredient);
+        return optimisticIngredient;
       } catch (nextError) {
         if (previousIngredient) {
           commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
@@ -262,8 +226,6 @@ export function createCrudActions({
         }
 
         throw nextError;
-      } finally {
-        finishSync();
       }
     },
 
@@ -274,40 +236,13 @@ export function createCrudActions({
       commitIngredients((current) =>
         optimisticIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current)
       );
-      startSync();
 
       try {
-        const { result: savedIngredients, source } = await runRepositoryCommand('addIngredients', () =>
-          saveIngredientsInRepository({
-            ingredients: optimisticIngredients,
-            scope: storageScope,
-            useApi,
-            pendingSyncState: SYNC_STATE.PENDING_CREATE
-          })
-        );
-
-        const committedIngredients =
-          source === 'api' ? savedIngredients.map((ingredient) => markIngredientAsSynced(ingredient)) : savedIngredients;
-
-        if (source === 'api' && committedIngredients.length) {
-          await syncIndexedDbCache('addIngredients', () =>
-            ingredientCache.saveMany(committedIngredients, buildScopeOptions(storageScope))
-          );
-          clearSyncSummary();
-        }
-
-        if (committedIngredients.length) {
-          commitIngredients((current) =>
-            committedIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current)
-          );
-        }
-
-        return committedIngredients || optimisticIngredients;
+        await saveLocalIngredients(optimisticIngredients);
+        return optimisticIngredients;
       } catch (nextError) {
         commitIngredients((current) => current.filter((ingredient) => !optimisticIds.has(ingredient.id)));
         throw nextError;
-      } finally {
-        finishSync();
       }
     },
 
@@ -316,32 +251,15 @@ export function createCrudActions({
       const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
 
       commitIngredients((current) => current.filter((ingredient) => ingredient.id !== id));
-      startSync();
 
       try {
-        const { source } = await runRepositoryCommand('removeIngredient', () =>
-          removeIngredientFromRepository({
-            id,
-            scope: storageScope,
-            useApi,
-            allowFallback: !useApi
-          })
-        );
-
-        if (source === 'api') {
-          await syncIndexedDbCache('removeIngredient', () =>
-            ingredientCache.remove(id, buildScopeOptions(storageScope))
-          );
-          clearSyncSummary();
-        }
+        await removeLocalIngredient(id);
       } catch (nextError) {
         if (previousIngredient) {
           commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
         }
 
         throw nextError;
-      } finally {
-        finishSync();
       }
     },
 
@@ -356,7 +274,7 @@ export function createCrudActions({
         findIngredientInRepository({
           id,
           scope: storageScope,
-          useApi
+          useApi: false
         })
       );
 
@@ -374,6 +292,62 @@ export function createCrudActions({
       }
 
       return committedIngredient;
+    }
+  };
+}
+
+export function createManualSyncAction({
+  isAuthenticated,
+  storageScope,
+  commitIngredients,
+  setSyncStatus,
+  setHasUnsyncedChanges,
+  setLastSyncedAt,
+  setSyncError,
+  setError
+}) {
+  return async function syncIngredientsToServer() {
+    if (!isAuthenticated) {
+      const message = '로그인이 필요합니다.';
+      setSyncStatus('error');
+      setHasUnsyncedChanges(true);
+      setSyncError(message);
+      setError(message);
+      return { ok: false, message };
+    }
+
+    setSyncStatus('syncing');
+    setSyncError(null);
+    setError('');
+
+    try {
+      const localIngredients = await ingredientCache.getAll(buildScopeOptions(storageScope));
+      const syncedIngredients = await syncIngredientsToServerInRepository(
+        localIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ingredient)
+      );
+      const now = new Date().toISOString();
+      const nextIngredients = syncedIngredients.map((ingredient) => markIngredientAsSynced(ingredient));
+
+      await ingredientCache.replaceAll(nextIngredients, buildScopeOptions(storageScope));
+      commitIngredients(nextIngredients, storageScope);
+      window.localStorage.setItem('fridgemate-last-synced-at', now);
+      setLastSyncedAt(now);
+      setSyncStatus('synced');
+      setHasUnsyncedChanges(false);
+      setSyncError(null);
+
+      return {
+        ok: true,
+        syncedCount: nextIngredients.length,
+        lastSyncedAt: now
+      };
+    } catch (nextError) {
+      const message = nextError.message || 'API request could not reach the server.';
+      setSyncStatus('error');
+      setHasUnsyncedChanges(true);
+      setSyncError(message);
+      setError(message);
+      return { ok: false, message };
     }
   };
 }

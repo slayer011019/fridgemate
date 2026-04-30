@@ -2,26 +2,31 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import {
   createCrudActions,
   createLoadIngredientsAction,
+  createManualSyncAction,
   createRepositoryCommandRunner
 } from '../features/ingredients/ingredientsActions';
 import { createEmptySyncSummary, getScopeState } from '../features/ingredients/ingredientsScopeState';
-import { getPreferredDataSource, isBackendEnabled } from '../utils/backendConfig';
+import { isBackendEnabled } from '../utils/backendConfig';
 import { useAuth } from './useAuth';
 
 const IngredientsContext = createContext(null);
 
 export function IngredientsProvider({ children }) {
   const { isAuthenticated, loading: authLoading, storageScope } = useAuth();
-  const useApi = isBackendEnabled() && isAuthenticated;
+  const backendSyncAvailable = isBackendEnabled() && isAuthenticated;
+  const useApi = false;
   const initialScopeState = getScopeState(storageScope);
   const [ingredients, setIngredients] = useState(() => (initialScopeState.loaded ? initialScopeState.items : []));
   const [loading, setLoading] = useState(() => authLoading || !initialScopeState.loaded);
   const [error, setError] = useState('');
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [dataSource, setDataSource] = useState(() => (useApi ? getPreferredDataSource() : 'indexeddb'));
+  const [dataSource, setDataSource] = useState('indexeddb');
   const [syncSummary, setSyncSummary] = useState(() => initialScopeState.syncSummary || createEmptySyncSummary());
+  const [syncStatus, setSyncStatus] = useState('idle');
+  const [lastSyncedAt, setLastSyncedAt] = useState(() => window.localStorage.getItem('fridgemate-last-synced-at'));
+  const [syncError, setSyncError] = useState(null);
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
+  const isSyncing = syncStatus === 'syncing';
   const ingredientsRef = useRef(ingredients);
-  const activeSyncCountRef = useRef(0);
   const scopeRef = useRef(storageScope);
 
   const clearError = useCallback(() => {
@@ -55,28 +60,20 @@ export function IngredientsProvider({ children }) {
     const nextScopeState = getScopeState(storageScope);
     scopeRef.current = storageScope;
     ingredientsRef.current = nextScopeState.items;
-    activeSyncCountRef.current = 0;
     setIngredients(nextScopeState.loaded ? nextScopeState.items : []);
     setLoading(authLoading || !nextScopeState.loaded);
     setError('');
-    setIsSyncing(false);
-    setDataSource(useApi ? 'api' : 'indexeddb');
+    setDataSource('indexeddb');
     setSyncSummary(nextScopeState.syncSummary || createEmptySyncSummary());
-  }, [authLoading, storageScope, useApi]);
+    setSyncStatus('idle');
+    setSyncError(null);
+    setHasUnsyncedChanges(false);
+    setLastSyncedAt(window.localStorage.getItem('fridgemate-last-synced-at'));
+  }, [authLoading, storageScope]);
 
   useEffect(() => {
     ingredientsRef.current = ingredients;
   }, [ingredients]);
-
-  const startSync = useCallback(() => {
-    activeSyncCountRef.current += 1;
-    setIsSyncing(true);
-  }, []);
-
-  const finishSync = useCallback(() => {
-    activeSyncCountRef.current = Math.max(0, activeSyncCountRef.current - 1);
-    setIsSyncing(activeSyncCountRef.current > 0);
-  }, []);
 
   const runRepositoryCommand = useMemo(
     () =>
@@ -87,6 +84,12 @@ export function IngredientsProvider({ children }) {
       }),
     [useApi]
   );
+
+  const markDirty = useCallback(() => {
+    setSyncStatus('dirty');
+    setHasUnsyncedChanges(true);
+    setSyncError(null);
+  }, []);
 
   const loadIngredients = useMemo(
     () =>
@@ -124,15 +127,28 @@ export function IngredientsProvider({ children }) {
     () =>
       createCrudActions({
         storageScope,
-        useApi,
         ingredientsRef,
         commitIngredients,
         commitSyncSummary,
         runRepositoryCommand,
-        startSync,
-        finishSync
+        markDirty
       }),
-    [commitIngredients, commitSyncSummary, finishSync, runRepositoryCommand, startSync, storageScope, useApi]
+    [commitIngredients, commitSyncSummary, markDirty, runRepositoryCommand, storageScope]
+  );
+
+  const syncIngredientsToServer = useMemo(
+    () =>
+      createManualSyncAction({
+        isAuthenticated: backendSyncAvailable,
+        storageScope,
+        commitIngredients,
+        setSyncStatus,
+        setHasUnsyncedChanges,
+        setLastSyncedAt,
+        setSyncError,
+        setError
+      }),
+    [backendSyncAvailable, commitIngredients, storageScope]
   );
 
   const value = useMemo(
@@ -143,8 +159,14 @@ export function IngredientsProvider({ children }) {
       error,
       dataSource,
       syncSummary,
+      syncStatus,
+      lastSyncedAt,
+      syncError,
+      hasUnsyncedChanges,
       clearError,
+      markIngredientsDirty: markDirty,
       loadIngredients,
+      syncIngredientsToServer,
       addIngredient,
       addIngredients,
       updateIngredient,
@@ -158,12 +180,18 @@ export function IngredientsProvider({ children }) {
       dataSource,
       error,
       findIngredient,
+      hasUnsyncedChanges,
       ingredients,
       isSyncing,
+      lastSyncedAt,
       loadIngredients,
       loading,
+      markDirty,
       removeIngredient,
+      syncError,
       syncSummary,
+      syncIngredientsToServer,
+      syncStatus,
       updateIngredient
     ]
   );

@@ -782,7 +782,7 @@ export function isLikelyReceiptText(lines = []) {
     /\bPOS\b/i
   ];
 
-  const numericLines = lines.filter((line) => /^\-?\d{1,3}(?:,\d{3})*$|^\-?\d+$/.test(line)).length;
+  const numericLines = lines.filter((line) => /^-?\d{1,3}(?:,\d{3})*$|^-?\d+$/.test(line)).length;
   return receiptSignals.some((pattern) => pattern.test(joinedText)) || numericLines >= 6;
 }
 

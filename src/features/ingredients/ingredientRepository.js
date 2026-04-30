@@ -106,6 +106,10 @@ export function saveIngredientsInRepository({
   });
 }
 
+export async function syncIngredientsToServerInRepository(ingredients = []) {
+  return ingredientsApi.saveIngredients(ingredients);
+}
+
 export function removeIngredientFromRepository({ id, scope, useApi, allowFallback = !useApi }) {
   return executeRepositoryCommand({
     useApi,

@@ -31,14 +31,12 @@ function ConnectionStatusToast() {
         description:
           'API\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC5B4 \uC7A0\uC2DC \uB85C\uCEEC \uC778\uC99D \uCE90\uC2DC\uB97C \uC0AC\uC6A9\uD558\uACE0 \uC788\uC5B4\uC694.'
       });
-    } else if (dataSource === 'indexeddb') {
+    } else if (dataSource === 'indexeddb' && error) {
       nextNotices.push({
         id: 'fallback',
         tone: 'warning',
         title: '\uB85C\uCEEC \uCE90\uC2DC \uC0AC\uC6A9 \uC911',
-        description:
-          error ||
-          '\uC11C\uBC84 \uC751\uB2F5\uC774 \uBD88\uC548\uC815\uD574\uC11C \uC778\uC99D \uC804\uC6A9 IndexedDB \uCE90\uC2DC\uB85C \uC804\uD658\uB410\uC5B4\uC694.'
+        description: error
       });
     } else if (error) {
       nextNotices.push({

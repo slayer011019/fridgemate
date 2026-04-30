@@ -61,6 +61,27 @@ export async function createIngredientsBulk(userId, items = []) {
   );
 }
 
+export async function replaceIngredientsForUser(userId, items = []) {
+  const normalizedItems = items.map((item) => normalizeAndValidateIngredient(item));
+
+  // MVP manual sync uses a replace strategy: the current local IndexedDB list wins.
+  await prisma.$transaction([
+    prisma.ingredient.deleteMany({
+      where: { userId }
+    }),
+    ...normalizedItems.map((ingredient) =>
+      prisma.ingredient.create({
+        data: {
+          ...ingredient,
+          userId
+        }
+      })
+    )
+  ]);
+
+  return listIngredients(userId);
+}
+
 export async function updateIngredientById(userId, id, input) {
   const existingIngredient = await findIngredientOrThrow(userId, id);
   const ingredient = normalizeAndValidateIngredient({

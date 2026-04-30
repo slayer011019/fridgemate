@@ -4,12 +4,43 @@ import { useIngredients } from '../hooks/useIngredients';
 
 function AccountPage() {
   const { dismissGuestImport, error, guestImportPrompt, importGuestIngredients, logout, user } = useAuth();
-  const { loadIngredients } = useIngredients();
+  const {
+    hasUnsyncedChanges,
+    lastSyncedAt,
+    loadIngredients,
+    markIngredientsDirty,
+    syncError,
+    syncIngredientsToServer,
+    syncStatus
+  } = useIngredients();
 
   const handleImportGuestIngredients = async () => {
     await importGuestIngredients();
+    markIngredientsDirty();
     await loadIngredients({ force: true });
   };
+
+  const handleSyncIngredients = async () => {
+    await syncIngredientsToServer();
+  };
+
+  const formattedLastSyncedAt = lastSyncedAt
+    ? new Intl.DateTimeFormat('ko-KR', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }).format(new Date(lastSyncedAt))
+    : '아직 동기화하지 않았습니다.';
+
+  const syncButtonText =
+    syncStatus === 'syncing'
+      ? '동기화 중...'
+      : syncStatus === 'error'
+        ? '다시 동기화'
+        : hasUnsyncedChanges
+          ? '변경사항 서버에 저장'
+          : syncStatus === 'synced'
+            ? '동기화 완료'
+            : '서버와 동기화';
 
   return (
     <div className="section-shell">
@@ -34,6 +65,66 @@ function AccountPage() {
           <button className="btn-primary" onClick={logout} type="button">
             {'\uB85C\uADF8\uC544\uC6C3'}
           </button>
+        </div>
+      </section>
+
+      <section className="card space-y-4">
+        <div>
+          <p className="kicker">재료 동기화</p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-900">로컬 저장 후 원하는 때 서버에 저장합니다</h3>
+          <p className="mt-2 text-sm leading-6 muted">
+            재료는 먼저 이 기기에 저장됩니다. 로그인 후 동기화 버튼을 누르면 현재 재료 목록이 서버에 저장되어 다른
+            기기에서도 사용할 수 있습니다.
+          </p>
+          <p className="mt-2 text-sm leading-6 muted">
+            재료를 삭제해도 서버에는 즉시 반영되지 않습니다. 삭제 내용을 다른 기기에도 반영하려면 서버와 동기화를
+            눌러주세요.
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="soft-panel">
+            <p className="kicker">현재 로그인 상태</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{user?.email || '로그인이 필요합니다.'}</p>
+          </div>
+          <div className="soft-panel">
+            <p className="kicker">현재 저장 방식</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">로컬 저장 / 서버 동기화 가능</p>
+          </div>
+          <div className="soft-panel">
+            <p className="kicker">마지막 동기화</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{formattedLastSyncedAt}</p>
+          </div>
+          <div className="soft-panel">
+            <p className="kicker">동기화되지 않은 변경사항</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">
+              {hasUnsyncedChanges ? '있습니다' : '없습니다'}
+            </p>
+          </div>
+        </div>
+
+        {syncStatus === 'synced' ? (
+          <div className="rounded-[18px] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            현재 로컬 재료 목록을 서버에 저장했습니다.
+          </div>
+        ) : null}
+
+        {syncError ? (
+          <div className="rounded-[18px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{syncError}</div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            className="btn-primary"
+            disabled={!user || syncStatus === 'syncing'}
+            onClick={handleSyncIngredients}
+            type="button"
+          >
+            {user ? syncButtonText : '로그인 후 동기화 가능'}
+          </button>
+          <p className="text-xs leading-5 muted">
+            MVP 동기화는 현재 기기의 재료 목록으로 서버 목록을 대체하는 last-write-wins 방식입니다.
+          </p>
         </div>
       </section>
 

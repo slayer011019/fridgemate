@@ -192,6 +192,9 @@ describe('useIngredients', () => {
 
       expect(result.current.ingredients).toEqual([ingredient]);
       expect(dbMocks.saveIngredient).toHaveBeenCalledWith(ingredient, { scope: 'guest' });
+      expect(apiMocks.saveIngredient).not.toHaveBeenCalled();
+      expect(result.current.syncStatus).toBe('dirty');
+      expect(result.current.hasUnsyncedChanges).toBe(true);
 
       const updatedIngredient = { ...ingredient, quantity: '2 bunches', memo: 'updated' };
 
@@ -204,6 +207,8 @@ describe('useIngredients', () => {
         quantity: '2 bunches',
         memo: 'updated'
       });
+      expect(apiMocks.saveIngredient).not.toHaveBeenCalled();
+      expect(result.current.syncStatus).toBe('dirty');
 
       await act(async () => {
         await result.current.removeIngredient('crud-1');
@@ -211,16 +216,16 @@ describe('useIngredients', () => {
 
       expect(result.current.ingredients).toEqual([]);
       expect(dbMocks.deleteIngredient).toHaveBeenCalledWith('crud-1', { scope: 'guest' });
+      expect(apiMocks.deleteIngredient).not.toHaveBeenCalled();
+      expect(result.current.syncStatus).toBe('dirty');
     });
   });
 
-  describe('optimistic updates in authenticated mode', () => {
-    it('updates UI state before the API add request resolves', async () => {
+  describe('authenticated local-first updates', () => {
+    it('stores authenticated adds locally without calling the API', async () => {
       backendState.enabled = true;
       backendState.preferredDataSource = 'api';
       setAuthenticatedMode();
-      const deferred = createDeferred();
-      apiMocks.saveIngredient.mockReturnValue(deferred.promise);
 
       const { result } = await renderUseIngredients();
 
@@ -229,35 +234,26 @@ describe('useIngredients', () => {
       });
 
       const ingredient = createIngredient('optimistic-1', { name: 'tofu' });
-      let addPromise;
 
-      act(() => {
-        addPromise = result.current.addIngredient(ingredient);
+      await act(async () => {
+        await result.current.addIngredient(ingredient);
       });
 
-      expect(result.current.ingredients).toHaveLength(1);
       expect(result.current.ingredients[0]).toMatchObject({
         id: 'optimistic-1',
         name: 'tofu'
       });
-
-      await act(async () => {
-        deferred.resolve({ ...ingredient, memo: 'saved-by-api', updatedAt: '2026-04-04T10:00:00.000Z' });
-        await addPromise;
-      });
-
-      expect(result.current.ingredients[0]).toMatchObject({
-        id: 'optimistic-1',
-        memo: 'saved-by-api',
-        syncState: 'clean'
-      });
+      expect(dbMocks.saveIngredient).toHaveBeenCalledWith(ingredient, { scope: 'user:user-1' });
+      expect(apiMocks.saveIngredient).not.toHaveBeenCalled();
+      expect(result.current.syncStatus).toBe('dirty');
+      expect(result.current.hasUnsyncedChanges).toBe(true);
     });
 
-    it('rolls back the optimistic add when the API fails without fallback', async () => {
+    it('rolls back an add only when the local write fails', async () => {
       backendState.enabled = true;
       backendState.preferredDataSource = 'api';
       setAuthenticatedMode();
-      apiMocks.saveIngredient.mockRejectedValue(new MockIngredientsApiError('Validation failed.', { status: 400 }));
+      dbMocks.saveIngredient.mockRejectedValue(new Error('IndexedDB write failed.'));
 
       const { result } = await renderUseIngredients();
 
@@ -283,9 +279,9 @@ describe('useIngredients', () => {
         }
       });
 
-      expect(caughtError).toBeInstanceOf(MockIngredientsApiError);
+      expect(caughtError.message).toBe('IndexedDB write failed.');
       expect(result.current.ingredients.map((item) => item.id)).not.toContain('rollback-1');
-      expect(result.current.error).toBe('Validation failed.');
+      expect(apiMocks.saveIngredient).not.toHaveBeenCalled();
     });
   });
 
@@ -308,11 +304,10 @@ describe('useIngredients', () => {
       expect(result.current.ingredients[0].name).toBe('cooking-oil');
     });
 
-    it('falls back to the authenticated IndexedDB cache when the API load fails with a server error', async () => {
+    it('loads the authenticated IndexedDB cache without an automatic API request', async () => {
       backendState.enabled = true;
       backendState.preferredDataSource = 'api';
       setAuthenticatedMode();
-      apiMocks.getAllIngredients.mockRejectedValue(new MockIngredientsApiError('Server down.', { status: 500 }));
       dbMocks.getAllIngredients.mockResolvedValue([createIngredient('fallback-1', { name: 'kimchi' })]);
 
       const { result } = await renderUseIngredients();
@@ -321,18 +316,17 @@ describe('useIngredients', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(apiMocks.getAllIngredients).toHaveBeenCalledTimes(1);
+      expect(apiMocks.getAllIngredients).not.toHaveBeenCalled();
       expect(dbMocks.getAllIngredients).toHaveBeenCalledWith({ scope: 'user:user-1' });
       expect(result.current.dataSource).toBe('indexeddb');
       expect(result.current.ingredients[0].name).toBe('kimchi');
-      expect(result.current.error).toBeTruthy();
+      expect(result.current.error).toBe('');
     });
 
-    it('stores a pending ingredient in the authenticated cache when the create API fails with a server error', async () => {
+    it('does not call the API when creating an authenticated ingredient', async () => {
       backendState.enabled = true;
       backendState.preferredDataSource = 'api';
       setAuthenticatedMode();
-      apiMocks.saveIngredient.mockRejectedValue(new MockIngredientsApiError('Temporary outage.', { status: 500 }));
 
       const { result } = await renderUseIngredients();
 
@@ -346,11 +340,10 @@ describe('useIngredients', () => {
         await result.current.addIngredient(ingredient);
       });
 
-      expect(apiMocks.saveIngredient).toHaveBeenCalledTimes(1);
+      expect(apiMocks.saveIngredient).not.toHaveBeenCalled();
       expect(dbMocks.saveIngredient).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 'fallback-add-1',
-          syncState: 'pendingCreate'
+          id: 'fallback-add-1'
         }),
         { scope: 'user:user-1' }
       );
@@ -359,15 +352,16 @@ describe('useIngredients', () => {
     });
   });
 
-  describe('backend cache mirroring', () => {
-    it('mirrors successful API loads into the authenticated IndexedDB cache', async () => {
+  describe('manual server sync', () => {
+    it('calls saveIngredients only when syncIngredientsToServer is requested', async () => {
       backendState.enabled = true;
       backendState.preferredDataSource = 'api';
       setAuthenticatedMode();
-      const apiIngredients = [
-        createIngredient('api-load-1', { name: 'api-loaded-item', updatedAt: '2026-04-04T10:00:00.000Z' })
-      ];
-      apiMocks.getAllIngredients.mockResolvedValue(apiIngredients);
+      const localIngredients = [createIngredient('sync-1', { name: 'api-loaded-item' })];
+      dbMocks.getAllIngredients.mockResolvedValue(localIngredients);
+      apiMocks.saveIngredients.mockResolvedValue([
+        { ...localIngredients[0], updatedAt: '2026-05-01T10:00:00.000Z' }
+      ]);
 
       const { result } = await renderUseIngredients();
 
@@ -375,63 +369,73 @@ describe('useIngredients', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.dataSource).toBe('api');
-      expect(dbMocks.replaceIngredients).toHaveBeenCalledWith(
-        [
-          expect.objectContaining({
-            id: 'api-load-1',
-            syncState: 'clean'
-          })
-        ],
-        { scope: 'user:user-1' }
-      );
-      expect(result.current.ingredients[0]).toMatchObject({
-        id: 'api-load-1',
-        syncState: 'clean'
-      });
-    });
-
-    it('mirrors successful API writes into the authenticated IndexedDB cache and exposes syncing state', async () => {
-      backendState.enabled = true;
-      backendState.preferredDataSource = 'api';
-      setAuthenticatedMode();
-      const deferred = createDeferred();
-      apiMocks.saveIngredient.mockReturnValue(deferred.promise);
-
-      const { result } = await renderUseIngredients();
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      const ingredient = createIngredient('api-write-1', { name: 'api-write-item' });
-      let addPromise;
-
-      act(() => {
-        addPromise = result.current.addIngredient(ingredient);
-      });
-
-      expect(result.current.isSyncing).toBe(true);
+      expect(apiMocks.saveIngredients).not.toHaveBeenCalled();
 
       await act(async () => {
-        deferred.resolve({ ...ingredient, memo: 'mirrored', updatedAt: '2026-04-04T11:00:00.000Z' });
-        await addPromise;
+        await result.current.addIngredient(localIngredients[0]);
       });
 
-      expect(result.current.isSyncing).toBe(false);
-      expect(dbMocks.saveIngredient).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'api-write-1',
-          memo: 'mirrored',
-          syncState: 'clean'
-        }),
+      let response;
+      await act(async () => {
+        response = await result.current.syncIngredientsToServer();
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.syncedCount).toBe(1);
+      expect(apiMocks.saveIngredients).toHaveBeenCalledTimes(1);
+      expect(apiMocks.saveIngredients).toHaveBeenCalledWith([localIngredients[0]]);
+      expect(window.localStorage.getItem('fridgemate-last-synced-at')).toBeTruthy();
+      expect(result.current.syncStatus).toBe('synced');
+      expect(result.current.hasUnsyncedChanges).toBe(false);
+      expect(dbMocks.replaceIngredients).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: 'sync-1', syncState: 'clean' })],
         { scope: 'user:user-1' }
       );
-      expect(result.current.ingredients[0]).toMatchObject({
-        id: 'api-write-1',
-        memo: 'mirrored',
-        syncState: 'clean'
+    });
+
+    it('sets syncStatus to error when manual sync fails', async () => {
+      backendState.enabled = true;
+      backendState.preferredDataSource = 'api';
+      setAuthenticatedMode();
+      const ingredient = createIngredient('sync-fail-1', { name: 'api-write-item' });
+      dbMocks.getAllIngredients.mockResolvedValue([ingredient]);
+      apiMocks.saveIngredients.mockRejectedValue(new MockIngredientsApiError('Server down.', { status: 500 }));
+
+      const { result } = await renderUseIngredients();
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
       });
+
+      let response;
+      await act(async () => {
+        response = await result.current.syncIngredientsToServer();
+      });
+
+      expect(response).toEqual({ ok: false, message: 'Server down.' });
+      expect(result.current.syncStatus).toBe('error');
+      expect(result.current.hasUnsyncedChanges).toBe(true);
+      expect(result.current.syncError).toBe('Server down.');
+    });
+
+    it('does not sync to the server when the user is not authenticated', async () => {
+      backendState.enabled = true;
+      setGuestMode();
+
+      const { result } = await renderUseIngredients();
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.syncIngredientsToServer();
+      });
+
+      expect(response).toEqual({ ok: false, message: '로그인이 필요합니다.' });
+      expect(apiMocks.saveIngredients).not.toHaveBeenCalled();
+      expect(result.current.syncStatus).toBe('error');
     });
   });
 

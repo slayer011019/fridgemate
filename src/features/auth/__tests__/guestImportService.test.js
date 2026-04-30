@@ -1,17 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const ingredientsApiMocks = {
-  saveIngredients: vi.fn()
-};
-
 const dbMocks = {
   getAllIngredients: vi.fn(),
   replaceIngredients: vi.fn()
 };
-
-vi.mock('../../../api/ingredientsApi.js', () => ({
-  saveIngredients: (...args) => ingredientsApiMocks.saveIngredients(...args)
-}));
 
 vi.mock('../../../db/indexedDB.js', () => ({
   getAllIngredients: (...args) => dbMocks.getAllIngredients(...args),
@@ -24,11 +16,10 @@ describe('guestImportService', () => {
     window.localStorage.clear();
     dbMocks.getAllIngredients.mockResolvedValue([]);
     dbMocks.replaceIngredients.mockResolvedValue(undefined);
-    ingredientsApiMocks.saveIngredients.mockResolvedValue([]);
   });
 
   it('shows a prompt when guest ingredients exist and there is no prior decision', async () => {
-    dbMocks.getAllIngredients.mockResolvedValue([{ id: 'guest-1', name: '김치' }]);
+    dbMocks.getAllIngredients.mockResolvedValue([{ id: 'guest-1', name: 'kimchi' }]);
     const { inspectGuestImportPrompt } = await import('../guestImportService.js');
     const setGuestImportPrompt = vi.fn();
 
@@ -46,11 +37,10 @@ describe('guestImportService', () => {
     });
   });
 
-  it('imports guest ingredients into the authenticated scope', async () => {
+  it('imports guest ingredients into the authenticated local scope without uploading them', async () => {
     dbMocks.getAllIngredients.mockResolvedValue([
-      { id: 'guest-1', name: '김치', syncState: 'pending', lastSyncedAt: 'now' }
+      { id: 'guest-1', name: 'kimchi', syncState: 'pending', lastSyncedAt: 'now' }
     ]);
-    ingredientsApiMocks.saveIngredients.mockResolvedValue([{ id: 'remote-1', name: '김치' }]);
 
     const { importGuestIngredientsForUser } = await import('../guestImportService.js');
     const setGuestImportPrompt = vi.fn();
@@ -64,9 +54,10 @@ describe('guestImportService', () => {
       defaultGuestImportPrompt: { available: false, count: 0, loading: false }
     });
 
-    expect(result).toEqual([{ id: 'remote-1', name: '김치' }]);
-    expect(ingredientsApiMocks.saveIngredients).toHaveBeenCalledWith([{ id: 'guest-1', name: '김치' }]);
-    expect(dbMocks.replaceIngredients).toHaveBeenCalledTimes(1);
+    expect(result).toEqual([{ id: 'guest-1', name: 'kimchi' }]);
+    expect(dbMocks.replaceIngredients).toHaveBeenCalledWith([{ id: 'guest-1', name: 'kimchi' }], {
+      scope: 'user:user-1'
+    });
     expect(setError).toHaveBeenCalledWith('');
   });
 });

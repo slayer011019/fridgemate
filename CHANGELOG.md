@@ -15,6 +15,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a Food Safety Korea recipe XML parser that keeps recipe names, raw ingredient text, tags, optional nutrition, and generated external search links without storing manual steps.
 - Added recipe ingredient parsing and fridge-to-menu match scoring utilities for ingredient-based recipe recommendations.
 - Added recipe raw import storage, batch LLM ingredient normalization fallback, embedding text generation, OpenAI embedding service scaffolding, pgvector search, and hybrid recipe ranking.
+- Added manual ingredient sync from the account page, including dirty/syncing/synced/error UI state and persisted last sync time.
+- Added a replace-style ingredient sync endpoint for saving the current local IndexedDB snapshot to the server on demand.
 - Frontend Sentry initialization behind `VITE_SENTRY_DSN` for optional production error monitoring.
 - GitHub Actions CI workflow for lint, test, and build jobs with artifact upload.
 - Vitest coverage across recommendation logic, OCR parsing, IndexedDB, import learning, and `useIngredients`.
@@ -34,7 +36,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Expanded import category and storage options so receipt parsing can suggest more specific classes such as `라면/면류`, `간식`, `양념/소스`, and `상온`.
 - Added Prisma `directUrl` configuration and Supabase pooler examples for hosted PostgreSQL connections.
 - Updated README and AGENTS documentation to match the current local-first + optional backend architecture.
-- Mirrored successful ingredient API reads and writes back into IndexedDB for fresher fallback data.
+- Changed ingredient CRUD to local-first IndexedDB writes; server writes now happen only when the user manually syncs from the account page.
+- Guest ingredient import now copies guest items into the authenticated local scope without automatically uploading them to the server.
 - Routed pantry-owned staples into recommendation scoring instead of keeping them UI-only.
 - Tightened deployment guidance around environment variables, smoke checks, and core journey verification.
 - Linked the business roadmap from the README so product and go-to-market direction are easier to find.
@@ -52,6 +55,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Fallback and syncing state now surface clearer user feedback in the UI.
 - Session restore now keeps authenticated local fallback available during transient server failures.
 - Sync reconciliation now drops stale clean cache entries and preserves newer local cache entries as pending updates.
+- Ingredient deletion no longer triggers an automatic server delete; deleted items are removed from the server only on the next manual replace sync.
 
 ## [1.5.0] - 2026-04-03
 ### Added
