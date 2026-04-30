@@ -56,3 +56,91 @@ model Ingredient {
   @@index([userId, createdAt])
   @@index([userId, updatedAt])
 }
+
+model Recipe {
+  id                 String             @id @default(cuid())
+  source             String
+  sourceRecipeId     String             @map("source_recipe_id")
+  name               String
+  category           String
+  cookingMethod      String             @map("cooking_method")
+  rawIngredientsText String             @map("raw_ingredients_text")
+  embeddingText      String?            @map("embedding_text")
+  embedding          Unsupported("vector")?
+  embeddingStatus    String             @default("pending") @map("embedding_status")
+  tags               String[]           @default([])
+  calories           Float?
+  carbohydrate       Float?
+  protein            Float?
+  fat                Float?
+  sodium             Float?
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  ingredients        RecipeIngredient[]
+
+  @@unique([source, sourceRecipeId])
+  @@index([name])
+  @@index([category])
+  @@map("recipes")
+}
+
+model RawRecipe {
+  id                 String   @id @default(cuid())
+  source             String
+  sourceRecipeId     String   @map("source_recipe_id")
+  rawPayload         Json     @map("raw_payload")
+  rawIngredientsText String   @map("raw_ingredients_text")
+  importedAt         DateTime @default(now()) @map("imported_at")
+
+  @@unique([source, sourceRecipeId])
+  @@index([source])
+  @@map("raw_recipes")
+}
+
+model RecipeIngredient {
+  id             String             @id @default(cuid())
+  recipeId       String             @map("recipe_id")
+  ingredientId   String?            @map("ingredient_id")
+  recipe         Recipe             @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient     IngredientCatalog? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  rawName        String             @map("raw_name")
+  normalizedName String             @map("normalized_name")
+  section        String
+  amountText     String?            @map("amount_text")
+  amountValue    Float?             @map("amount_value")
+  amountUnit     String?            @map("amount_unit")
+  displayAmount  String?            @map("display_amount")
+  ingredientType String             @default("main") @map("ingredient_type")
+  confidence     Float              @default(0.5)
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  @@index([recipeId])
+  @@index([ingredientId])
+  @@index([normalizedName])
+  @@map("recipe_ingredients")
+}
+
+model IngredientCatalog {
+  id                String             @id @default(cuid())
+  name              String             @unique
+  category          String
+  storageType       String             @map("storage_type")
+  defaultExpireDays Int?               @map("default_expire_days")
+  aliases           IngredientAlias[]
+  recipeIngredients RecipeIngredient[]
+
+  @@index([category])
+  @@index([storageType])
+  @@map("ingredients")
+}
+
+model IngredientAlias {
+  id           String            @id @default(cuid())
+  ingredientId String            @map("ingredient_id")
+  alias        String
+  ingredient   IngredientCatalog @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([ingredientId, alias])
+  @@index([alias])
+  @@map("ingredient_aliases")
+}

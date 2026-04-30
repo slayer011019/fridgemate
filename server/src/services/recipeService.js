@@ -2,6 +2,7 @@ import { prisma } from '../db/prisma.js';
 import { serverConfig } from '../config.js';
 import { seedRecipes } from '../../../src/data/seedRecipes.js';
 import { buildRecipeRecommendations } from '../../../src/utils/recommendations.js';
+import { recommendRecipes as recommendHybridRecipes } from './recipeHybridRecommendationService.js';
 
 function buildFallbackAiSuggestions(ingredients = []) {
   return buildRecipeRecommendations(seedRecipes, ingredients)
@@ -107,6 +108,17 @@ async function requestClaudeSuggestions(ingredients = []) {
 export async function getRecipeRecommendations({ userId, ingredients, pantryItems = [] } = {}) {
   const inputIngredients =
     Array.isArray(ingredients) && ingredients.length ? ingredients : await getStoredIngredients(userId);
+
+  try {
+    const hybridRecommendations = await recommendHybridRecipes(inputIngredients);
+
+    if (hybridRecommendations.length) {
+      return hybridRecommendations;
+    }
+  } catch (error) {
+    console.warn('[recipeService] Hybrid recipe recommendations failed. Falling back to seed recipes.', error);
+  }
+
   return buildRecipeRecommendations(seedRecipes, inputIngredients, { pantryItems });
 }
 

@@ -1,0 +1,79 @@
+<COOKRCP01>
+  <row>
+    <RCP_SEQ>28</RCP_SEQ>
+    <RCP_NM>새우 두부 계란찜</RCP_NM>
+    <RCP_PARTS_DTLS>새우 두부 계란찜 연두부 75g(3/4모), 칵테일새우 20g(5마리), 달걀 30g(1/2개), 물 300ml(1½컵), 참깨 약간</RCP_PARTS_DTLS>
+    <RCP_PAT2>반찬</RCP_PAT2>
+    <RCP_WAY2>찌기</RCP_WAY2>
+    <HASH_TAG>#연두부 #계란찜</HASH_TAG>
+    <INFO_ENG>220</INFO_ENG>
+    <INFO_CAR>3</INFO_CAR>
+    <INFO_PRO>14</INFO_PRO>
+    <INFO_FAT>17</INFO_FAT>
+    <INFO_NA>99</INFO_NA>
+    <MANUAL01>연두부를 준비한다.</MANUAL01>
+    <MANUAL_IMG01>https://example.com/manual1.jpg</MANUAL_IMG01>
+    <RCP_NA_TIP>전자레인지로 익혀도 된다.</RCP_NA_TIP>
+  </row>
+  <row>
+    <RCP_SEQ>29</RCP_SEQ>
+    <RCP_NM>방울토마토 샐러드</RCP_NM>
+    <RCP_PARTS_DTLS>방울토마토 150g(5개), 양상추 80g, ●소스 : 저염간장 3g(1작은술), 올리브오일 5ml(1작은술)</RCP_PARTS_DTLS>
+    <RCP_PAT2>샐러드</RCP_PAT2>
+    <RCP_WAY2>무침</RCP_WAY2>
+    <HASH_TAG>#방울토마토,#샐러드</HASH_TAG>
+    <INFO_ENG>125</INFO_ENG>
+    <INFO_CAR>9</INFO_CAR>
+    <INFO_PRO>2</INFO_PRO>
+    <INFO_FAT>8</INFO_FAT>
+    <INFO_NA>145</INFO_NA>
+    <MANUAL01>채소를 씻는다.</MANUAL01>
+    <MANUAL02>소스를 섞는다.</MANUAL02>
+    <MANUAL_IMG01>https://example.com/manual2.jpg</MANUAL_IMG01>
+  </row>
+  <row>
+    <RCP_SEQ>30</RCP_SEQ>
+    <RCP_NM>북어국</RCP_NM>
+    <RCP_PARTS_DTLS>북어채 20g, 물 500ml(2컵), ·고명 : 다진 대파 10g(1큰술), 달걀 30g(1/2개)</RCP_PARTS_DTLS>
+    <RCP_PAT2>국</RCP_PAT2>
+    <RCP_WAY2>끓이기</RCP_WAY2>
+    <HASH_TAG>#북어국 #해장</HASH_TAG>
+    <INFO_ENG>95</INFO_ENG>
+    <INFO_CAR>4</INFO_CAR>
+    <INFO_PRO>9</INFO_PRO>
+    <INFO_FAT>3</INFO_FAT>
+    <INFO_NA>220</INFO_NA>
+    <MANUAL01>북어를 불린다.</MANUAL01>
+    <MANUAL_IMG01>https://example.com/manual3.jpg</MANUAL_IMG01>
+  </row>
+  <row>
+    <RCP_SEQ>31</RCP_SEQ>
+    <RCP_NM>버터 새우볶음</RCP_NM>
+    <RCP_PARTS_DTLS>칵테일새우 100g, 무염버터 10g, 다진 마늘 5g</RCP_PARTS_DTLS>
+    <RCP_PAT2>볶음</RCP_PAT2>
+    <RCP_WAY2>볶기</RCP_WAY2>
+    <HASH_TAG>#새우 #버터</HASH_TAG>
+    <INFO_ENG>180</INFO_ENG>
+    <INFO_CAR>2</INFO_CAR>
+    <INFO_PRO>16</INFO_PRO>
+    <INFO_FAT>11</INFO_FAT>
+    <INFO_NA>210</INFO_NA>
+    <MANUAL01>새우를 볶는다.</MANUAL01>
+    <MANUAL_IMG01>https://example.com/manual4.jpg</MANUAL_IMG01>
+  </row>
+  <row>
+    <RCP_SEQ>32</RCP_SEQ>
+    <RCP_NM>두부 양념장 무침</RCP_NM>
+    <RCP_PARTS_DTLS>두부 300g(1모), ●양념장 : 고춧가루 4g(1작은술), 멸치액젓 3g(1/2작은술), 참깨 약간</RCP_PARTS_DTLS>
+    <RCP_PAT2>반찬</RCP_PAT2>
+    <RCP_WAY2>무침</RCP_WAY2>
+    <HASH_TAG>#두부 #양념장</HASH_TAG>
+    <INFO_ENG>160</INFO_ENG>
+    <INFO_CAR>5</INFO_CAR>
+    <INFO_PRO>12</INFO_PRO>
+    <INFO_FAT>9</INFO_FAT>
+    <INFO_NA>340</INFO_NA>
+    <MANUAL01>양념장을 만든다.</MANUAL01>
+    <MANUAL_IMG01>https://example.com/manual5.jpg</MANUAL_IMG01>
+  </row>
+</COOKRCP01>

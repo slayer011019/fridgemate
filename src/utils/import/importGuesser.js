@@ -149,11 +149,28 @@ export function guessStorageType(name, category) {
     return STORAGE_FREEZER;
   }
 
-  if (category === '\uC0C1\uC628\uC2DD\uD488' || category === '\uC18C\uC2A4' || category === '\uAC04\uD3B8\uC2DD' || category === '\uC74C\uB8CC') {
+  if (
+    category === '\uC0C1\uC628\uC2DD\uD488' ||
+    category === '\uC18C\uC2A4' ||
+    category === '\uC591\uB150/\uC18C\uC2A4' ||
+    category === '\uAC04\uD3B8\uC2DD' ||
+    category === '\uB77C\uBA74/\uBA74\uB958' ||
+    category === '\uAC04\uC2DD' ||
+    category === '\uC74C\uB8CC'
+  ) {
     return STORAGE_PANTRY;
   }
 
-  if (category === '\uC720\uC81C\uD488' || category === '\uB2EC\uAC40' || category === '\uC721\uB958' || category === '\uD574\uC0B0\uBB3C' || category === '\uCC44\uC18C' || category === '\uACFC\uC77C') {
+  if (
+    category === '\uC720\uC81C\uD488' ||
+    category === '\uB2EC\uAC40' ||
+    category === '\uB450\uBD80/\uCF69\uB958' ||
+    category === '\uC721\uB958' ||
+    category === '\uC721\uB958/\uAC00\uACF5\uC721' ||
+    category === '\uD574\uC0B0\uBB3C' ||
+    category === '\uCC44\uC18C' ||
+    category === '\uACFC\uC77C'
+  ) {
     return STORAGE_FRIDGE;
   }
 

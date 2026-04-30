@@ -20,6 +20,7 @@ import { runOcrWithProvider } from '../utils/ocr/ocrService';
 const IMPORT_PAGE_COPY = {
   uploadFirstError: '\u004F\u0043\u0052\uC744 \uC2DC\uC791\uD558\uAE30 \uC804\uC5D0 \uC774\uBBF8\uC9C0\uB97C \uBA3C\uC800 \uC5C5\uB85C\uB4DC\uD574\uC8FC\uC138\uC694.',
   ocrFailed: '\u004F\u0043\u0052 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.',
+  pasteFirstError: '\uBD99\uC5EC\uB123\uC740 OCR \uD14D\uC2A4\uD2B8\uB97C \uBA3C\uC800 \uC785\uB825\uD574\uC8FC\uC138\uC694.',
   noSelectedItems:
     '\uAC00\uC838\uC62C \uD56D\uBAA9\uC774 \uC120\uD0DD\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694. \uCD5C\uC18C 1\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.',
   importFailed: '\uAC00\uC838\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694. \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.'
@@ -48,6 +49,7 @@ function ImportPage() {
   const [error, setError] = useState('');
   const [items, setItems] = useState([]);
   const [importMessage, setImportMessage] = useState('');
+  const [manualText, setManualText] = useState('');
 
   useEffect(() => {
     if (!imageFile) {
@@ -84,6 +86,31 @@ function ImportPage() {
     setError('');
     setStatus('idle');
     setImportMessage('');
+  };
+
+  const handleManualParse = () => {
+    const nextText = manualText.trim();
+
+    if (!nextText) {
+      setError(IMPORT_PAGE_COPY.pasteFirstError);
+      setStatus('error');
+      return;
+    }
+
+    setError('');
+    setImportMessage('');
+    setProgress(1);
+    setOcrResult({
+      text: nextText,
+      source: 'manual_receipt_text'
+    });
+    setStatus('success');
+    trackEvent('ocr_parse_completed', {
+      raw_text_length: nextText.length,
+      parsed_item_count: parseImportText(nextText).candidates.length,
+      template_type: parseImportText(nextText).template?.id || 'unknown',
+      confidence_bucket: 'manual_text'
+    });
   };
 
   const runOcr = async () => {
@@ -204,6 +231,35 @@ function ImportPage() {
         onRunOcr={runOcr}
       />
 
+      <section className="card space-y-3">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="kicker">{'\uB610\uB294 \uD14D\uC2A4\uD2B8 \uBD99\uC5EC\uB123\uAE30'}</p>
+            <h3 className="mt-2 text-lg font-semibold text-slate-900 sm:text-[1.35rem]">
+              {'\uD734\uB300\uD3F0 OCR \uACB0\uACFC\uB97C \uBC14\uB85C \uBD99\uC5EC\uB123\uC744 \uC218 \uC788\uC5B4\uC694'}
+            </h3>
+            <p className="mt-1.5 text-sm leading-5.5 muted">
+              {
+                '\uAE30\uBCF8 OCR, \uC11C\uBC84 OCR, \uC774\uBBF8\uC9C0 OCR\uC5D0\uC11C \uC774\uBBF8 \uCD94\uCD9C\uB41C \uC601\uC218\uC99D \uD14D\uC2A4\uD2B8\uB97C \uBD99\uC5EC\uB123\uACE0 \uBC14\uB85C \uD6C4\uBCF4\uB97C \uBCF5\uC6D0\uD574\uBCF4\uC138\uC694.'
+              }
+            </p>
+          </div>
+          <button type="button" className="btn-primary" onClick={handleManualParse}>
+            {'\uBD99\uC5EC\uB123\uC740 \uD14D\uC2A4\uD2B8 \uBD84\uC11D'}
+          </button>
+        </div>
+
+        <textarea
+          rows={10}
+          className="min-h-[15rem] resize-y"
+          value={manualText}
+          placeholder={
+            '\uC601\uC218\uC99D OCR \uD14D\uC2A4\uD2B8\uB97C \uC5EC\uAE30\uC5D0 \uBD99\uC5EC\uB123\uC73C\uBA74 \uC0C1\uD488\uBA85, \uC218\uB7C9, \uAE08\uC561\uC744 \uCD94\uCD9C\uD574\uC694.'
+          }
+          onChange={(event) => setManualText(event.target.value)}
+        />
+      </section>
+
       <OcrResultPanel
         status={status}
         progress={progress}
@@ -230,7 +286,8 @@ function ImportPage() {
       ) : null}
 
       {status === 'success' ? (
-        <section className="soft-panel grid gap-2 text-sm text-slate-700 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,auto))_minmax(0,1fr)] xl:items-center">
+        <section className="space-y-3">
+          <div className="soft-panel grid gap-2 text-sm text-slate-700 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,auto))_minmax(0,1fr)] xl:items-center">
           <span className="badge bg-emerald-100 text-emerald-700">{`\uD6C4\uBCF4 \uD56D\uBAA9 ${parseResult.candidates.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uC720\uD6A8 \uBB38\uC7A5 ${parseResult.usefulLines.length}\uAC1C`}</span>
           <span className="badge bg-slate-100 text-slate-700">{`\uC81C\uC678 \uBB38\uC7A5 ${parseResult.ignoredLines.length}\uAC1C`}</span>
@@ -240,6 +297,18 @@ function ImportPage() {
             <span className="rounded-2xl border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm font-medium text-brand-700 xl:justify-self-end">
               {importMessage}
             </span>
+          ) : null}
+          </div>
+
+          {parseResult.warnings?.length ? (
+            <div className="rounded-[20px] border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
+              <p className="font-semibold">{'\uD655\uC778\uD558\uBA74 \uC88B\uC740 \uD56D\uBAA9'}</p>
+              <ul className="mt-2 space-y-1.5 text-sm leading-6">
+                {parseResult.warnings.map((warning, index) => (
+                  <li key={`${warning}-${index}`}>{`\u2022 ${warning}`}</li>
+                ))}
+              </ul>
+            </div>
           ) : null}
         </section>
       ) : null}

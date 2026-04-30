@@ -95,6 +95,21 @@ function ParsedItemEditor({ items, onItemChange, onToggleItem, onSelectAll, onDe
                       <p className="font-medium text-slate-900">{item.specText || item.quantity || '-'}</p>
                     </div>
                   </div>
+                  {item.rawName && item.rawName !== item.displayName ? (
+                    <p className="mt-2 text-xs text-slate-500">{`\uC6D0\uBCF8 \uC0C1\uD488\uBA85: ${item.rawName}`}</p>
+                  ) : null}
+                  {item.unitPrice || item.totalPrice || item.discount ? (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {[
+                        item.unitPrice ? `\uB2E8\uAC00 ${item.unitPrice.toLocaleString('ko-KR')}\uC6D0` : '',
+                        item.totalPrice ? `\uAE08\uC561 ${item.totalPrice.toLocaleString('ko-KR')}\uC6D0` : '',
+                        item.discount ? `\uD560\uC778 ${item.discount.toLocaleString('ko-KR')}\uC6D0` : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' / ')}
+                    </p>
+                  ) : null}
+                  {item.reason ? <p className="mt-1 text-xs text-slate-500">{item.reason}</p> : null}
                   {item.originalText || item.rawLine ? (
                     <p className="mt-2 truncate text-xs text-slate-400">{item.originalText || item.rawLine}</p>
                   ) : null}

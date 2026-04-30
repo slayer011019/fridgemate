@@ -4,17 +4,29 @@ import {
   resolvePantryItems,
   uniqueNormalizedIngredients
 } from '../features/ingredients/ingredientDomain.js';
+import { generateRecipeSearchLinks } from '../features/recipes/recipeSearchLinks.js';
+
 export { ingredientAliases } from '../features/ingredients/ingredientDomain.js';
 export { normalizeIngredientName } from '../features/ingredients/ingredientDomain.js';
 
 const EXPIRING_SOON_DAYS = 3;
-const MAX_OPTIONAL_BONUS = 20;
-const MAX_URGENT_BONUS = 20;
 
 export const RECIPE_STATUS = {
   READY: 'ready',
   NEEDS_CORE: 'needsCore'
 };
+
+function clamp(value, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function roundToTwo(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function getRecipeDisplayName(recipe = {}) {
+  return String(recipe?.title || recipe?.name || '').trim();
+}
 
 function buildIngredientIndex(ingredients = [], pantryItems = []) {
   const index = ingredients.reduce(
@@ -53,92 +65,293 @@ function buildIngredientIndex(ingredients = [], pantryItems = []) {
   return index;
 }
 
-function getPreparedRecipe(recipe) {
-  const coreIngredients = uniqueNormalizedIngredients(recipe.coreIngredients || recipe.requiredIngredients || []);
-  const optionalIngredients = uniqueNormalizedIngredients(recipe.optionalIngredients || []);
-  const requiredGroups = Array.isArray(recipe.requiredGroups) ? recipe.requiredGroups : [];
+function mapRecipeIngredient(item, ingredientType = 'main', section = 'main') {
+  if (typeof item === 'string') {
+    const normalizedName = normalizeIngredientName(item);
+
+    if (!normalizedName) {
+      return null;
+    }
+
+    return {
+      rawName: item,
+      normalizedName,
+      ingredientType,
+      section
+    };
+  }
+
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const rawName = String(item.rawName || item.name || item.normalizedName || '').trim();
+  const normalizedName = normalizeIngredientName(item.normalizedName || rawName);
+
+  if (!normalizedName) {
+    return null;
+  }
 
   return {
-    ...recipe,
-    coreIngredients,
-    optionalIngredients,
-    requiredGroups,
-    requiredIngredients: coreIngredients,
-    requiredSeasonings: recipe.requiredSeasonings || [],
-    pantryIngredients: recipe.pantryIngredients || recipe.requiredSeasonings || []
+    ...item,
+    rawName: rawName || normalizedName,
+    normalizedName,
+    ingredientType: item.ingredientType || ingredientType,
+    section: item.section || section
   };
 }
 
-function getUrgentMatches(preparedRecipe, ingredientIndex) {
-  const candidates = uniqueNormalizedIngredients([
-    ...preparedRecipe.coreIngredients,
-    ...preparedRecipe.optionalIngredients,
-    ...preparedRecipe.pantryIngredients
-  ]);
+function uniqueByNormalizedName(items = []) {
+  const seen = new Set();
 
-  return candidates.filter((item) => ingredientIndex.urgentSet.has(item)).slice(0, 2);
+  return items.filter((item) => {
+    const normalizedName = item?.normalizedName;
+
+    if (!normalizedName || seen.has(normalizedName)) {
+      return false;
+    }
+
+    seen.add(normalizedName);
+    return true;
+  });
+}
+
+function buildIngredientGroups(recipe = {}) {
+  if (Array.isArray(recipe.ingredients) && recipe.ingredients.length) {
+    const normalizedIngredients = uniqueByNormalizedName(
+      recipe.ingredients.map((item) => mapRecipeIngredient(item)).filter(Boolean)
+    );
+
+    return {
+      mainIngredients: normalizedIngredients.filter((item) => item.ingredientType === 'main'),
+      optionalIngredients: normalizedIngredients.filter(
+        (item) => item.ingredientType === 'optional' || item.ingredientType === 'garnish'
+      ),
+      seasoningIngredients: normalizedIngredients.filter((item) => item.ingredientType === 'seasoning'),
+      liquidIngredients: normalizedIngredients.filter((item) => item.ingredientType === 'liquid')
+    };
+  }
+
+  const mainIngredients = uniqueByNormalizedName(
+    uniqueNormalizedIngredients(recipe.coreIngredients || recipe.requiredIngredients || []).map((item) =>
+      mapRecipeIngredient(item, 'main')
+    )
+  );
+  const optionalIngredients = uniqueByNormalizedName(
+    uniqueNormalizedIngredients(recipe.optionalIngredients || []).map((item) => mapRecipeIngredient(item, 'optional'))
+  );
+  const seasoningIngredients = uniqueByNormalizedName(
+    uniqueNormalizedIngredients(recipe.requiredSeasonings || recipe.pantryIngredients || []).map((item) =>
+      mapRecipeIngredient(item, 'seasoning', '양념장')
+    )
+  );
+
+  return {
+    mainIngredients,
+    optionalIngredients,
+    seasoningIngredients,
+    liquidIngredients: []
+  };
+}
+
+function prepareRecipe(recipe = {}) {
+  const ingredientGroups = buildIngredientGroups(recipe);
+  const displayName = getRecipeDisplayName(recipe);
+  const requiredGroups = Array.isArray(recipe.requiredGroups) ? recipe.requiredGroups : [];
+  const coreIngredients = ingredientGroups.mainIngredients.map((item) => item.normalizedName);
+  const optionalIngredients = ingredientGroups.optionalIngredients.map((item) => item.normalizedName);
+  const requiredSeasonings = ingredientGroups.seasoningIngredients.map((item) => item.normalizedName);
+
+  return {
+    ...recipe,
+    id: recipe.id || recipe.sourceRecipeId || displayName,
+    title: displayName,
+    name: recipe.name || displayName,
+    searchLinks: recipe.searchLinks || generateRecipeSearchLinks(displayName),
+    coreIngredients,
+    optionalIngredients,
+    requiredIngredients: coreIngredients,
+    requiredSeasonings,
+    pantryIngredients: requiredSeasonings,
+    ingredientGroups,
+    requiredGroups
+  };
+}
+
+function evaluateRequiredGroups(requiredGroups = [], ingredientIndex) {
+  const satisfiedGroups = requiredGroups.filter(
+    (group) =>
+      Array.isArray(group.anyOf) &&
+      group.anyOf.some((item) => ingredientIndex.availableSet.has(normalizeIngredientName(item)))
+  );
+  const missingGroups = requiredGroups
+    .filter((group) => !satisfiedGroups.includes(group))
+    .map((group) => group.label)
+    .filter(Boolean);
+
+  return {
+    satisfiedGroups,
+    missingGroups
+  };
+}
+
+function computeMatchMetrics(preparedRecipe, ingredientIndex, recipeId = preparedRecipe.id) {
+  const mainNames = preparedRecipe.ingredientGroups.mainIngredients.map((item) => item.normalizedName);
+  const optionalNames = preparedRecipe.ingredientGroups.optionalIngredients.map((item) => item.normalizedName);
+  const seasoningNames = preparedRecipe.ingredientGroups.seasoningIngredients.map((item) => item.normalizedName);
+
+  const matchedMain = mainNames.filter((item) => ingredientIndex.availableSet.has(item));
+  const missingMain = mainNames.filter((item) => !ingredientIndex.availableSet.has(item));
+  const matchedOptional = optionalNames.filter((item) => ingredientIndex.availableSet.has(item));
+  const matchedSeasonings = seasoningNames.filter((item) => ingredientIndex.availableSet.has(item));
+  const missingSeasonings = seasoningNames.filter((item) => !ingredientIndex.availableSet.has(item));
+  const { satisfiedGroups, missingGroups } = evaluateRequiredGroups(preparedRecipe.requiredGroups, ingredientIndex);
+  const matchedIngredients = uniqueNormalizedIngredients([...matchedMain, ...matchedOptional]);
+  const expiringMatchedIngredients = matchedIngredients.filter((item) => ingredientIndex.urgentSet.has(item)).slice(0, 3);
+
+  const mainCoverage = mainNames.length ? matchedMain.length / mainNames.length : 0;
+  const optionalCoverage = optionalNames.length ? matchedOptional.length / optionalNames.length : 0;
+  const seasoningCoverage = seasoningNames.length ? matchedSeasonings.length / seasoningNames.length : 1;
+  const groupCoverage = preparedRecipe.requiredGroups.length
+    ? satisfiedGroups.length / preparedRecipe.requiredGroups.length
+    : 1;
+  const urgencyBonus = expiringMatchedIngredients.length
+    ? Math.min(0.08, expiringMatchedIngredients.length * 0.04)
+    : 0;
+  const mainPenalty = mainNames.length ? (missingMain.length / mainNames.length) * 0.28 : 0;
+  const groupPenalty = preparedRecipe.requiredGroups.length
+    ? (missingGroups.length / preparedRecipe.requiredGroups.length) * 0.18
+    : 0;
+  const seasoningPenalty = seasoningNames.length ? (missingSeasonings.length / seasoningNames.length) * 0.04 : 0;
+  const weightedBase = clamp(
+    mainCoverage * 0.7 +
+      optionalCoverage * 0.1 +
+      groupCoverage * 0.1 +
+      seasoningCoverage * 0.1 +
+      urgencyBonus -
+      mainPenalty -
+      groupPenalty -
+      seasoningPenalty
+  );
+
+  return {
+    recipeId,
+    score: roundToTwo(weightedBase),
+    matchedIngredients,
+    missingIngredients: missingMain,
+    missingSeasonings,
+    expiringMatchedIngredients,
+    matchedMain,
+    missingMain,
+    matchedOptional,
+    matchedSeasonings,
+    satisfiedGroups,
+    missingGroups
+  };
+}
+
+function buildRecommendationReason({
+  canMakeNow,
+  missingIngredients,
+  missingSeasonings,
+  expiringMatchedIngredients,
+  missingGroups
+}) {
+  if (canMakeNow) {
+    return '핵심 재료가 모두 있어서 외부 레시피 검색으로 바로 조리법을 확인하면 좋아요.';
+  }
+
+  if (missingIngredients.length === 1) {
+    return `${missingIngredients[0]}만 추가하면 바로 도전하기 좋아요.`;
+  }
+
+  if (expiringMatchedIngredients.length) {
+    return `${expiringMatchedIngredients[0]}처럼 빨리 써야 하는 재료를 먼저 활용하기 좋은 메뉴예요.`;
+  }
+
+  if (missingSeasonings.length && missingIngredients.length <= 2) {
+    return `핵심 재료는 대부분 맞고 ${missingSeasonings.join(', ')} 같은 양념만 조금 보완하면 돼요.`;
+  }
+
+  if (missingGroups.length) {
+    return `${missingGroups.join(', ')} 조합을 채우면 매칭률이 더 좋아져요.`;
+  }
+
+  return '보유 재료와 겹치는 메뉴를 먼저 추천했어요.';
+}
+
+/**
+ * @param {Array<string|{name?: string, rawName?: string, normalizedName?: string, ingredientType?: string, section?: string, consumed?: boolean, expiryDate?: string, expiresAt?: string}>} userIngredients
+ * @param {Array<string|{rawName?: string, normalizedName?: string, ingredientType?: string, section?: string}>} recipeIngredients
+ * @param {{ recipeId?: string, pantryItems?: string[] }} [options]
+ * @returns {{
+ *   recipeId: string | undefined,
+ *   score: number,
+ *   matchedIngredients: string[],
+ *   missingIngredients: string[],
+ *   missingSeasonings: string[],
+ *   expiringMatchedIngredients: string[]
+ * }}
+ */
+export function getRecipeMatchScore(userIngredients = [], recipeIngredients = [], options = {}) {
+  const ingredientIndex = buildIngredientIndex(userIngredients, resolvePantryItems({ pantryItems: options.pantryItems }));
+  const preparedRecipe = prepareRecipe({
+    id: options.recipeId,
+    ingredients: recipeIngredients
+  });
+
+  return computeMatchMetrics(preparedRecipe, ingredientIndex, options.recipeId);
 }
 
 function evaluateRecipe(recipe, ingredientIndex) {
-  const preparedRecipe = getPreparedRecipe(recipe);
-  const matchedCore = preparedRecipe.coreIngredients.filter((item) => ingredientIndex.availableSet.has(item));
-  const missingCore = preparedRecipe.coreIngredients.filter((item) => !ingredientIndex.availableSet.has(item));
-  const matchedOptional = preparedRecipe.optionalIngredients.filter((item) => ingredientIndex.availableSet.has(item));
-
-  const satisfiedGroups = preparedRecipe.requiredGroups.filter((group) =>
-    Array.isArray(group.anyOf) && group.anyOf.some((item) => ingredientIndex.availableSet.has(normalizeIngredientName(item)))
+  const preparedRecipe = prepareRecipe(recipe);
+  const matchMetrics = computeMatchMetrics(preparedRecipe, ingredientIndex, preparedRecipe.id);
+  const canMakeNow = matchMetrics.missingIngredients.length === 0 && matchMetrics.missingGroups.length === 0;
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        matchMetrics.score * 100 -
+          matchMetrics.missingIngredients.length * 18 -
+          matchMetrics.missingGroups.length * 12 +
+          matchMetrics.matchedOptional.length * 4 +
+          matchMetrics.expiringMatchedIngredients.length * 6
+      )
+    )
   );
-  const missingGroups = preparedRecipe.requiredGroups
-    .filter((group) => !satisfiedGroups.includes(group))
-    .map((group) => group.label);
-
-  const urgentMatches = getUrgentMatches(preparedRecipe, ingredientIndex);
-  const coreMatchRate = preparedRecipe.coreIngredients.length
-    ? matchedCore.length / preparedRecipe.coreIngredients.length
-    : 0;
-
-  const coreScore = coreMatchRate * 50;
-  const optionalScore = Math.min(MAX_OPTIONAL_BONUS, matchedOptional.length * 3);
-  const groupScore = satisfiedGroups.length * 10;
-  const urgentScore = Math.min(MAX_URGENT_BONUS, urgentMatches.length * 10);
-  const missingCorePenalty = missingCore.length * 15;
-  const rawScore = coreScore + optionalScore + groupScore + urgentScore - missingCorePenalty;
-  const score = Math.max(0, Math.round(rawScore));
-  const canMakeNow = score >= 50 && missingCore.length === 0;
-
-  let reason = '';
-  if (canMakeNow) {
-    reason = '\uD575\uC2EC \uC7AC\uB8CC\uAC00 \uAC16\uCDB0\uC838 \uC788\uC5B4\uC11C \uBC14\uB85C \uB9CC\uB4E4\uAE30 \uC88B\uC544\uC694.';
-  } else if (missingCore.length === 1) {
-    reason = `${missingCore[0]}\uB9CC \uBCF4\uC644\uD558\uBA74 \uBC14\uB85C \uB3C4\uC804\uD558\uAE30 \uC88B\uC544\uC694.`;
-  } else if (urgentMatches.length) {
-    reason = `${urgentMatches[0]}\uCC98\uB7FC \uBE68\uB9AC \uC368\uC57C \uD558\uB294 \uC7AC\uB8CC\uB97C \uBA3C\uC800 \uD65C\uC6A9\uD558\uAE30 \uC88B\uC544\uC694.`;
-  } else if (missingGroups.length) {
-    reason = `${missingGroups.join(', ')} \uC870\uAC74\uC744 \uCC44\uC6B0\uBA74 \uC870\uD569\uC774 \uB354 \uC88B\uC544\uC838\uC694.`;
-  } else {
-    reason = '\uD575\uC2EC \uC7AC\uB8CC\uB97C \uC870\uAE08 \uB354 \uCC44\uC6B0\uBA74 \uCD94\uCC9C \uC810\uC218\uAC00 \uBE60\uB974\uAC8C \uC62C\uB77C\uAC00\uC694.';
-  }
+  const reason = buildRecommendationReason({
+    canMakeNow,
+    missingIngredients: matchMetrics.missingIngredients,
+    missingSeasonings: matchMetrics.missingSeasonings,
+    expiringMatchedIngredients: matchMetrics.expiringMatchedIngredients,
+    missingGroups: matchMetrics.missingGroups
+  });
 
   return {
     ...preparedRecipe,
     score,
-    scoreLabel: `${score}\uC810`,
-    missingCore,
-    missingGroups,
-    urgentMatches,
+    scoreLabel: `${score}점`,
+    matchRate: matchMetrics.score,
+    matchRateLabel: `${Math.round(matchMetrics.score * 100)}%`,
+    missingCore: matchMetrics.missingIngredients,
+    missingGroups: matchMetrics.missingGroups,
+    urgentMatches: matchMetrics.expiringMatchedIngredients,
     canMakeNow,
-    matchedCore,
-    matchedOptional,
-    matchedIngredients: matchedCore,
-    missingIngredients: missingCore,
-    matchedCount: matchedCore.length,
-    missingCount: missingCore.length + missingGroups.length,
+    matchedCore: matchMetrics.matchedMain,
+    matchedOptional: matchMetrics.matchedOptional,
+    matchedSeasonings: matchMetrics.matchedSeasonings,
+    matchedIngredients: matchMetrics.matchedIngredients,
+    missingIngredients: matchMetrics.missingIngredients,
+    missingSeasonings: matchMetrics.missingSeasonings,
+    matchedCount: matchMetrics.matchedMain.length,
+    missingCount: matchMetrics.missingIngredients.length + matchMetrics.missingGroups.length,
     totalRequiredIngredients: preparedRecipe.coreIngredients.length,
-    expiringMatchedIngredients: urgentMatches,
-    useSoon: urgentMatches.length > 0,
+    expiringMatchedIngredients: matchMetrics.expiringMatchedIngredients,
+    useSoon: matchMetrics.expiringMatchedIngredients.length > 0,
     status: canMakeNow ? RECIPE_STATUS.READY : RECIPE_STATUS.NEEDS_CORE,
     reason,
-    baseScore: Math.round(coreMatchRate * 100) / 100
+    baseScore: roundToTwo(preparedRecipe.coreIngredients.length ? matchMetrics.matchedMain.length / preparedRecipe.coreIngredients.length : 0)
   };
 }
 
@@ -158,8 +371,8 @@ export function recommendRecipes({
         return right.score - left.score;
       }
 
-      if (left.missingCore.length !== right.missingCore.length) {
-        return left.missingCore.length - right.missingCore.length;
+      if (left.missingIngredients.length !== right.missingIngredients.length) {
+        return left.missingIngredients.length - right.missingIngredients.length;
       }
 
       return left.title.localeCompare(right.title, 'ko');
@@ -186,7 +399,7 @@ export function explainRecipeMatch(
   recipeId,
   { recipes = [], fridgeIngredients = [], pantryItems = [], pantryOwnership = {} } = {}
 ) {
-  const recipe = recipes.find((item) => item.id === recipeId);
+  const recipe = recipes.find((item) => (item.id || item.sourceRecipeId || getRecipeDisplayName(item)) === recipeId);
 
   if (!recipe) {
     return null;

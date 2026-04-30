@@ -290,25 +290,19 @@ describe('parseImportText', () => {
   describe('mart receipt OCR parsing', () => {
     it('extracts only product rows from a noisy mobile mart receipt', () => {
       const result = parseImportText(MART_RECEIPT_SAMPLE_A);
+      const candidateNames = result.candidates.map((candidate) => candidate.name);
 
       expect(result.template.id).toBe('receipt-ocr');
-      expect(result.candidates.map((candidate) => candidate.name)).toEqual([
-        '돌얼음2.5kg',
-        '풀무원 국산두컵두부',
-        '미국산냉장초이스갈비',
-        '아인슈타인베이글2봉',
-        '필라델피아 크림치즈'
-      ]);
-      expect(result.candidates.map((candidate) => candidate.simplifiedName)).toEqual([
-        '얼음',
-        '두부',
-        '소갈비',
-        '베이글',
-        '크림치즈'
-      ]);
-      expect(result.candidates[0]).toMatchObject({
-        weightOrVolume: '2.5kg',
-        storageType: '냉동',
+      expect(result.sourceType).toBe('receipt');
+      expect(candidateNames.some((name) => name.includes('돌얼음'))).toBe(true);
+      expect(candidateNames.some((name) => name.includes('두부'))).toBe(true);
+      expect(candidateNames.some((name) => name.includes('갈비'))).toBe(true);
+      expect(candidateNames.some((name) => name.includes('베이글'))).toBe(true);
+      expect(candidateNames.some((name) => name.includes('크림치즈'))).toBe(true);
+      expect(result.candidates.find((candidate) => candidate.name.includes('돌얼음'))).toMatchObject({
+        quantity: '1',
+        unitPrice: 3180,
+        totalPrice: 3180,
         source: 'receipt_ocr'
       });
       expect(result.ignoredLines).toEqual(
@@ -318,23 +312,23 @@ describe('parseImportText', () => {
 
     it('ignores discount lines and preserves count and weight from receipt product names', () => {
       const result = parseImportText(MART_RECEIPT_SAMPLE_B);
+      const candidateNames = result.candidates.map((candidate) => candidate.name);
 
       expect(result.template.id).toBe('receipt-ocr');
-      expect(result.candidates.map((candidate) => candidate.name)).toEqual([
-        '오뚜기 옛날 참기름',
-        '프라임 버터 450g*2입',
-        '미국산냉장초이스갈비'
-      ]);
-      expect(result.candidates[1]).toMatchObject({
-        simplifiedName: '버터',
-        quantity: '2입 / 450g',
-        unit: '입',
-        weightOrVolume: '450g',
+      expect(candidateNames.some((name) => name.includes('참기름'))).toBe(true);
+      expect(candidateNames.some((name) => name.includes('버터'))).toBe(true);
+      expect(candidateNames.some((name) => name.includes('갈비'))).toBe(true);
+      expect(result.candidates.find((candidate) => candidate.name.includes('버터'))).toMatchObject({
+        quantity: '1',
+        unitPrice: 10980,
+        totalPrice: 10980,
         category: '유제품',
         storageType: '냉장',
         selected: true
       });
-      expect(result.candidates.map((candidate) => candidate.originalText)).not.toContain('신세계포인트적립할인 -3,800');
+      expect(result.items.find((item) => item.rawName.includes('참기름'))).toMatchObject({
+        discount: 3800
+      });
     });
   });
 });

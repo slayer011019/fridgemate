@@ -75,7 +75,10 @@ describe('analytics utilities', () => {
     const formatDate = (offset) => {
       const date = new Date(today);
       date.setDate(date.getDate() + offset);
-      return date.toISOString().slice(0, 10);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     };
 
     expect(getDaysToExpiryBucket(formatDate(-1))).toBe('expired');

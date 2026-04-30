@@ -87,7 +87,10 @@ export const serverConfig = {
   authCookieSameSite: process.env.AUTH_COOKIE_SAME_SITE || 'Lax',
   redisUrl: process.env.REDIS_URL || '',
   authRedisPrefix: process.env.AUTH_REDIS_PREFIX || 'fridgemate:auth',
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY || ''
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+  openAiApiKey: process.env.OPENAI_API_KEY || '',
+  recipeEmbeddingModel: process.env.RECIPE_EMBEDDING_MODEL || 'text-embedding-3-small',
+  recipeEmbeddingDimensions: Number(process.env.RECIPE_EMBEDDING_DIMENSIONS || 1536)
 };
 
 export function isAllowedOrigin(origin) {

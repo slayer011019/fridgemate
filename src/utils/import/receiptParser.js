@@ -1,66 +1,165 @@
 import { guessCategory, guessStorageType } from './importGuesser.js';
+import { cleanImportedProductTitle, normalizeImportedIngredient } from './ingredientNormalizer.js';
 
-const PRICE_PATTERN = /\d{1,3}(?:,\d{3})+/;
-const PRICE_TAIL_PATTERN = /\s+\d{1,3}(?:,\d{3})+(?:원)?(?:\s+\d+(?:\.\d+)?)?(?:\s+\d{1,3}(?:,\d{3})+(?:원)?)?\s*$/;
-const BARCODE_PATTERN = /^\d{10,}$/;
-const HANGUL_PATTERN = /[가-힣]/;
-const SECTION_START_PATTERN = /(상품\s*명|상\s*품\s*명|단가\s*수량\s*금액|\[?\s*구매\s*\]?)/;
-const SECTION_END_PATTERN = /(총\s*품목\s*수량|합계|결제대상금액|카드결제|부가세)/;
-const LINE_SEPARATOR_PATTERN = /^[-=~_\s]{3,}$/;
-const DATE_TIME_ONLY_PATTERN =
-  /^(\[?\s*구매\s*\]?\s*)?\d{4}[-./년\s]\d{1,2}[-./월\s]\d{1,2}(?:일)?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?(?:\s+POS[:\s-]*[\d-]+)?$/i;
-const PHONE_PATTERN = /(?:\(?0\d{1,2}\)?[-)\s]?\d{3,4}[-\s]?\d{4}|01[016789][-\s]?\d{3,4}[-\s]?\d{4})/;
-const BUSINESS_NUMBER_PATTERN = /\d{3}[-\s]?\d{2}[-\s]?\d{5}/;
-const CARD_NUMBER_PATTERN = /(카드|card).*(\d{4}[-\s*]){2,}\d{2,4}|(\d{4}[-\s*]){3}\d{2,4}/i;
-const POS_PATTERN = /\bPOS\b|포스|pos[:\s-]*\d+/i;
-const ADDRESS_PATTERN =
-  /(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|특별시|광역시|특별자치시|도)\s?.*(시|군|구|읍|면|동|로|길|대로)/;
+const STORAGE_ROOM = '상온';
+const STORAGE_FRIDGE = '냉장';
+const STORAGE_FREEZER = '냉동';
 
-const NOISE_KEYWORDS = [
-  '합계',
-  '부가세',
-  '과세',
-  '면세',
-  '결제',
-  '카드',
-  '승인',
-  'POS',
-  '포인트',
-  '적립',
-  '할인',
-  '환불',
-  '교환',
-  '영수증',
-  '사업자',
-  '전화',
-  '주소',
-  '총품목',
-  '총 품목',
-  '결제대상금액',
-  '받은금액',
-  '거스름돈'
-];
+const CATEGORY_NOODLES = '라면/면류';
+const CATEGORY_DAIRY = '유제품';
+const CATEGORY_BEANS = '두부/콩류';
+const CATEGORY_FROZEN = '냉동식품';
+const CATEGORY_MEAT = '육류';
+const CATEGORY_PROCESSED_MEAT = '육류/가공육';
+const CATEGORY_VEGETABLE = '채소';
+const CATEGORY_FRUIT = '과일';
+const CATEGORY_SNACK = '간식';
+const CATEGORY_SAUCE = '양념/소스';
+const CATEGORY_OTHER = '기타';
 
-const HEADER_KEYWORDS = ['상품명', '상 품 명', '단가 수량 금액', '구매'];
-const PRODUCT_DICTIONARY = [
-  { keywords: ['돌얼음', '얼음'], simplifiedName: '얼음', category: '냉동식품', storageType: '냉동' },
-  { keywords: ['국산두컵두부', '풀무원 두부', '두부'], simplifiedName: '두부', category: '기타', storageType: '냉장' },
+const OCR_ALIAS_RULES = [
   {
-    keywords: ['미국산냉장초이스갈비', '냉장초이스갈비', '초이스갈비'],
-    simplifiedName: '소갈비',
-    category: '육류',
-    storageType: '냉장'
-  },
-  { keywords: ['베이글'], simplifiedName: '베이글', category: '간편식', storageType: '실온', needsReview: true },
-  { keywords: ['필라델피아 크림치즈', '크림치즈'], simplifiedName: '크림치즈', category: '유제품', storageType: '냉장' },
-  { keywords: ['프라임 버터', '버터'], simplifiedName: '버터', category: '유제품', storageType: '냉장' },
-  { keywords: ['참기름'], simplifiedName: '참기름', category: '소스', storageType: '실온' },
-  { keywords: ['와일드터키', '레어브리'], simplifiedName: '주류', category: '기타', storageType: '실온', needsReview: true },
-  { keywords: ['바이스비어'], simplifiedName: '주류', category: '기타', storageType: '냉장', needsReview: true }
+    pattern: /^C(?=\s*[가-힣A-Za-z])/i,
+    replacement: 'CJ'
+  }
 ];
 
-function clampScore(value) {
-  return Math.max(0, Math.min(1, Math.round(value * 100) / 100));
+const PROMO_NOISE_PATTERN = /(?:^|\s)(?:기획|행사|증정|사은품|세트|묶음|특가|추천|쿠폰|할인)(?=\s|$)/gi;
+const RECEIPT_CATEGORY_HINTS = [
+  {
+    keywords: ['양념', '소스', '드레싱', '쌈장', '된장', '고추장', '간장', '마요', '케첩', '육수'],
+    category: CATEGORY_SAUCE,
+    storageType: STORAGE_ROOM,
+    includeByDefault: false
+  },
+  {
+    keywords: ['만두', '교자'],
+    category: CATEGORY_FROZEN,
+    storageType: STORAGE_FREEZER,
+    includeByDefault: true
+  },
+  {
+    keywords: ['라면', '우동', '국수', '냉면', '소면', '스파게티', '파스타', '면'],
+    category: CATEGORY_NOODLES,
+    storageType: STORAGE_ROOM,
+    includeByDefault: false
+  },
+  {
+    keywords: ['과자', '스낵', '쿠키', '비스킷', '칩', '강정', '땅콩', '초콜릿', '캔디'],
+    category: CATEGORY_SNACK,
+    storageType: STORAGE_ROOM,
+    includeByDefault: false
+  },
+  {
+    keywords: ['우유', '치즈', '요거트', '버터', '생크림'],
+    category: CATEGORY_DAIRY,
+    storageType: STORAGE_FRIDGE,
+    includeByDefault: true
+  },
+  {
+    keywords: ['두부', '순두부', '연두부', '콩'],
+    category: CATEGORY_BEANS,
+    storageType: STORAGE_FRIDGE,
+    includeByDefault: true
+  },
+  {
+    keywords: ['훈제', '햄', '베이컨', '소시지'],
+    category: CATEGORY_PROCESSED_MEAT,
+    storageType: STORAGE_FRIDGE,
+    includeByDefault: true
+  },
+  {
+    keywords: ['삼겹살', '목살', '돼지', '소고기', '쇠고기', '한우', '오리', '닭', '설도', '갈비'],
+    category: CATEGORY_MEAT,
+    storageType: STORAGE_FRIDGE,
+    includeByDefault: true
+  },
+  {
+    keywords: ['상추', '깻잎', '쌈', '채소', '숙주', '콩나물', '양파', '대파', '오이', '감자', '당근', '토마토', '호박', '버섯'],
+    category: CATEGORY_VEGETABLE,
+    storageType: STORAGE_FRIDGE,
+    includeByDefault: true
+  },
+  {
+    keywords: ['사과', '바나나', '참외', '포도', '귤', '오렌지', '키위', '딸기', '수박', '과일'],
+    category: CATEGORY_FRUIT,
+    storageType: STORAGE_FRIDGE,
+    includeByDefault: true
+  }
+];
+
+const IGNORE_KEYWORDS = [
+  '재사용 봉투',
+  '봉투',
+  '면세 물품가액',
+  '과세 물품가액',
+  '부가세',
+  '합계',
+  '자사할인',
+  '결제금액',
+  '결제대상금액',
+  '카드번호',
+  '현금IC',
+  'POS',
+  '승인번호',
+  '할인 상세내역',
+  '사업자번호',
+  '상품명 단가 수량 금액',
+  '총 품목 수량'
+];
+
+const DISCOUNT_KEYWORDS = ['할인', '번들', '쿠폰'];
+const RECEIPT_HEADER_PATTERNS = [/상품\s*명.*단가.*수량.*금액/i, /총\s*품목\s*수량/i];
+const NUMBER_TOKEN_PATTERN = /^-?\d{1,3}(?:,\d{3})*$|^-?\d+$/;
+const PERCENT_TOKEN_PATTERN = /^\d+%$/;
+const HAS_NAME_PATTERN = /[A-Za-z가-힣]/;
+const TRAILING_GRADE_PATTERN = /\(\s*\d+\s*등급\s*\)/g;
+const RECEIPT_DATE_PATTERN = /^\[?\s*구매\s*\]?\s*\d{4}[-./]\d{1,2}[-./]\d{1,2}/i;
+const PHONE_PATTERN = /(?:\(?0\d{1,2}\)?[-)\s]?\d{3,4}[-\s]?\d{4}|01[016789][-\s]?\d{3,4}[-\s]?\d{4})/;
+const ADDRESS_PATTERN = /(특별시|광역시|도|시).{0,20}(구|군|읍|면|동|로|길)/;
+
+function clampConfidence(value) {
+  return Math.max(0.1, Math.min(0.99, Math.round(value * 100) / 100));
+}
+
+function formatAmount(amount) {
+  return new Intl.NumberFormat('ko-KR').format(amount);
+}
+
+function isNumericToken(token) {
+  return NUMBER_TOKEN_PATTERN.test(token);
+}
+
+function parseNumberValue(token) {
+  if (!token) {
+    return null;
+  }
+
+  const normalized = String(token).replace(/,/g, '').trim();
+
+  if (!/^-?\d+$/.test(normalized)) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isQuantityValue(value, rawToken = '') {
+  return Number.isInteger(value) && value >= 1 && value <= 99 && !String(rawToken).includes(',');
+}
+
+function isPriceValue(value, rawToken = '') {
+  return value >= 100 || String(rawToken).includes(',');
+}
+
+function normalizeSpacing(text) {
+  return String(text || '')
+    .normalize('NFKC')
+    .replace(/[\u00a0\u1680\u2000-\u200b\u202f\u205f\u3000]/g, ' ')
+    .replace(/(^|\s)-\s+(?=\d)/g, '$1-')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 function normalizeComparable(text) {
@@ -69,164 +168,125 @@ function normalizeComparable(text) {
     .replace(/\s+/g, '');
 }
 
-function hasNoiseKeyword(line) {
-  const normalized = String(line || '').toLowerCase();
-  return NOISE_KEYWORDS.some((keyword) => normalized.includes(keyword.toLowerCase()));
+function applyOcrAliases(text) {
+  return OCR_ALIAS_RULES.reduce((current, rule) => current.replace(rule.pattern, rule.replacement), String(text || ''));
 }
 
-function isSectionMarker(line) {
-  return HEADER_KEYWORDS.some((keyword) => String(line || '').replace(/\s+/g, ' ').includes(keyword));
-}
-
-function isDiscountLine(line) {
-  return /(할인|포인트|적립|쿠폰|에누리|프로모션)/.test(line) || /-\s*\d{1,3}(?:,\d{3})+/.test(line);
-}
-
-function isReceiptNoiseLine(line, { keepSectionMarkers = false } = {}) {
-  const text = String(line || '').trim();
-
-  if (!text) return true;
-  if (keepSectionMarkers && (isSectionMarker(text) || SECTION_END_PATTERN.test(text))) return false;
-  if (LINE_SEPARATOR_PATTERN.test(text)) return true;
-  if (/^\d+$/.test(text)) return true;
-  if (BARCODE_PATTERN.test(text)) return true;
-  if (PHONE_PATTERN.test(text)) return true;
-  if (BUSINESS_NUMBER_PATTERN.test(text)) return true;
-  if (CARD_NUMBER_PATTERN.test(text)) return true;
-  if (POS_PATTERN.test(text) && !PRICE_PATTERN.test(text)) return true;
-  if (ADDRESS_PATTERN.test(text)) return true;
-  if (DATE_TIME_ONLY_PATTERN.test(text)) return true;
-
-  if (isDiscountLine(text)) return true;
-
-  if (hasNoiseKeyword(text)) {
-    const looksLikeProductWithPrice = PRICE_PATTERN.test(text) && HANGUL_PATTERN.test(text) && !isSectionMarker(text);
-    return !looksLikeProductWithPrice;
+function mapReceiptStorageType(storageType) {
+  if (!storageType) {
+    return STORAGE_FRIDGE;
   }
 
-  return false;
+  if (storageType === '팬트리' || storageType === '실온' || storageType === STORAGE_ROOM) {
+    return STORAGE_ROOM;
+  }
+
+  return storageType;
 }
 
-function stripReceiptProductName(line) {
-  return String(line || '')
-    .replace(/^[*\-•·\s]+/g, '')
-    .replace(/\b\d{10,}\b/g, ' ')
-    .replace(PRICE_TAIL_PATTERN, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
+function findCategoryHint(text) {
+  const comparable = normalizeComparable(text);
 
-function extractWeightOrVolume(name) {
-  return (
-    String(name || '').match(/\d+(?:\.\d+)?\s*(?:kg|㎏|킬로그램|킬로|키로|g|그램|ml|㎖|mL|l|L|ℓ|리터)/i)?.[0]
-      ?.replace(/\s+/g, '')
-      .replace(/㎏|킬로그램|킬로|키로/gi, 'kg')
-      .replace(/그램/gi, 'g')
-      .replace(/㎖/g, 'ml')
-      .replace(/ℓ|리터/gi, 'L') || ''
+  return RECEIPT_CATEGORY_HINTS.find((rule) =>
+    rule.keywords.some((keyword) => comparable.includes(normalizeComparable(keyword)))
   );
 }
 
-function extractCountUnit(name) {
-  const compactName = String(name || '').replace(/\s+/g, '');
-  const packMatch = compactName.match(/(?:\*(\d+)(입|개|봉|팩|박스|병|캔))|(\d+)(입|개입|개|봉|팩|박스|구|병|캔)$/);
+/**
+ * @typedef {Object} ReceiptParsedItem
+ * @property {string} rawName
+ * @property {string} normalizedName
+ * @property {number|null} unitPrice
+ * @property {number} quantity
+ * @property {number|null} totalPrice
+ * @property {number} discount
+ * @property {string} category
+ * @property {string} storageType
+ * @property {boolean} includeByDefault
+ * @property {number} confidence
+ * @property {string} reason
+ * @property {number[]} lineIndexes
+ * @property {string[]} sourceLines
+ */
 
-  if (!packMatch) {
-    return { quantity: '', unit: '' };
-  }
+/**
+ * @typedef {Object} ReceiptParseResult
+ * @property {'receipt'} sourceType
+ * @property {string} normalizedText
+ * @property {string[]} lines
+ * @property {string[]} usefulLines
+ * @property {string[]} ignoredLines
+ * @property {string[]} warnings
+ * @property {ReceiptParsedItem[]} items
+ * @property {ReceiptParsedItem[]} receiptItems
+ * @property {Array<Object>} candidates
+ * @property {{id: string, confidence: string}} template
+ * @property {{lines: string[], startIndex: number, endIndex: number, detected: boolean}} itemSection
+ */
 
-  return {
-    quantity: Number(packMatch[1] || packMatch[3]),
-    unit: packMatch[2] || packMatch[4] || ''
-  };
-}
+function createLineInfo(text, index) {
+  const tokens = text.split(' ').filter(Boolean);
+  const compactText = text.replace(/\s+/g, '');
+  const numericTokens = tokens
+    .map((token, tokenIndex) => {
+      if (!isNumericToken(token)) {
+        return null;
+      }
 
-function matchIngredientDictionary(name) {
-  const normalized = normalizeComparable(name);
-  const rule = PRODUCT_DICTIONARY.find((entry) => entry.keywords.some((keyword) => normalized.includes(normalizeComparable(keyword))));
+      const value = parseNumberValue(token);
 
-  if (!rule) {
-    const category = guessCategory(name);
-    return {
-      simplifiedName: stripReceiptProductName(name),
-      category,
-      storageType: guessStorageType(name, category),
-      matched: false,
-      needsReview: false
-    };
-  }
+      if (value === null) {
+        return null;
+      }
 
-  return {
-    simplifiedName: rule.simplifiedName,
-    category: rule.category,
-    storageType: rule.storageType,
-    matched: true,
-    needsReview: Boolean(rule.needsReview)
-  };
-}
-
-function calculateReceiptConfidence({ originalText, name, dictionaryMatch, quantity, unit, weightOrVolume, storageType, fromPriceSection }) {
-  let score = 0;
-
-  if (fromPriceSection) score += 0.25;
-  if (HANGUL_PATTERN.test(name)) score += 0.2;
-  if (dictionaryMatch) score += 0.3;
-  if (quantity || unit || weightOrVolume) score += 0.15;
-  if (storageType) score += 0.1;
-  if (isDiscountLine(originalText) || /(결제|카드|승인|포인트|적립|할인)/.test(originalText)) score -= 0.5;
-  if ((originalText.match(/\d/g) || []).length > 10 && !/[가-힣]{2,}/.test(originalText)) score -= 0.4;
-  if (isReceiptNoiseLine(originalText)) score -= 0.5;
-  if (name.length > 30) score -= 0.2;
-
-  return clampScore(score);
-}
-
-function buildReceiptCandidate(item, index, today) {
-  const dictionaryMatch = matchIngredientDictionary(item.name);
-  const countUnit = extractCountUnit(item.name);
-  const weightOrVolume = extractWeightOrVolume(item.name);
-  const quantity = countUnit.quantity || 1;
-  const unit = countUnit.unit || '개';
-  const confidence = calculateReceiptConfidence({
-    originalText: item.originalText,
-    name: item.name,
-    dictionaryMatch: dictionaryMatch.matched,
-    quantity,
-    unit,
-    weightOrVolume,
-    storageType: dictionaryMatch.storageType,
-    fromPriceSection: item.fromPriceSection
-  });
-  const needsReview = dictionaryMatch.needsReview || confidence < 0.7 || item.name.length > 30;
-  const quantityText = weightOrVolume
-    ? `${quantity}${unit} / ${weightOrVolume}`
-    : `${quantity}${unit}`;
+      return {
+        token,
+        value,
+        tokenIndex,
+        hasComma: token.includes(','),
+        negative: value < 0
+      };
+    })
+    .filter(Boolean);
+  const standaloneNumber = tokens.length === 1 && isNumericToken(tokens[0]) ? parseNumberValue(tokens[0]) : null;
+  const hasDiscountKeyword = DISCOUNT_KEYWORDS.some((keyword) => text.includes(keyword));
+  const matchesIgnoreKeyword = IGNORE_KEYWORDS.some((keyword) => text.includes(keyword));
+  const isPercentOnly = tokens.length === 1 && PERCENT_TOKEN_PATTERN.test(tokens[0]);
+  const hasNameText = HAS_NAME_PATTERN.test(text);
+  const isHeader = RECEIPT_HEADER_PATTERNS.some((pattern) => pattern.test(text));
+  const isMeta =
+    RECEIPT_DATE_PATTERN.test(text) ||
+    PHONE_PATTERN.test(text) ||
+    ADDRESS_PATTERN.test(text) ||
+    /^\d{10,}$/.test(compactText);
 
   return {
-    id: `receipt-candidate-${index}-${crypto.randomUUID()}`,
-    originalText: item.originalText,
-    name: item.name,
-    originalName: item.name,
-    displayName: item.name,
-    normalizedName: dictionaryMatch.simplifiedName || item.name,
-    simplifiedName: dictionaryMatch.simplifiedName || item.name,
-    quantity: quantityText,
-    originalQuantity: quantityText,
-    unit,
-    weightOrVolume,
-    specText: quantityText,
-    category: dictionaryMatch.category,
-    storageType: dictionaryMatch.storageType,
-    selected: confidence >= 0.7,
-    confidence,
-    needsReview,
-    purchaseDate: today,
-    expiryDate: '',
-    memo: '',
-    consumed: false,
-    source: 'receipt_ocr',
-    rawLine: item.originalText,
-    sourceLine: item.originalText
+    index,
+    text,
+    compactText,
+    tokens,
+    numericTokens,
+    standaloneNumber,
+    hasDiscountKeyword,
+    matchesIgnoreKeyword,
+    isPercentOnly,
+    hasNameText,
+    isHeader,
+    isMeta,
+    isIgnored:
+      matchesIgnoreKeyword ||
+      isHeader ||
+      isMeta ||
+      /^[-=~_]{3,}$/.test(text) ||
+      /^면세\s*물품가액/i.test(text) ||
+      /^과세\s*물품가액/i.test(text),
+    isDiscountMeta:
+      hasDiscountKeyword ||
+      /^\[[^\]]*(할인|번들|쿠폰)/i.test(text) ||
+      (isPercentOnly && ['10%', '40%'].includes(tokens[0] || '')),
+    isNegativeAmountOnly: standaloneNumber !== null && standaloneNumber < 0,
+    isPositiveAmountOnly: standaloneNumber !== null && standaloneNumber > 0,
+    nameText: tokens.filter((token) => !isNumericToken(token) && !PERCENT_TOKEN_PATTERN.test(token)).join(' ').trim()
   };
 }
 
@@ -235,12 +295,7 @@ export function normalizeReceiptText(rawText = '') {
     .normalize('NFKC')
     .replace(/[\u00a0\u1680\u2000-\u200b\u202f\u205f\u3000]/g, ' ')
     .split(/\r?\n/)
-    .map((line) =>
-      line
-        .replace(/[-=~_]{3,}/g, ' ')
-        .replace(/[ \t]+/g, ' ')
-        .trim()
-    )
+    .map((line) => normalizeSpacing(line))
     .filter(Boolean)
     .join('\n')
     .trim();
@@ -249,131 +304,602 @@ export function normalizeReceiptText(rawText = '') {
 export function splitReceiptLines(normalizedText = '') {
   return String(normalizedText || '')
     .split(/\r?\n/)
-    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .map((line) => normalizeSpacing(line))
     .filter(Boolean);
 }
 
-export function removeReceiptNoiseLines(lines = [], options = {}) {
-  return lines.filter((line) => !isReceiptNoiseLine(line, options));
+function getDiscountAmount(lineInfo) {
+  if (!lineInfo) {
+    return null;
+  }
+
+  if (lineInfo.isPercentOnly || (lineInfo.text.includes('%') && !/원/.test(lineInfo.text))) {
+    return null;
+  }
+
+  if (lineInfo.isNegativeAmountOnly) {
+    return Math.abs(lineInfo.standaloneNumber);
+  }
+
+  const amountMatch = lineInfo.text.match(/-?\d{1,3}(?:,\d{3})+|-?\d+/);
+  const amount = parseNumberValue(amountMatch?.[0] || '');
+
+  if (amount === null) {
+    return null;
+  }
+
+  if (lineInfo.hasDiscountKeyword || amount < 0) {
+    return Math.abs(amount);
+  }
+
+  return null;
 }
 
-export function detectItemSection(lines = []) {
-  if (!lines.length) {
-    return { lines: [], startIndex: -1, endIndex: -1, detected: false };
-  }
+function cleanRawName(name) {
+  return normalizeSpacing(String(name || ''))
+    .replace(/^\*+\s*/, '')
+    .replace(TRAILING_GRADE_PATTERN, ' ')
+    .replace(PROMO_NOISE_PATTERN, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 
-  const headerIndex = lines.findIndex((line) => SECTION_START_PATTERN.test(line));
-  let startIndex = headerIndex >= 0 ? headerIndex + 1 : -1;
+export function normalizeProductName(name = '') {
+  const aliased = applyOcrAliases(name);
+  const cleaned = cleanRawName(aliased)
+    .replace(/([A-Za-z])([가-힣])/g, '$1 $2')
+    .replace(/([가-힣])([A-Za-z])/g, '$1 $2')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  const lightlyNormalized = cleanImportedProductTitle(cleaned)
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 
-  if (startIndex < 0) {
-    const firstPriceIndex = lines.findIndex((line, index) => {
-      const window = lines.slice(index, index + 5);
-      return window.filter((entry) => PRICE_PATTERN.test(entry)).length >= 2;
-    });
-    startIndex = firstPriceIndex;
-  }
+  return lightlyNormalized || cleaned;
+}
 
-  if (startIndex < 0) {
-    return { lines, startIndex: 0, endIndex: lines.length, detected: false };
-  }
-
-  const relativeEndIndex = lines.slice(startIndex).findIndex((line) => SECTION_END_PATTERN.test(line));
-  const endIndex = relativeEndIndex >= 0 ? startIndex + relativeEndIndex : lines.length;
+export function classifyReceiptIngredient(name = '') {
+  const normalizedIngredient = normalizeImportedIngredient(name);
+  const hint = findCategoryHint(name) || findCategoryHint(normalizedIngredient.originalName) || findCategoryHint(normalizedIngredient.normalizedName);
+  const fallbackCategory = normalizedIngredient.category || guessCategory(name) || CATEGORY_OTHER;
+  const fallbackStorage = mapReceiptStorageType(
+    normalizedIngredient.storageType || guessStorageType(name, fallbackCategory) || STORAGE_FRIDGE
+  );
+  const category = hint?.category || fallbackCategory;
+  const shouldDefaultToRoom =
+    !hint && !normalizedIngredient.matchedCanonical && (fallbackCategory === CATEGORY_OTHER || fallbackCategory === '기타');
+  const storageType = hint?.storageType || (shouldDefaultToRoom ? STORAGE_ROOM : fallbackStorage);
+  const includeByDefault =
+    hint?.includeByDefault ??
+    [CATEGORY_DAIRY, CATEGORY_BEANS, CATEGORY_MEAT, CATEGORY_PROCESSED_MEAT, CATEGORY_VEGETABLE, CATEGORY_FRUIT, '달걀'].includes(
+      category
+    );
 
   return {
-    lines: lines.slice(startIndex, endIndex),
-    startIndex,
-    endIndex,
-    detected: true
+    category,
+    storageType,
+    includeByDefault,
+    matched: Boolean(hint || normalizedIngredient.matchedCanonical)
   };
 }
 
-export function extractReceiptItems(lines = []) {
-  const items = [];
-
-  lines.forEach((line, index) => {
-    if (isReceiptNoiseLine(line) || isSectionMarker(line) || isDiscountLine(line)) {
-      return;
+function collectPreviousPositiveLine(lineInfos, startIndex, consumedIndexes) {
+  for (let index = startIndex - 1; index >= 0 && index >= startIndex - 2; index -= 1) {
+    if (consumedIndexes.has(index)) {
+      continue;
     }
 
-    if (!PRICE_PATTERN.test(line) || !HANGUL_PATTERN.test(line)) {
-      return;
+    const lineInfo = lineInfos[index];
+
+    if (!lineInfo || lineInfo.isIgnored || lineInfo.isDiscountMeta || lineInfo.isNegativeAmountOnly) {
+      continue;
     }
 
-    const name = stripReceiptProductName(line);
-
-    if (!name || name.length < 2 || !HANGUL_PATTERN.test(name) || BARCODE_PATTERN.test(name)) {
-      return;
+    if (lineInfo.isPositiveAmountOnly) {
+      return lineInfo;
     }
 
-    items.push({
-      originalText: line,
-      name,
-      lineIndex: index,
-      fromPriceSection: true
-    });
-  });
+    if (lineInfo.hasNameText) {
+      break;
+    }
+  }
 
-  return items;
+  return null;
 }
 
-export function createIngredientCandidates(items = [], today) {
-  const seen = new Set();
+function collectFollowingPositiveLines(lineInfos, startIndex, consumedIndexes) {
+  const collected = [];
 
-  return items.reduce((candidates, item, index) => {
-    const key = normalizeComparable(item.name);
-
-    if (!key || seen.has(key)) {
-      return candidates;
+  for (let index = startIndex + 1; index < lineInfos.length && collected.length < 4; index += 1) {
+    if (consumedIndexes.has(index)) {
+      continue;
     }
 
-    seen.add(key);
-    candidates.push(buildReceiptCandidate(item, index, today));
-    return candidates;
-  }, []);
+    const lineInfo = lineInfos[index];
+
+    if (!lineInfo) {
+      continue;
+    }
+
+    if (lineInfo.isIgnored || lineInfo.isDiscountMeta || lineInfo.isNegativeAmountOnly) {
+      continue;
+    }
+
+    if (lineInfo.hasNameText && !lineInfo.isPositiveAmountOnly) {
+      break;
+    }
+
+    if (lineInfo.isPositiveAmountOnly) {
+      collected.push(lineInfo);
+      continue;
+    }
+
+    break;
+  }
+
+  return collected;
+}
+
+function buildSequence(values = []) {
+  return values.map((lineInfo) => lineInfo?.standaloneNumber).filter((value) => Number.isFinite(value));
+}
+
+function createFallbackAssignment(sameLineNumbers, previousLine, nextPositiveLines) {
+  const nextValues = buildSequence(nextPositiveLines);
+  const firstSameLinePrice = sameLineNumbers.find((entry) => isPriceValue(entry.value, entry.token));
+  const nextPrice = nextValues.find((value, index) => isPriceValue(value, nextPositiveLines[index]?.tokens[0] || ''));
+  const nextQuantity = nextValues.find((value, index) => isQuantityValue(value, nextPositiveLines[index]?.tokens[0] || ''));
+  const previousValue = previousLine?.standaloneNumber || null;
+  const unitPrice = firstSameLinePrice?.value || nextPrice || previousValue || null;
+  const quantity = nextQuantity || 1;
+  const totalPriceCandidate = nextValues.find(
+    (value) => value !== unitPrice && value !== quantity && isPriceValue(value, String(value))
+  );
+  const totalPrice = totalPriceCandidate || (unitPrice !== null ? unitPrice * quantity : null);
+
+  return {
+    unitPrice,
+    quantity,
+    totalPrice,
+    consumedIndexes: [
+      ...(previousLine && previousValue === unitPrice ? [previousLine.index] : []),
+      ...nextPositiveLines
+        .filter((lineInfo) => [quantity, totalPrice, unitPrice].includes(lineInfo.standaloneNumber))
+        .map((lineInfo) => lineInfo.index)
+    ],
+    reason: totalPriceCandidate
+      ? '상품명 주변 숫자 후보로 가격과 수량을 복원'
+      : '총액이 없어 단가와 수량으로 금액을 계산',
+    explicitQuantity: Boolean(nextQuantity),
+    exactMatch: unitPrice !== null && totalPrice !== null && unitPrice * quantity === totalPrice,
+    uncertain: true
+  };
+}
+
+function resolveLineAssignment(lineInfos, lineInfo, consumedIndexes) {
+  const sameLineNumbers = lineInfo.numericTokens.filter((entry) => entry.value > 0);
+  const previousLine = collectPreviousPositiveLine(lineInfos, lineInfo.index, consumedIndexes);
+  const nextPositiveLines = collectFollowingPositiveLines(lineInfos, lineInfo.index, consumedIndexes);
+  const nextValues = buildSequence(nextPositiveLines);
+
+  if (sameLineNumbers.length >= 3) {
+    const lastThree = sameLineNumbers.slice(-3);
+    const [unitPriceToken, quantityToken, totalPriceToken] = lastThree;
+
+    if (isQuantityValue(quantityToken.value, quantityToken.token)) {
+      return {
+        unitPrice: unitPriceToken.value,
+        quantity: quantityToken.value,
+        totalPrice: totalPriceToken.value,
+        consumedIndexes: [],
+        reason: '상품명 + 단가 + 수량 + 금액 패턴 감지',
+        explicitQuantity: true,
+        exactMatch: unitPriceToken.value * quantityToken.value === totalPriceToken.value,
+        uncertain: false
+      };
+    }
+  }
+
+  if (
+    sameLineNumbers.length === 1 &&
+    nextValues.length >= 2 &&
+    isQuantityValue(nextValues[0], nextPositiveLines[0]?.tokens[0] || '') &&
+    isPriceValue(nextValues[1], nextPositiveLines[1]?.tokens[0] || '')
+  ) {
+    return {
+      unitPrice: sameLineNumbers[0].value,
+      quantity: nextValues[0],
+      totalPrice: nextValues[1],
+      consumedIndexes: [nextPositiveLines[0].index, nextPositiveLines[1].index],
+      reason: '상품명 + 단가 뒤에 수량과 금액이 이어진 패턴 감지',
+      explicitQuantity: true,
+      exactMatch: sameLineNumbers[0].value * nextValues[0] === nextValues[1],
+      uncertain: false
+    };
+  }
+
+  if (
+    sameLineNumbers.length === 0 &&
+    nextValues.length >= 3 &&
+    isPriceValue(nextValues[0], nextPositiveLines[0]?.tokens[0] || '') &&
+    isQuantityValue(nextValues[1], nextPositiveLines[1]?.tokens[0] || '') &&
+    isPriceValue(nextValues[2], nextPositiveLines[2]?.tokens[0] || '')
+  ) {
+    return {
+      unitPrice: nextValues[0],
+      quantity: nextValues[1],
+      totalPrice: nextValues[2],
+      consumedIndexes: [nextPositiveLines[0].index, nextPositiveLines[1].index, nextPositiveLines[2].index],
+      reason: '상품명 다음 줄들에서 단가, 수량, 금액 패턴 감지',
+      explicitQuantity: true,
+      exactMatch: nextValues[0] * nextValues[1] === nextValues[2],
+      uncertain: false
+    };
+  }
+
+  if (
+    sameLineNumbers.length === 0 &&
+    previousLine &&
+    nextValues.length >= 2 &&
+    isPriceValue(previousLine.standaloneNumber, previousLine.tokens[0] || '') &&
+    isPriceValue(nextValues[0], nextPositiveLines[0]?.tokens[0] || '') &&
+    isQuantityValue(nextValues[1], nextPositiveLines[1]?.tokens[0] || '')
+  ) {
+    const totalFromPrevious = previousLine.standaloneNumber;
+    const unitFromNext = nextValues[0];
+    const quantityFromNext = nextValues[1];
+
+    if (unitFromNext * quantityFromNext === totalFromPrevious) {
+      return {
+        unitPrice: unitFromNext,
+        quantity: quantityFromNext,
+        totalPrice: totalFromPrevious,
+        consumedIndexes: [previousLine.index, nextPositiveLines[0].index, nextPositiveLines[1].index],
+        reason: '금액이 상품명 위에 있고 단가와 수량이 아래에 있는 패턴 감지',
+        explicitQuantity: true,
+        exactMatch: true,
+        uncertain: false
+      };
+    }
+
+    if (totalFromPrevious === unitFromNext) {
+      return {
+        unitPrice: unitFromNext,
+        quantity: quantityFromNext,
+        totalPrice: unitFromNext * quantityFromNext,
+        consumedIndexes: [previousLine.index, nextPositiveLines[0].index, nextPositiveLines[1].index],
+        reason: '상품명 위아래 단가를 비교해 수량과 총액을 복원',
+        explicitQuantity: true,
+        exactMatch: true,
+        uncertain: false
+      };
+    }
+  }
+
+  if (sameLineNumbers.length === 1 && nextValues.length === 0) {
+    return {
+      unitPrice: sameLineNumbers[0].value,
+      quantity: 1,
+      totalPrice: sameLineNumbers[0].value,
+      consumedIndexes: [],
+      reason: '상품명과 금액이 같은 줄에 있어 수량 1개로 추정',
+      explicitQuantity: false,
+      exactMatch: true,
+      uncertain: true
+    };
+  }
+
+  if (
+    sameLineNumbers.length === 1 &&
+    nextValues.length >= 1 &&
+    isQuantityValue(nextValues[0], nextPositiveLines[0]?.tokens[0] || '')
+  ) {
+    const totalCandidate = nextValues.find((value, index) => {
+      if (index === 0) {
+        return false;
+      }
+
+      return isPriceValue(value, nextPositiveLines[index]?.tokens[0] || '');
+    });
+
+    return {
+      unitPrice: sameLineNumbers[0].value,
+      quantity: nextValues[0],
+      totalPrice: totalCandidate || sameLineNumbers[0].value * nextValues[0],
+      consumedIndexes: nextPositiveLines
+        .filter((nextLine) => [nextValues[0], totalCandidate].includes(nextLine.standaloneNumber))
+        .map((nextLine) => nextLine.index),
+      reason: totalCandidate
+        ? '상품명 줄의 금액과 다음 줄 수량/금액을 연결'
+        : '총액이 없어 단가와 수량으로 금액을 계산',
+      explicitQuantity: true,
+      exactMatch: !totalCandidate || sameLineNumbers[0].value * nextValues[0] === totalCandidate,
+      uncertain: true
+    };
+  }
+
+  return createFallbackAssignment(sameLineNumbers, previousLine, nextPositiveLines);
+}
+
+function calculateItemConfidence({
+  matchedClassification,
+  unitPrice,
+  totalPrice,
+  quantity,
+  explicitQuantity,
+  exactMatch,
+  uncertain
+}) {
+  let score = 0.35;
+
+  if (unitPrice !== null) score += 0.18;
+  if (totalPrice !== null) score += 0.12;
+  if (quantity) score += 0.08;
+  if (explicitQuantity) score += 0.08;
+  if (matchedClassification) score += 0.07;
+  if (exactMatch) score += 0.12;
+  if (!explicitQuantity) score -= 0.08;
+  if (uncertain) score -= 0.07;
+  if (unitPrice === null) score -= 0.2;
+
+  return clampConfidence(score);
+}
+
+function buildReceiptReason(baseReason, item) {
+  if (!item.discount) {
+    return baseReason;
+  }
+
+  return `${baseReason}, 할인 ${formatAmount(item.discount)}원 연결`;
+}
+
+function createReceiptItem(lineInfos, lineInfo, assignment, warnings) {
+  const rawName = cleanRawName(lineInfo.nameText || lineInfo.text);
+  const normalizedName = normalizeProductName(rawName);
+  const classification = classifyReceiptIngredient(normalizedName);
+  const quantity = assignment.quantity || 1;
+  const unitPrice = assignment.unitPrice;
+  const totalPrice = assignment.totalPrice !== null ? assignment.totalPrice : unitPrice !== null ? unitPrice * quantity : null;
+  const confidence = calculateItemConfidence({
+    matchedClassification: classification.matched,
+    unitPrice,
+    totalPrice,
+    quantity,
+    explicitQuantity: assignment.explicitQuantity,
+    exactMatch: assignment.exactMatch,
+    uncertain: assignment.uncertain
+  });
+
+  if (unitPrice === null) {
+    warnings.push(`가격을 찾지 못한 항목: ${rawName}`);
+  } else if (assignment.uncertain || !assignment.exactMatch) {
+    warnings.push(`가격/수량 복원이 불확실한 항목: ${rawName}`);
+  }
+
+  return {
+    rawName,
+    normalizedName,
+    unitPrice,
+    quantity,
+    totalPrice,
+    discount: 0,
+    category: classification.category,
+    storageType: classification.storageType,
+    includeByDefault: classification.includeByDefault,
+    confidence,
+    reason: assignment.reason,
+    lineIndexes: [lineInfo.index, ...assignment.consumedIndexes].sort((left, right) => left - right),
+    sourceLines: [lineInfo.text, ...assignment.consumedIndexes.map((index) => lineInfos[index]?.text).filter(Boolean)]
+  };
+}
+
+function createCandidateId(index) {
+  return `receipt-candidate-${index}-${crypto.randomUUID()}`;
+}
+
+function sanitizeReceiptItem(item) {
+  const { lastDiscountAmount, lastDiscountLineIndex, ...safeItem } = item;
+  return safeItem;
+}
+
+function buildReceiptCandidate(item, index, today) {
+  const quantityText = String(item.quantity || '').trim() || '1';
+  const priceSummary = [
+    item.quantity ? `${item.quantity}개` : '',
+    item.unitPrice !== null ? `단가 ${formatAmount(item.unitPrice)}원` : '',
+    item.totalPrice !== null ? `금액 ${formatAmount(item.totalPrice)}원` : '',
+    item.discount ? `할인 ${formatAmount(item.discount)}원` : ''
+  ]
+    .filter(Boolean)
+    .join(' / ');
+
+  return {
+    id: createCandidateId(index),
+    name: item.normalizedName,
+    displayName: item.normalizedName,
+    normalizedName: item.normalizedName,
+    rawName: item.rawName,
+    originalName: item.rawName,
+    quantity: quantityText,
+    originalQuantity: quantityText,
+    unit: '개',
+    specText: priceSummary || quantityText,
+    category: item.category,
+    storageType: item.storageType,
+    selected: item.includeByDefault,
+    includeByDefault: item.includeByDefault,
+    confidence: item.confidence,
+    needsReview: item.confidence < 0.65,
+    purchaseDate: today,
+    expiryDate: '',
+    memo: '',
+    consumed: false,
+    source: 'receipt_ocr',
+    rawLine: item.sourceLines.join(' | '),
+    sourceLine: item.sourceLines[0] || item.rawName,
+    originalText: item.sourceLines.join(' | '),
+    unitPrice: item.unitPrice,
+    totalPrice: item.totalPrice,
+    discount: item.discount,
+    reason: buildReceiptReason(item.reason, item)
+  };
+}
+
+export function createIngredientCandidates(items = [], today = '') {
+  return items.map((item, index) => buildReceiptCandidate(item, index, today));
+}
+
+function applyDiscountToLastItem(items, lineInfo, warnings) {
+  const lastItem = items[items.length - 1];
+  const discountAmount = getDiscountAmount(lineInfo);
+
+  if (!lastItem || discountAmount === null) {
+    if (lineInfo.hasDiscountKeyword || lineInfo.isNegativeAmountOnly) {
+      warnings.push(`할인 금액 연결 대상이 불분명한 줄: ${lineInfo.text}`);
+    }
+
+    return null;
+  }
+
+  if (lastItem.lastDiscountAmount === discountAmount && Math.abs((lastItem.lastDiscountLineIndex ?? -10) - lineInfo.index) <= 1) {
+    return null;
+  }
+
+  lastItem.discount += discountAmount;
+  lastItem.lastDiscountAmount = discountAmount;
+  lastItem.lastDiscountLineIndex = lineInfo.index;
+  return discountAmount;
 }
 
 export function isLikelyReceiptText(lines = []) {
   const joinedText = lines.join('\n');
-  const barcodeCount = lines.filter((line) => BARCODE_PATTERN.test(line)).length;
-  const priceRowCount = lines.filter((line) => PRICE_PATTERN.test(line) && HANGUL_PATTERN.test(line)).length;
-  const looksLikeCommerceOrder = /(쿠팡|로켓|장바구니|배송완료|배송중|주문)/.test(joinedText);
-  const hasReceiptAnchor = /(상품\s*명|상\s*품\s*명|총\s*품목\s*수량|합계|결제대상금액)/.test(joinedText);
+  const receiptSignals = [
+    /상품\s*명.*단가.*수량.*금액/i,
+    /면세\s*물품가액/i,
+    /과세\s*물품가액/i,
+    /부가세/i,
+    /결제금액/i,
+    /\bPOS\b/i
+  ];
 
-  if (looksLikeCommerceOrder && !hasReceiptAnchor && barcodeCount < 2) {
-    return false;
-  }
-
-  return (
-    hasReceiptAnchor ||
-    SECTION_START_PATTERN.test(joinedText) ||
-    SECTION_END_PATTERN.test(joinedText) ||
-    barcodeCount >= 2 ||
-    priceRowCount >= 3
-  );
+  const numericLines = lines.filter((line) => /^\-?\d{1,3}(?:,\d{3})*$|^\-?\d+$/.test(line)).length;
+  return receiptSignals.some((pattern) => pattern.test(joinedText)) || numericLines >= 6;
 }
 
-export function parseReceiptText(rawText = '', today) {
-  const normalizedText = normalizeReceiptText(rawText);
-  const lines = splitReceiptLines(normalizedText);
-  const likelyReceipt = isLikelyReceiptText(lines);
-  const prefilteredLines = removeReceiptNoiseLines(lines, { keepSectionMarkers: true });
-  const section = detectItemSection(prefilteredLines);
-  const itemSectionLines = removeReceiptNoiseLines(section.lines);
-  const items = extractReceiptItems(itemSectionLines);
-  const candidates = likelyReceipt ? createIngredientCandidates(items, today) : [];
+export function detectItemSection(lines = []) {
+  return {
+    lines,
+    startIndex: lines.length ? 0 : -1,
+    endIndex: lines.length,
+    detected: false
+  };
+}
+
+export function removeReceiptNoiseLines(lines = []) {
+  return lines.filter((line) => {
+    const lineInfo = createLineInfo(line, 0);
+    return !(lineInfo.isIgnored && !lineInfo.isDiscountMeta);
+  });
+}
+
+export function extractReceiptItems(lines = []) {
+  const lineInfos = lines.map((line, index) => createLineInfo(line, index));
+  const consumedIndexes = new Set();
+  const warnings = [];
+  const items = [];
+  let pendingDiscountContext = null;
+  let lastAttachedDiscountAmount = null;
+
+  lineInfos.forEach((lineInfo) => {
+    if (consumedIndexes.has(lineInfo.index)) {
+      return;
+    }
+
+    if (lineInfo.isDiscountMeta && !lineInfo.isNegativeAmountOnly) {
+      const inlineDiscountAmount = getDiscountAmount(lineInfo);
+
+      if (inlineDiscountAmount !== null && items.length) {
+        if (lastAttachedDiscountAmount === inlineDiscountAmount) {
+          pendingDiscountContext = null;
+          return;
+        }
+
+        items[items.length - 1].discount += inlineDiscountAmount;
+        items[items.length - 1].lastDiscountAmount = inlineDiscountAmount;
+        items[items.length - 1].lastDiscountLineIndex = lineInfo.index;
+        lastAttachedDiscountAmount = inlineDiscountAmount;
+      } else {
+        pendingDiscountContext = lineInfo.text;
+      }
+
+      return;
+    }
+
+    if (lineInfo.isNegativeAmountOnly) {
+      const attachedAmount = applyDiscountToLastItem(items, lineInfo, warnings);
+      lastAttachedDiscountAmount = attachedAmount;
+      pendingDiscountContext = null;
+      return;
+    }
+
+    if (lineInfo.isIgnored || !lineInfo.hasNameText || !lineInfo.nameText) {
+      return;
+    }
+
+    const assignment = resolveLineAssignment(lineInfos, lineInfo, consumedIndexes);
+
+    if (assignment.unitPrice === null && assignment.totalPrice === null) {
+      return;
+    }
+
+    const item = createReceiptItem(lineInfos, lineInfo, assignment, warnings);
+
+    items.push(item);
+    item.lineIndexes.forEach((index) => consumedIndexes.add(index));
+
+    if (pendingDiscountContext) {
+      warnings.push(`할인 설명은 있었지만 금액 줄이 분리되어 있었어요: ${pendingDiscountContext}`);
+      pendingDiscountContext = null;
+    }
+
+    lastAttachedDiscountAmount = null;
+  });
+
+  if (pendingDiscountContext) {
+    warnings.push(`할인 금액 연결 대상이 불분명한 줄: ${pendingDiscountContext}`);
+  }
 
   return {
+    items: items.map(sanitizeReceiptItem),
+    consumedIndexes,
+    warnings
+  };
+}
+
+export function parseReceiptText(rawText = '', today = '') {
+  const normalizedText = normalizeReceiptText(rawText);
+  const lines = splitReceiptLines(normalizedText);
+  const itemSection = detectItemSection(lines);
+  const likelyReceipt = isLikelyReceiptText(lines);
+  const { items, consumedIndexes, warnings } = extractReceiptItems(itemSection.lines);
+  const usefulLines = [...consumedIndexes].sort((left, right) => left - right).map((index) => lines[index]).filter(Boolean);
+  const ignoredLines = lines.filter((_, index) => !consumedIndexes.has(index));
+  const candidates = likelyReceipt ? createIngredientCandidates(items, today) : [];
+
+  return /** @type {ReceiptParseResult} */ ({
+    sourceType: 'receipt',
     normalizedText,
     lines,
-    usefulLines: items.map((item) => item.originalText),
-    ignoredLines: lines.filter((line) => !items.some((item) => item.originalText === line)),
-    candidates,
+    usefulLines,
+    ignoredLines,
+    warnings,
+    items,
     receiptItems: items,
-    itemSection: section,
+    candidates,
     template: {
-      id: candidates.length ? 'receipt-ocr' : 'generic-text',
-      confidence: candidates.length >= 2 ? 'high' : 'medium'
-    }
-  };
+      id: items.length ? 'receipt-ocr' : 'generic-text',
+      confidence: items.length >= 4 ? 'high' : items.length >= 1 ? 'medium' : 'low'
+    },
+    itemSection
+  });
 }

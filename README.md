@@ -38,18 +38,31 @@ For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/AN
 
 ### Recipe recommendations
 
-- Rule-based scoring using required ingredients, optional ingredients, and expiring items
+- Rule-based menu scoring using fridge ingredients, pantry staples, and expiring items
+- Backend-connected mode can use a hybrid recipe recommender: structured ingredient matching first, pgvector similarity as a secondary signal
 - Pantry staple support for items like oil, soy sauce, or salt
+- Recipe cards focus on menu fit, owned ingredients, missing ingredients, and missing seasonings
+- External search buttons for 10000recipe, YouTube, and Naver instead of storing cooking steps in-app
 - Recommendation groups:
   - Ready now
   - Buy one more
   - Use soon
 
+### Recipe import
+
+- Food Safety Korea recipe XML import is reduced to recipe name, category, cooking method, raw ingredient text, tags, and optional nutrition
+- Public recipe imports do not store `MANUAL01~20`, `MANUAL_IMG01~20`, or crawled recipe bodies
+- Recipe import stores raw payloads, parsed ingredients, embedding text, and embedding status so failed embedding jobs do not block the catalog import
+- LLM-based ingredient normalization can run in batches and falls back to rule-based normalization with confidence and review flags
+- Recipe ingredient parsing preserves the raw ingredient text while splitting sections such as `양념장`, `소스`, and `고명`
+
 ### OCR import
 
 - Upload screenshot with a step-by-step review flow
+- Paste OCR text directly when the phone or server has already extracted receipt text
 - Extract text in the browser with Tesseract.js
 - Parse shopping/order text into ingredient candidates
+- Use a dedicated receipt parser for receipt OCR so product name, unit price, quantity, total price, and discount lines can be reconstructed separately from Coupang or Kurly order parsing
 - Review and selectively save parsed items
 - Learn user corrections for future imports
 

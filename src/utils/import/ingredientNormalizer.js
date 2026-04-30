@@ -235,7 +235,7 @@ function stripStopwords(text) {
   return BRAND_STOPWORDS.reduce((current, stopword) => current.replaceAll(stopword, ' '), text);
 }
 
-function normalizeProductTitle(displayName) {
+export function cleanImportedProductTitle(displayName) {
   return normalizeSpaces(
     stripStopwords(String(displayName || ''))
       .replace(/[/,]+/g, ' ')
@@ -292,7 +292,7 @@ export function normalizeIngredientName(displayName) {
 export function normalizeImportedIngredient(displayName, specTokens = []) {
   const storageFromTitle = inferStorageFromText(displayName);
   const rawTitle = normalizeSpaces(displayName);
-  const cleanedTitle = normalizeProductTitle(displayName);
+  const cleanedTitle = cleanImportedProductTitle(displayName);
   const matchedRule = findRule(rawTitle) || findRule(cleanedTitle);
   const normalizedName = normalizeDomainIngredientName(matchedRule?.normalizedName || cleanedTitle || rawTitle);
 

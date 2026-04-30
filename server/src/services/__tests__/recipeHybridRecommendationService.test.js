@@ -1,0 +1,59 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { recommendRecipes } from '../recipeHybridRecommendationService.js';
+
+describe('recipeHybridRecommendationService', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 1, 12, 0, 0, 0));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('combines structuredScore and vectorScore into finalScore', async () => {
+    const prismaClient = {
+      ingredientAlias: {
+        findMany: vi.fn(async () => [])
+      },
+      recipe: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'recipe-1',
+            name: '새우 두부 계란찜',
+            category: '반찬',
+            cookingMethod: '찌기',
+            rawIngredientsText: '연두부, 새우, 계란',
+            ingredients: [
+              { rawName: '연두부', normalizedName: '두부', ingredientType: 'main', section: 'main' },
+              { rawName: '칵테일새우', normalizedName: '새우', ingredientType: 'main', section: 'main' },
+              { rawName: '달걀', normalizedName: '계란', ingredientType: 'main', section: 'main' },
+              { rawName: '설탕', normalizedName: '설탕', ingredientType: 'seasoning', section: '양념장' }
+            ]
+          }
+        ])
+      }
+    };
+    const recommendations = await recommendRecipes(
+      [
+        { name: '순두부', expiryDate: '2026-05-02' },
+        { name: '계란' },
+        { name: '새우' }
+      ],
+      {
+        prismaClient,
+        vectorSearch: async () => [{ recipeId: 'recipe-1', vectorScore: 0.74 }]
+      }
+    );
+
+    expect(recommendations[0]).toMatchObject({
+      recipeId: 'recipe-1',
+      name: '새우 두부 계란찜',
+      vectorScore: 0.74,
+      matchedIngredients: ['두부', '새우', '계란'],
+      missingIngredients: [],
+      missingSeasonings: ['설탕']
+    });
+    expect(recommendations[0].finalScore).toBeCloseTo(recommendations[0].structuredScore * 0.7 + 0.74 * 0.3, 2);
+  });
+});

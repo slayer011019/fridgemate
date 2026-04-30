@@ -10,6 +10,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - OCR import now detects source type before parsing and routes Coupang, Kurly, receipt, and generic shopping text separately.
 - Receipt OCR parsing now extracts grocery item rows from mobile and mart receipts before falling back to generic OCR parsing.
 - OCR import candidates now include confidence and review metadata, with receipt garbage filtering for obvious non-product lines.
+- Added a dedicated receipt text parser that reconstructs product name, unit price, quantity, total price, and discounts from pasted or OCR-extracted receipt text.
+- OCR import now supports directly pasting receipt OCR text into the review flow without re-running image OCR.
+- Added a Food Safety Korea recipe XML parser that keeps recipe names, raw ingredient text, tags, optional nutrition, and generated external search links without storing manual steps.
+- Added recipe ingredient parsing and fridge-to-menu match scoring utilities for ingredient-based recipe recommendations.
+- Added recipe raw import storage, batch LLM ingredient normalization fallback, embedding text generation, OpenAI embedding service scaffolding, pgvector search, and hybrid recipe ranking.
 - Frontend Sentry initialization behind `VITE_SENTRY_DSN` for optional production error monitoring.
 - GitHub Actions CI workflow for lint, test, and build jobs with artifact upload.
 - Vitest coverage across recommendation logic, OCR parsing, IndexedDB, import learning, and `useIngredients`.
@@ -23,6 +28,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 ### Changed
 - Moved header account actions to the top-right area, restyled ingredient filters as a category toolbar, and made the manual memo field auto-grow.
 - Removed the internal storage scope display from the account page.
+- Simplified recipe recommendation cards around ingredient match rate, owned ingredients, missing ingredients, missing seasonings, and external search buttons.
+- Simplified the public recipe catalog shape so `MANUAL01~20`, `MANUAL_IMG01~20`, and recipe body content are not imported or stored.
+- Recipe recommendation API now tries DB-backed hybrid recommendations first and falls back to seed recipes when the recipe catalog or vector search is unavailable.
+- Expanded import category and storage options so receipt parsing can suggest more specific classes such as `라면/면류`, `간식`, `양념/소스`, and `상온`.
 - Added Prisma `directUrl` configuration and Supabase pooler examples for hosted PostgreSQL connections.
 - Updated README and AGENTS documentation to match the current local-first + optional backend architecture.
 - Mirrored successful ingredient API reads and writes back into IndexedDB for fresher fallback data.
