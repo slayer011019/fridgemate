@@ -1,95 +1,128 @@
 # FridgeMate
 
-FridgeMate is a local-first fridge and pantry tracker built as a portfolio project.
-It helps users manage ingredients, track expiry dates, reduce food waste, and get recipe suggestions based on what they already have.
+FridgeMate is a local-first fridge and pantry tracker built as a practical portfolio project. It helps users manage ingredients, track expiry dates, reduce food waste, import shopping text with OCR, and find recipe ideas from the food they already have.
 
 ## Overview
 
 Current product scope:
 
 - Ingredient CRUD with expiry tracking
+- Local-first IndexedDB persistence for guest and authenticated users
+- Manual server sync from the account page
 - Recipe recommendations with pantry-aware scoring
-- OCR-based ingredient import from shopping screenshots
-- Guest mode with local-first IndexedDB persistence
-- Authenticated mode with JWT-based login and user-scoped server persistence
-- Express + Prisma backend with PostgreSQL-backed ingredient storage
+- OCR import with review-before-save
+- Receipt OCR parsing and correction learning
+- Shopping panel for consumed ingredients
+- JWT-based signup, login, logout, and session restore
+- Express + Prisma backend with PostgreSQL storage
+- Optional AI recipe suggestions when `ANTHROPIC_API_KEY` is configured
 
-The project is intentionally practical and understandable. It is not a full enterprise architecture, but it now has clearer boundaries so authenticated persistence and local-first fallback can evolve without rewriting the app.
+The app is intentionally simple enough for one developer to understand and maintain, while still having clear boundaries between UI, local storage, backend APIs, auth, OCR, and recommendation logic.
 
-For product strategy beyond the current feature set, see [docs/BUSINESS_ROADMAP.md](docs/BUSINESS_ROADMAP.md).
+For product strategy, see [docs/BUSINESS_ROADMAP.md](docs/BUSINESS_ROADMAP.md).  
 For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/ANALYTICS_EVENTS.md).
+
+## Current Status
+
+FridgeMate is past the original v1 MVP and is currently in a v1.5-style portfolio build.
+
+Shipped and working:
+
+- Local ingredient CRUD, expiry tracking, filtering, sorting, and shopping list workflows
+- IndexedDB persistence for guest and authenticated local scopes
+- Manual account-page ingredient sync to the backend
+- JWT auth with cookie-based session restore
+- Guest ingredient import after login without automatic server upload
+- OCR import with review-before-save
+- Dedicated receipt parsing for grocery/mart-style OCR text
+- Rule-based recipe recommendations with pantry-aware scoring
+- Recipe import and hybrid recommendation backend scaffolding
+- Vitest coverage for date logic, recommendations, import parsing, auth, IndexedDB, and `useIngredients`
+
+Still intentionally limited:
+
+- Server sync is one-way local-to-server replace, not two-way merge
+- Cross-device conflict handling is not implemented yet
+- Pantry staple ownership is still frontend/local-first oriented
+- Production deployment and long-term operations need final hardening
+- Browser E2E coverage exists as scaffolding but is not broad enough to be called complete
+
+## Recent Updates
+
+Recent work focused on making the app more stable for MVP usage:
+
+- Switched ingredient CRUD from automatic API writes to local-first IndexedDB writes
+- Added manual "server sync" from the account page for authenticated users
+- Added `POST /api/ingredients/sync` to replace the server ingredient list with the local snapshot
+- Added sync UI state: dirty, syncing, synced, error, last sync time, and error messages
+- Stopped ingredient deletion from calling the server immediately
+- Kept guest import separate from server sync so login does not trigger automatic uploads
+- Added Food Safety Korea recipe XML import utilities
+- Added recipe ingredient normalization, embedding scaffolding, vector search helpers, and hybrid recommendation services
+- Expanded receipt OCR parsing and tests
+- Updated docs and changelog to reflect the local-first plus optional backend architecture
 
 ## Features
 
-### Ingredient management
+### Ingredient Management
 
-- Add, edit, delete, and mark ingredients as consumed
+- Add, edit, delete, consume, and restore ingredients
 - Track quantity, category, storage type, purchase date, expiry date, and notes
 - Search by ingredient name or notes
 - Filter by category and storage type
 - Sort by expiry date
-- Shopping panel for consumed items
+- Keep a shopping panel for consumed items
 
-### Expiry awareness
+### Local-First Storage
+
+- IndexedDB is the day-to-day source of truth on the device
+- Guest and authenticated caches are kept in separate IndexedDB scopes
+- Ingredient add, edit, consume/restore, and delete actions write locally first
+- Server API calls are not made automatically during ingredient CRUD
+- Deleted ingredients are removed from the server only after a manual sync
+
+### Manual Ingredient Sync
+
+Authenticated users can sync from the account page.
+
+- The account page shows sync status, unsynced changes, last sync time, and errors
+- Pressing the sync button reads the current IndexedDB ingredient list
+- The app posts the full local snapshot to `POST /api/ingredients/sync`
+- The backend replaces the user's server ingredient list with that local snapshot
+- `lastSyncedAt` is stored in `localStorage` under `fridgemate-last-synced-at`
+
+This is a last-write-wins MVP sync strategy. It is deliberately simpler than two-way merge and can later evolve into `updatedAt`-based conflict resolution with delete markers.
+
+### Expiry Awareness
 
 - D-day style expiry labels
 - Expiring-soon and expired summaries
 - Dashboard preview of ingredients to use first
 
-### Recipe recommendations
+### Recipe Recommendations
 
-- Rule-based menu scoring using fridge ingredients, pantry staples, and expiring items
-- Backend-connected mode can use a hybrid recipe recommender: structured ingredient matching first, pgvector similarity as a secondary signal
-- Pantry staple support for items like oil, soy sauce, or salt
-- Recipe cards focus on menu fit, owned ingredients, missing ingredients, and missing seasonings
-- External search buttons for 10000recipe, YouTube, and Naver instead of storing cooking steps in-app
-- Recommendation groups:
-  - Ready now
-  - Buy one more
-  - Use soon
+- Rule-based scoring using fridge ingredients, pantry staples, and expiring items
+- Optional backend hybrid recommender with structured ingredient matching and pgvector similarity
+- Pantry staple support for oil, soy sauce, salt, and similar basics
+- Recipe cards show match rate, owned ingredients, missing ingredients, and missing seasonings
+- External search links for 10000recipe, YouTube, and Naver instead of storing cooking steps in-app
+- Recommendation groups: Ready now, Buy one more, Use soon
 
-### Recipe import
+### Recipe Import
 
-- Food Safety Korea recipe XML import is reduced to recipe name, category, cooking method, raw ingredient text, tags, and optional nutrition
-- Public recipe imports do not store `MANUAL01~20`, `MANUAL_IMG01~20`, or crawled recipe bodies
-- Recipe import stores raw payloads, parsed ingredients, embedding text, and embedding status so failed embedding jobs do not block the catalog import
-- LLM-based ingredient normalization can run in batches and falls back to rule-based normalization with confidence and review flags
-- Recipe ingredient parsing preserves the raw ingredient text while splitting sections such as `양념장`, `소스`, and `고명`
+- Food Safety Korea XML import stores recipe name, category, cooking method, raw ingredient text, tags, and optional nutrition
+- Public imports do not store `MANUAL01~20`, `MANUAL_IMG01~20`, or crawled recipe bodies
+- Recipe import stores raw payloads, parsed ingredients, embedding text, and embedding status
+- LLM ingredient normalization can run in batches and falls back to rule-based normalization
 
-### OCR import
+### OCR Import
 
-- Upload screenshot with a step-by-step review flow
-- Paste OCR text directly when the phone or server has already extracted receipt text
+- Upload shopping screenshots and review parsed candidates before saving
+- Paste OCR text directly when text has already been extracted elsewhere
 - Extract text in the browser with Tesseract.js
-- Parse shopping/order text into ingredient candidates
-- Use a dedicated receipt parser for receipt OCR so product name, unit price, quantity, total price, and discount lines can be reconstructed separately from Coupang or Kurly order parsing
-- Review and selectively save parsed items
+- Route Coupang, Kurly, receipt, and generic shopping text through separate parsers
+- Receipt parsing reconstructs product name, unit price, quantity, total price, and discounts
 - Learn user corrections for future imports
-
-### UI and usability
-
-- Condensed header and page hero layout for faster scanning on desktop and mobile
-- Dashboard cards prioritize urgent expiry work and next actions
-- Ingredient cards emphasize consume/restore first, with edit and delete as secondary actions
-- Recipe recommendation screen uses tighter summary blocks and compact pantry controls
-
-### Local-first data flow
-
-- Works without a backend by using IndexedDB
-- Ingredient add, edit, consume/restore, and delete actions write to IndexedDB first
-- Keeps guest and authenticated caches in separate IndexedDB scopes
-- Authenticated users can manually sync from the account page
-- Manual sync sends the current local ingredient snapshot to the server and replaces the server copy
-- Deleting an ingredient does not call the server until the user manually syncs
-
-### Authentication and persistence
-
-- Sign up, log in, log out, and restore a persistent session with short-lived access tokens and rotating refresh tokens
-- Protect ingredient and recipe API access on the backend
-- Scope server-backed ingredients by user
-- Keep guest mode separate instead of forcing account creation
-- Offer a manual "import guest ingredients" step after login instead of auto-merging local data
-- Keep guest import and server sync as separate actions
 
 ## Tech Stack
 
@@ -98,7 +131,7 @@ For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/AN
 - React
 - Vite
 - Tailwind CSS
-- React Context + custom hooks + local component state
+- React Context and custom hooks
 - IndexedDB
 
 ### Backend
@@ -106,10 +139,11 @@ For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/AN
 - Express
 - Prisma
 - PostgreSQL
-- JWT bearer auth with Node `crypto`
+- JWT auth with `httpOnly` access and refresh cookies
 - Redis-backed auth throttling and logout token revocation with memory fallback
+- Optional pgvector recipe search
 
-### Testing and tooling
+### Testing and Tooling
 
 - Vitest
 - React Testing Library
@@ -121,85 +155,83 @@ For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/AN
 ### OCR and AI
 
 - Tesseract.js
-- Anthropic API (optional, rule-based fallback exists)
+- Anthropic API for optional AI suggestions
+- OpenAI-compatible embedding scaffolding for recipe vectors
 
-## Refactored Structure
+## Project Structure
 
 ```text
 fridgemate/
-├── prisma/
-│   └── schema.prisma
-├── server/
-│   └── src/
-│       ├── controllers/      # Request/response handlers
-│       ├── db/               # Prisma client and DB health helpers
-│       ├── lib/              # Validation and shared backend utilities
-│       ├── routes/           # Express route definitions
-│       ├── services/         # Business logic and DB-backed operations
-│       ├── app.js
-│       ├── config.js
-│       └── index.js
-├── src/
-│   ├── api/                  # Fetch wrappers for backend requests
-│   ├── components/           # Reusable UI components
-│   ├── data/                 # Seed data and pantry defaults
-│   ├── db/                   # IndexedDB implementation
-│   ├── features/
-│   │   ├── import/           # Import flow helpers
-│   │   ├── ingredients/      # Ingredient fields, selectors, repository
-│   │   └── recipes/          # Recommendation view helpers
-│   ├── hooks/                # App-level state hooks
-│   ├── pages/                # Route-level screens
-│   ├── test/                 # Shared test setup and smoke test
-│   ├── utils/                # Pure utilities used across features
-│   ├── App.jsx
-│   └── main.jsx
-├── docs/
-├── scripts/
-├── railway.json
-├── vercel.json
-└── package.json
+|-- prisma/
+|   `-- schema.prisma
+|-- server/
+|   `-- src/
+|       |-- controllers/
+|       |-- db/
+|       |-- lib/
+|       |-- routes/
+|       |-- services/
+|       |-- app.js
+|       |-- config.js
+|       `-- index.js
+|-- src/
+|   |-- api/
+|   |-- components/
+|   |-- data/
+|   |-- db/
+|   |-- features/
+|   |   |-- auth/
+|   |   |-- import/
+|   |   |-- ingredients/
+|   |   `-- recipes/
+|   |-- hooks/
+|   |-- pages/
+|   |-- test/
+|   |-- utils/
+|   |-- App.jsx
+|   `-- main.jsx
+|-- docs/
+|-- scripts/
+|-- railway.json
+|-- vercel.json
+`-- package.json
 ```
-
-## Why This Refactor Helps
-
-### Frontend
-
-- `pages/` now focus more on composition and user flow
-- `features/ingredients/` centralizes ingredient-specific constants, selectors, and data-source orchestration
-- `features/recipes/` groups recommendation presentation logic instead of leaving it inside page components
-- `features/import/` keeps import-item selection logic out of the page component
-
-### Backend
-
-- `routes/` are now thin
-- `controllers/` handle HTTP request/response concerns
-- `services/` contain business logic and Prisma calls
-
-This separation is small enough for a student portfolio project but makes the code easier to explain in an interview.
 
 ## Data Flow
 
-### Ingredient flow
+### Ingredient CRUD
 
 ```text
 UI action
   -> page component
   -> useIngredients hook
-  -> ingredientRepository
-     -> IndexedDB save/update/delete
-     -> mark syncStatus as dirty
-  -> React state update
+  -> IndexedDB save/update/delete
+  -> mark syncStatus as dirty
+  -> update React state
+```
 
+### Manual Server Sync
+
+```text
 Account page sync button
   -> syncIngredientsToServer()
   -> read current IndexedDB snapshot
   -> POST /api/ingredients/sync
-  -> replace the server ingredient list with the local list
+  -> replace server ingredient list with local list
   -> mark syncStatus as synced or error
 ```
 
-### Recommendation flow
+### Guest Ingredient Import
+
+```text
+Login
+  -> detect guest IndexedDB ingredients
+  -> user chooses guest import
+  -> copy guest ingredients into authenticated local scope
+  -> user manually syncs later if they want server persistence
+```
+
+### Recipe Recommendations
 
 ```text
 RecipesPage / HomePage
@@ -209,57 +241,27 @@ RecipesPage / HomePage
   -> pantry staples merged into available ingredients
 ```
 
-### Backend flow
-
-```text
-Route
-  -> Controller
-  -> Service
-  -> Prisma / seed data / recommendation engine
-  -> JSON response
-```
-
 ## Authentication and Persistence
 
-FridgeMate now supports two clear modes:
+FridgeMate supports two clear modes:
 
 - Guest mode
   - IndexedDB is the source of truth
   - no account is required
   - no protected backend calls are made
 - Authenticated mode
-  - JWT-backed access cookies protect the API
-  - rotating refresh cookies restore the session and mint fresh access cookies
-  - access tokens carry issuer, audience, and token id claims
-  - ingredients are scoped by `userId`
-  - IndexedDB remains the day-to-day source of truth on the device
-  - the account page exposes a manual "server sync" action for authenticated users
-  - guest ingredient import copies local guest items into the authenticated IndexedDB scope without uploading them automatically
+  - JWT-backed cookies protect the API
+  - rotating refresh cookies restore sessions
+  - ingredients are scoped by `userId` on the backend
+  - IndexedDB remains the active local working copy
+  - server persistence happens only through account-page manual sync
 
-Current auth hardening notes:
+Auth hardening notes:
 
-- signup and login are rate-limited by IP and normalized email
-- email uniqueness is enforced on a normalized database column
-- logout revokes the current token until it expires and revokes the refresh session in storage
-- access and refresh tokens are stored as `httpOnly` cookies, while the frontend keeps only the last known user snapshot locally
-
-This keeps the project simple enough for a portfolio app while making the data boundary easy to explain:
-
-```text
-Route
-  -> auth middleware
-  -> controller
-  -> service
-  -> Prisma query scoped by userId
-```
-
-Current manual sync is intentionally simple:
-
-- guest mode remains fully local
-- local IndexedDB changes are marked dirty in the frontend state
-- `lastSyncedAt` is stored in `localStorage` under `fridgemate-last-synced-at`
-- `/api/ingredients/sync` replaces the user's server ingredient list with the current local list
-- this is a last-write-wins MVP strategy; future sync can extend the same boundary with `updatedAt`-based merge and delete conflict handling
+- Signup and login are rate-limited by IP and normalized email
+- Email uniqueness is enforced on a normalized database column
+- Logout revokes the current access token and refresh session
+- The SPA does not store auth tokens in `localStorage`; it keeps only the last known user snapshot for local-first recovery
 
 ## Getting Started
 
@@ -269,7 +271,7 @@ Current manual sync is intentionally simple:
 npm install
 ```
 
-### Frontend-only mode
+### Frontend-Only Mode
 
 Set `VITE_API_URL=` in `.env` so the app runs in local-only mode.
 
@@ -277,13 +279,13 @@ Set `VITE_API_URL=` in `.env` so the app runs in local-only mode.
 npm run dev
 ```
 
-To enable frontend error monitoring, also set:
+Optional frontend error monitoring:
 
 ```env
 VITE_SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
 ```
 
-### Frontend + backend mode
+### Frontend + Backend Mode
 
 Set the API URL and database connection in `.env`.
 
@@ -305,6 +307,7 @@ AUTH_COOKIE_SAME_SITE=Lax
 REDIS_URL=redis://localhost:6379
 AUTH_REDIS_PREFIX=fridgemate:auth
 ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
 ```
 
 For Supabase, use the pooler URL for runtime database traffic and the direct/session URL for Prisma migrations:
@@ -328,7 +331,7 @@ In another terminal:
 npm run dev
 ```
 
-### Health check
+### Health Check
 
 ```text
 http://localhost:4000/health
@@ -342,14 +345,6 @@ npm run test:run
 npm run build
 ```
 
-## Security Notes
-
-- Use a random `JWT_SECRET` of at least 32 bytes.
-- Keep `ALLOWED_ORIGINS` tight in production instead of broad wildcards.
-- Set `REDIS_URL` to share auth throttling and logout revocation across API instances. If Redis is unavailable at boot or fails during runtime, the server falls back to in-memory storage.
-- Keep `AUTH_COOKIE_SECURE=true` in production so auth cookies are sent only over HTTPS.
-- The SPA no longer stores auth tokens in `localStorage`; only the user snapshot is persisted for local-first recovery.
-
 Optional:
 
 ```bash
@@ -360,20 +355,32 @@ npm run test:e2e
 Playwright E2E uses two dev-server projects:
 
 - `local-only`: no backend URL, verifies IndexedDB CRUD and OCR review flow
-- `api-mode`: relative `/api` base URL with mocked responses, verifies auth, API CRUD, and fallback behavior
+- `api-mode`: relative `/api` base URL with mocked responses, verifies auth, manual sync, and fallback behavior
 
-## Suggested Next Improvements
+## Security Notes
 
-- Add conflict-aware sync uploads for pending authenticated writes
-- Move shared recipe data/logic into a dedicated `shared/` module if the backend becomes a permanent part of the app
-- Expand Playwright coverage beyond the core five user journeys
-- Add user-scoped pantry staple persistence so auth mode covers the full recipe context
+- Use a random `JWT_SECRET` of at least 32 bytes.
+- Keep `ALLOWED_ORIGINS` tight in production instead of broad wildcards.
+- Set `REDIS_URL` to share auth throttling and logout revocation across API instances.
+- Keep `AUTH_COOKIE_SECURE=true` in production so auth cookies are sent only over HTTPS.
+- Keep API keys out of client-visible environment variables.
 
 ## Deployment
 
-1. Add a Railway PostgreSQL plugin and confirm `DATABASE_URL` is available to the backend service.
-2. Set Railway environment variables: `JWT_SECRET`, `ALLOWED_ORIGINS`, `CLIENT_ORIGIN`.
-3. Set the Vercel environment variables: `VITE_API_URL`, `VITE_SENTRY_DSN` if Sentry monitoring is enabled.
-4. Push to GitHub so Railway and Vercel can deploy automatically.
-5. Verify the backend health check at `GET /health`.
-6. Run an end-to-end smoke test: sign up, log in, add an ingredient, then load recipe recommendations.
+1. Add a PostgreSQL database and confirm `DATABASE_URL` is available to the backend service.
+2. Set backend environment variables: `JWT_SECRET`, `ALLOWED_ORIGINS`, `CLIENT_ORIGIN`, and optional AI keys.
+3. Set frontend environment variables: `VITE_API_URL` and optionally `VITE_SENTRY_DSN`.
+4. Run Prisma migrations against the production database.
+5. Deploy the backend and frontend.
+6. Verify `GET /health`.
+7. Smoke test: sign up, log in, add an ingredient, sync from the account page, reload, and load recipe recommendations.
+
+## Suggested Next Improvements
+
+- Add conflict-aware two-way sync using `updatedAt` and delete markers
+- Add a server pull/download action so authenticated users can restore server data onto a new device
+- Persist pantry staple ownership per user
+- Harden auth recovery UX around expired sessions and offline fallback
+- Deploy the frontend and backend to stable public environments
+- Expand Playwright coverage beyond the core journeys
+- Move shared recipe data and normalization logic into a dedicated shared module if the backend becomes permanent
