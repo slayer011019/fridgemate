@@ -61,7 +61,7 @@ function Header() {
             </div>
           </div>
 
-          <nav className="glass-card touch-pan-x flex w-full max-w-full items-center gap-1.5 overflow-x-auto p-1.5">
+          <nav className="primary-nav glass-card touch-pan-x flex w-full max-w-full items-center gap-1.5 overflow-x-auto p-1.5">
             {visibleNavItems.map((item) => {
               const isActive = item.match(location.pathname);
 
