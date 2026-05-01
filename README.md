@@ -7,6 +7,7 @@ FridgeMate is a local-first fridge and pantry tracker built as a practical portf
 Current product scope:
 
 - Ingredient CRUD with expiry tracking
+- Duplicate ingredient cleanup by purchase date
 - Local-first IndexedDB persistence for guest and authenticated users
 - Manual server sync from the account page
 - Recipe recommendations with pantry-aware scoring
@@ -67,6 +68,7 @@ Recent work focused on making the app more stable for MVP usage:
 ### Ingredient Management
 
 - Add, edit, delete, consume, and restore ingredients
+- Clean up duplicate active ingredients by keeping the newest purchase-date item
 - Track quantity, category, storage type, purchase date, expiry date, and notes
 - Search by ingredient name or notes
 - Filter by category and storage type
@@ -89,6 +91,7 @@ Authenticated users can sync from the account page.
 - Pressing the sync button reads the current IndexedDB ingredient list
 - The app posts the full local snapshot to `POST /api/ingredients/sync`
 - The backend replaces the user's server ingredient list with that local snapshot
+- Server sync upserts each ingredient by `clientId` to avoid duplicate rows on repeated sync
 - `lastSyncedAt` is stored in `localStorage` under `fridgemate-last-synced-at`
 
 This is a last-write-wins MVP sync strategy. It is deliberately simpler than two-way merge and can later evolve into `updatedAt`-based conflict resolution with delete markers.
@@ -217,7 +220,7 @@ Account page sync button
   -> syncIngredientsToServer()
   -> read current IndexedDB snapshot
   -> POST /api/ingredients/sync
-  -> replace server ingredient list with local list
+  -> upsert by clientId and remove server rows missing from the local snapshot
   -> mark syncStatus as synced or error
 ```
 

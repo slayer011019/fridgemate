@@ -84,6 +84,7 @@ function createDeferred() {
 function createIngredient(id, overrides = {}) {
   return {
     id,
+    clientId: id,
     name: `ingredient-${id}`,
     category: 'vegetable',
     storageType: 'fridge',

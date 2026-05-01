@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { ingredientCategories, storageTypes } from '../../../src/utils/ingredientOptions.js';
 import { createHttpError } from './httpError.js';
 
@@ -18,8 +19,12 @@ function normalizeDate(value) {
 }
 
 export function normalizeIngredientInput(input = {}) {
+  const id = typeof input.id === 'string' && input.id.trim() ? input.id.trim() : undefined;
+  const clientId = typeof input.clientId === 'string' && input.clientId.trim() ? input.clientId.trim() : id || randomUUID();
+
   return {
-    id: typeof input.id === 'string' && input.id.trim() ? input.id.trim() : undefined,
+    id,
+    clientId,
     name: normalizeText(input.name, MAX_NAME_LENGTH),
     category: ingredientCategories.includes(input.category) ? input.category : ingredientCategories[0],
     storageType: storageTypes.includes(input.storageType) ? input.storageType : storageTypes[0],
@@ -34,6 +39,10 @@ export function normalizeIngredientInput(input = {}) {
 export function assertValidIngredient(ingredient) {
   if (!ingredient.name) {
     throw createHttpError(400, 'Ingredient name is required.');
+  }
+
+  if (!ingredient.clientId) {
+    throw createHttpError(400, 'Ingredient client id is required.');
   }
 
   if (!ingredient.quantity) {

@@ -1,4 +1,5 @@
 import { getRemainingDays } from '../../utils/date';
+import { normalizeIngredientName } from './ingredientDomain';
 
 export const defaultIngredientFilters = {
   query: '',
@@ -53,4 +54,81 @@ export function getConsumedIngredients(ingredients = []) {
 
 export function getUpcomingIngredients(ingredients = [], limit = 4) {
   return sortIngredientsByExpiry(getActiveIngredients(ingredients), 'asc').slice(0, limit);
+}
+
+function getComparableDateValue(value) {
+  return String(value || '').trim() || '0000-00-00';
+}
+
+function getDuplicateSortValue(ingredient) {
+  return [
+    getComparableDateValue(ingredient.purchaseDate),
+    getComparableDateValue(ingredient.updatedAt),
+    getComparableDateValue(ingredient.createdAt),
+    String(ingredient.id || '')
+  ].join('|');
+}
+
+function getDuplicateGroupKey(ingredient) {
+  const normalizedName = normalizeIngredientName(ingredient.name);
+
+  if (!normalizedName) {
+    return '';
+  }
+
+  return [
+    normalizedName.trim().toLowerCase(),
+    String(ingredient.category || '').trim().toLowerCase(),
+    String(ingredient.storageType || '').trim().toLowerCase()
+  ].join('|');
+}
+
+export function getDuplicateIngredientGroups(ingredients = []) {
+  const groups = new Map();
+
+  getActiveIngredients(ingredients).forEach((ingredient) => {
+    const key = getDuplicateGroupKey(ingredient);
+
+    if (!key) {
+      return;
+    }
+
+    const currentGroup = groups.get(key) || {
+      key,
+      name: normalizeIngredientName(ingredient.name),
+      category: ingredient.category,
+      storageType: ingredient.storageType,
+      items: []
+    };
+
+    currentGroup.items.push(ingredient);
+    groups.set(key, currentGroup);
+  });
+
+  return [...groups.values()]
+    .filter((group) => group.items.length > 1)
+    .map((group) => {
+      const sortedItems = [...group.items].sort((left, right) =>
+        getDuplicateSortValue(right).localeCompare(getDuplicateSortValue(left))
+      );
+
+      return {
+        ...group,
+        items: sortedItems,
+        keep: sortedItems[0],
+        remove: sortedItems.slice(1)
+      };
+    });
+}
+
+export function getDuplicateIngredientCleanupPlan(ingredients = []) {
+  const groups = getDuplicateIngredientGroups(ingredients);
+  const removeIds = groups.flatMap((group) => group.remove.map((ingredient) => ingredient.id)).filter(Boolean);
+
+  return {
+    groups,
+    duplicateGroupCount: groups.length,
+    removeIds,
+    removeCount: removeIds.length
+  };
 }

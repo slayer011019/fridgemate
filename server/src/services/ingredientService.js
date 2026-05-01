@@ -63,21 +63,44 @@ export async function createIngredientsBulk(userId, items = []) {
 
 export async function replaceIngredientsForUser(userId, items = []) {
   const normalizedItems = items.map((item) => normalizeAndValidateIngredient(item));
+  const syncedClientIds = normalizedItems.map((ingredient) => ingredient.clientId);
 
-  // MVP manual sync uses a replace strategy: the current local IndexedDB list wins.
-  await prisma.$transaction([
+  // MVP manual sync is local-first: the current local snapshot wins.
+  // Rows are upserted by clientId so repeated syncs do not create duplicates.
+  const operations = [
     prisma.ingredient.deleteMany({
-      where: { userId }
+      where: {
+        userId,
+        ...(syncedClientIds.length
+          ? {
+              clientId: {
+                notIn: syncedClientIds
+              }
+            }
+          : {})
+      }
     }),
     ...normalizedItems.map((ingredient) =>
-      prisma.ingredient.create({
-        data: {
+      prisma.ingredient.upsert({
+        where: {
+          userId_clientId: {
+            userId,
+            clientId: ingredient.clientId
+          }
+        },
+        create: {
+          ...ingredient,
+          userId
+        },
+        update: {
           ...ingredient,
           userId
         }
       })
     )
-  ]);
+  ];
+
+  await prisma.$transaction(operations);
 
   return listIngredients(userId);
 }

@@ -17,6 +17,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added recipe raw import storage, batch LLM ingredient normalization fallback, embedding text generation, OpenAI embedding service scaffolding, pgvector search, and hybrid recipe ranking.
 - Added manual ingredient sync from the account page, including dirty/syncing/synced/error UI state and persisted last sync time.
 - Added a replace-style ingredient sync endpoint for saving the current local IndexedDB snapshot to the server on demand.
+- Added duplicate ingredient cleanup on the ingredients page, keeping the newest purchase-date item in each duplicate group.
+- Added ingredient `clientId` sync identity so repeated manual syncs upsert existing server rows instead of creating duplicates.
 - Frontend Sentry initialization behind `VITE_SENTRY_DSN` for optional production error monitoring.
 - GitHub Actions CI workflow for lint, test, and build jobs with artifact upload.
 - Vitest coverage across recommendation logic, OCR parsing, IndexedDB, import learning, and `useIngredients`.
@@ -37,6 +39,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added Prisma `directUrl` configuration and Supabase pooler examples for hosted PostgreSQL connections.
 - Updated README and AGENTS documentation to match the current local-first + optional backend architecture.
 - Changed ingredient CRUD to local-first IndexedDB writes; server writes now happen only when the user manually syncs from the account page.
+- Manual ingredient sync now upserts by `clientId` and removes server rows that are no longer present in the local snapshot.
 - Guest ingredient import now copies guest items into the authenticated local scope without automatically uploading them to the server.
 - Routed pantry-owned staples into recommendation scoring instead of keeping them UI-only.
 - Tightened deployment guidance around environment variables, smoke checks, and core journey verification.

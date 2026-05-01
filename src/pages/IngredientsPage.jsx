@@ -8,7 +8,8 @@ import ShoppingListPanel from '../components/ShoppingListPanel';
 import {
   defaultIngredientFilters,
   filterIngredients,
-  getConsumedIngredients
+  getConsumedIngredients,
+  getDuplicateIngredientCleanupPlan
 } from '../features/ingredients/ingredientSelectors';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useIngredients } from '../hooks/useIngredients';
@@ -25,6 +26,7 @@ function IngredientsPage() {
   const filteredIngredients = useMemo(() => filterIngredients(ingredients, filters), [filters, ingredients]);
   const shoppingListItems = useMemo(() => getConsumedIngredients(ingredients), [ingredients]);
   const activeIngredientCount = useMemo(() => ingredients.filter((ingredient) => !ingredient.consumed).length, [ingredients]);
+  const duplicateCleanupPlan = useMemo(() => getDuplicateIngredientCleanupPlan(ingredients), [ingredients]);
 
   const handleFilterChange = useCallback((field, value) => {
     setFilters((current) => ({ ...current, [field]: value }));
@@ -92,6 +94,30 @@ function IngredientsPage() {
     }
   }, [shoppingListItems, updateIngredient]);
 
+  const handleCleanupDuplicateIngredients = useCallback(async () => {
+    if (!duplicateCleanupPlan.removeCount) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `동일한 재료 ${duplicateCleanupPlan.duplicateGroupCount}묶음을 구매일 기준으로 정리할까요?\n최신 구매일 항목만 남기고 ${duplicateCleanupPlan.removeCount}개를 삭제합니다.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await Promise.all(duplicateCleanupPlan.removeIds.map((id) => removeIngredient(id)));
+      trackEvent('ingredient_duplicates_cleaned', {
+        duplicate_group_count: duplicateCleanupPlan.duplicateGroupCount,
+        removed_count: duplicateCleanupPlan.removeCount
+      });
+    } catch {
+      // Error state is surfaced from the hook.
+    }
+  }, [duplicateCleanupPlan, removeIngredient, trackEvent]);
+
   return (
     <div className="section-shell">
       <PageHeader
@@ -126,9 +152,38 @@ function IngredientsPage() {
           <span className="summary-chip">{`\uBCF4\uC720 \uC911 ${activeIngredientCount}\uAC1C`}</span>
           <span className="summary-chip">{`\uAC80\uC0C9 \uACB0\uACFC ${filteredIngredients.length}\uAC1C`}</span>
           <span className="summary-chip">{`\uC7AC\uAD6C\uB9E4 \uD6C4\uBCF4 ${shoppingListItems.length}\uAC1C`}</span>
+          {duplicateCleanupPlan.removeCount ? (
+            <span className="summary-chip">{`\uC911\uBCF5 \uC815\uB9AC \uD6C4\uBCF4 ${duplicateCleanupPlan.removeCount}\uAC1C`}</span>
+          ) : null}
         </div>
-        <p className="text-xs muted">{'\uD575\uC2EC \uC561\uC158\uC740 \uC18C\uBE44 \uCC98\uB9AC, \uBCF4\uC870 \uC561\uC158\uC740 \uC218\uC815 \uC911\uC2EC\uC73C\uB85C \uBC30\uCE58\uD588\uC5B4\uC694.'}</p>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {duplicateCleanupPlan.removeCount ? (
+            <button className="btn-secondary min-h-[2.15rem] px-3 py-1.5 text-xs" onClick={handleCleanupDuplicateIngredients} type="button">
+              {`\uC911\uBCF5 ${duplicateCleanupPlan.removeCount}\uAC1C \uC815\uB9AC`}
+            </button>
+          ) : null}
+          <p className="text-xs muted">{'\uD575\uC2EC \uC561\uC158\uC740 \uC18C\uBE44 \uCC98\uB9AC, \uBCF4\uC870 \uC561\uC158\uC740 \uC218\uC815 \uC911\uC2EC\uC73C\uB85C \uBC30\uCE58\uD588\uC5B4\uC694.'}</p>
+        </div>
       </section>
+
+      {duplicateCleanupPlan.removeCount ? (
+        <section className="soft-panel space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="kicker">{'\uC911\uBCF5 \uC7AC\uB8CC \uAD00\uB9AC'}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-700">
+                {`\uB3D9\uC77C\uD55C \uC7AC\uB8CC ${duplicateCleanupPlan.duplicateGroupCount}\uBB36\uC74C\uC774 \uC788\uC5B4\uC694. \uAD6C\uB9E4\uC77C\uC774 \uAC00\uC7A5 \uCD5C\uADFC\uC778 \uD56D\uBAA9\uB9CC \uB0A8\uAE38 \uC218 \uC788\uC2B5\uB2C8\uB2E4.`}
+              </p>
+            </div>
+            <button className="btn-primary" onClick={handleCleanupDuplicateIngredients} type="button">
+              {'\uAD6C\uB9E4\uC77C \uAE30\uC900\uC73C\uB85C \uD558\uB098\uB9CC \uB0A8\uAE30\uAE30'}
+            </button>
+          </div>
+          <p className="text-xs leading-5 muted">
+            {'\uC18C\uBE44 \uCC98\uB9AC\uB41C \uC7AC\uB8CC\uB294 \uC7AC\uAD6C\uB9E4 \uD6C4\uBCF4\uB85C \uBCF4\uACE0 \uC790\uB3D9 \uC815\uB9AC\uC5D0\uC11C \uC81C\uC678\uD569\uB2C8\uB2E4.'}
+          </p>
+        </section>
+      ) : null}
 
       {!loading ? (
         <ShoppingListPanel

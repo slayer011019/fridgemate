@@ -36,6 +36,7 @@ model AuthSession {
 
 model Ingredient {
   id           String   @id @default(cuid())
+  clientId     String
   name         String
   category     String
   storageType  String
@@ -55,6 +56,7 @@ model Ingredient {
   @@index([storageType])
   @@index([userId, createdAt])
   @@index([userId, updatedAt])
+  @@unique([userId, clientId])
 }
 
 model Recipe {

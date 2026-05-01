@@ -11,7 +11,12 @@ const FALLBACK_WARNING_MESSAGE =
   'The API connection is unstable, so FridgeMate is temporarily using the authenticated local cache.';
 
 export function ensureIngredientId(ingredient) {
-  return ingredient.id ? ingredient : { ...ingredient, id: crypto.randomUUID() };
+  const id = ingredient.id || crypto.randomUUID();
+  return {
+    ...ingredient,
+    id,
+    clientId: ingredient.clientId || id
+  };
 }
 
 export function upsertIngredient(items, nextIngredient) {
@@ -323,7 +328,10 @@ export function createManualSyncAction({
     try {
       const localIngredients = await ingredientCache.getAll(buildScopeOptions(storageScope));
       const syncedIngredients = await syncIngredientsToServerInRepository(
-        localIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ingredient)
+        localIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ({
+          ...ingredient,
+          clientId: ingredient.clientId || ingredient.id
+        }))
       );
       const now = new Date().toISOString();
       const nextIngredients = syncedIngredients.map((ingredient) => markIngredientAsSynced(ingredient));
