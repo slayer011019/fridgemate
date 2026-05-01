@@ -17,6 +17,15 @@ import { getDaysToExpiryBucket } from '../utils/analytics';
 import { isOcrEnabled } from '../utils/backendConfig';
 import { ingredientCategories, storageTypes } from '../utils/ingredientOptions';
 
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const date = String(today.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${date}`;
+}
+
 function IngredientsPage() {
   const { ingredients, loading, error, removeIngredient, updateIngredient } = useIngredients();
   const { trackEvent } = useAnalytics();
@@ -37,7 +46,8 @@ function IngredientsPage() {
       try {
         await updateIngredient({
           ...ingredient,
-          consumed: !ingredient.consumed
+          consumed: !ingredient.consumed,
+          ...(ingredient.consumed ? { purchaseDate: getTodayDateString() } : {})
         });
 
         if (ingredient.consumed) {
@@ -85,7 +95,8 @@ function IngredientsPage() {
         shoppingListItems.map((ingredient) =>
           updateIngredient({
             ...ingredient,
-            consumed: false
+            consumed: false,
+            purchaseDate: getTodayDateString()
           })
         )
       );

@@ -12,12 +12,12 @@ import { useAuth } from './useAuth';
 const IngredientsContext = createContext(null);
 
 export function IngredientsProvider({ children }) {
-  const { isAuthenticated, loading: authLoading, storageScope } = useAuth();
+  const { isAuthenticated, storageScope } = useAuth();
   const backendSyncAvailable = isBackendEnabled() && isAuthenticated;
   const useApi = false;
   const initialScopeState = getScopeState(storageScope);
   const [ingredients, setIngredients] = useState(() => (initialScopeState.loaded ? initialScopeState.items : []));
-  const [loading, setLoading] = useState(() => authLoading || !initialScopeState.loaded);
+  const [loading, setLoading] = useState(() => !initialScopeState.loaded);
   const [error, setError] = useState('');
   const [dataSource, setDataSource] = useState('indexeddb');
   const [syncSummary, setSyncSummary] = useState(() => initialScopeState.syncSummary || createEmptySyncSummary());
@@ -61,7 +61,7 @@ export function IngredientsProvider({ children }) {
     scopeRef.current = storageScope;
     ingredientsRef.current = nextScopeState.items;
     setIngredients(nextScopeState.loaded ? nextScopeState.items : []);
-    setLoading(authLoading || !nextScopeState.loaded);
+    setLoading(!nextScopeState.loaded);
     setError('');
     setDataSource('indexeddb');
     setSyncSummary(nextScopeState.syncSummary || createEmptySyncSummary());
@@ -69,7 +69,7 @@ export function IngredientsProvider({ children }) {
     setSyncError(null);
     setHasUnsyncedChanges(false);
     setLastSyncedAt(window.localStorage.getItem('fridgemate-last-synced-at'));
-  }, [authLoading, storageScope]);
+  }, [storageScope]);
 
   useEffect(() => {
     ingredientsRef.current = ingredients;
@@ -94,7 +94,6 @@ export function IngredientsProvider({ children }) {
   const loadIngredients = useMemo(
     () =>
       createLoadIngredientsAction({
-        authLoading,
         storageScope,
         useApi,
         scopeRef,
@@ -103,14 +102,10 @@ export function IngredientsProvider({ children }) {
         runRepositoryCommand,
         setLoading
       }),
-    [authLoading, commitIngredients, commitSyncSummary, runRepositoryCommand, storageScope, useApi]
+    [commitIngredients, commitSyncSummary, runRepositoryCommand, storageScope, useApi]
   );
 
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
-
     const scopeState = getScopeState(storageScope);
 
     if (scopeState.loaded) {
@@ -121,7 +116,7 @@ export function IngredientsProvider({ children }) {
     loadIngredients().catch(() => {
       setLoading(false);
     });
-  }, [authLoading, loadIngredients, storageScope]);
+  }, [loadIngredients, storageScope]);
 
   const { addIngredient, updateIngredient, addIngredients, removeIngredient, findIngredient } = useMemo(
     () =>

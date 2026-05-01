@@ -83,7 +83,6 @@ async function syncIndexedDbCache(actionLabel, operation) {
 }
 
 export function createLoadIngredientsAction({
-  authLoading,
   storageScope,
   useApi,
   scopeRef,
@@ -93,10 +92,6 @@ export function createLoadIngredientsAction({
   setLoading
 }) {
   return async function loadIngredients({ force = false } = {}) {
-    if (authLoading) {
-      return getScopeState(storageScope).items;
-    }
-
     const scopeState = getScopeState(storageScope);
 
     if (!force && scopeState.loaded) {
