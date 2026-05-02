@@ -9,26 +9,27 @@ datasource db {
 }
 
 model User {
-  id              String       @id @default(cuid())
-  email           String       @unique
-  emailNormalized String       @unique
-  passwordHash    String
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  ingredients     Ingredient[]
-  authSessions    AuthSession[]
+  id                String             @id @default(cuid())
+  email             String             @unique
+  emailNormalized   String             @unique
+  passwordHash      String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  ingredients       Ingredient[]
+  authSessions      AuthSession[]
+  importCorrections ImportCorrection[]
 }
 
 model AuthSession {
-  id                  String      @id @default(cuid())
-  tokenHash           String      @unique
+  id                  String    @id @default(cuid())
+  tokenHash           String    @unique
   expiresAt           DateTime
   revokedAt           DateTime?
   replacedBySessionId String?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
   userId              String
-  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@index([userId, revokedAt])
@@ -143,4 +144,27 @@ model IngredientAlias {
   @@unique([ingredientId, alias])
   @@index([alias])
   @@map("ingredient_aliases")
+}
+
+model ImportCorrection {
+  id                  String                      @id @default(cuid())
+  sourceKey           String
+  sourceText          String
+  correctedName       String
+  category            String
+  storageType         String
+  usageCount          Int                         @default(1)
+  lastUsedAt          DateTime                    @default(now())
+  embeddingText       String?
+  embeddingModel      String?
+  embeddingDimensions Int?
+  embedding           Unsupported("vector(512)")?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  userId              String
+  user                User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceKey])
+  @@index([userId, updatedAt])
+  @@index([userId, lastUsedAt])
 }

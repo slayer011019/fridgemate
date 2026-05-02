@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { authRoutes } from './routes/authRoutes.js';
 import { ingredientRoutes } from './routes/ingredientRoutes.js';
+import { importCorrectionRoutes } from './routes/importCorrectionRoutes.js';
 import { recipeRoutes } from './routes/recipeRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { isAllowedOrigin } from './config.js';
@@ -38,6 +39,7 @@ export function createApp() {
   app.use('/api/health', healthRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/ingredients', requireAuth, ingredientRoutes);
+  app.use('/api/import', requireAuth, importCorrectionRoutes);
   app.use('/api/recipes', requireAuth, recipeRoutes);
 
   app.use('/api', (_request, response) => {
