@@ -308,6 +308,10 @@ REDIS_URL=redis://localhost:6379
 AUTH_REDIS_PREFIX=fridgemate:auth
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
+RECIPE_EMBEDDING_MODEL=text-embedding-3-small
+RECIPE_EMBEDDING_DIMENSIONS=1536
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIMENSIONS=512
 ```
 
 For Supabase, use the pooler URL for runtime database traffic and the direct/session URL for Prisma migrations:
@@ -317,12 +321,20 @@ DATABASE_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1
 DIRECT_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres"
 ```
 
+OCR correction suggestions use Postgres `pgvector` when `OPENAI_API_KEY` is set. The migration enables the `vector` extension and stores 512-dimension embeddings for user-scoped import corrections; keep `EMBEDDING_DIMENSIONS=512` unless you also change the migration/schema. If the key is missing, imports still use the browser's local correction fallback.
+
 Then run:
 
 ```bash
 npm run prisma:generate
 npm run prisma:migrate
 npm run dev:server
+```
+
+To embed existing server-side import correction rows after enabling `OPENAI_API_KEY`, run:
+
+```bash
+npm run import-corrections:backfill
 ```
 
 In another terminal:

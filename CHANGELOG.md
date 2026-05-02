@@ -7,6 +7,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- User-scoped OCR import correction storage with optional pgvector embeddings for similarity-based review suggestions.
+- Backend import correction APIs and OpenAI embedding configuration while preserving local import correction fallback.
+- Script for backfilling missing import correction embeddings after enabling OpenAI embeddings.
 - OCR import now detects source type before parsing and routes Coupang, Kurly, receipt, and generic shopping text separately.
 - Receipt OCR parsing now extracts grocery item rows from mobile and mart receipts before falling back to generic OCR parsing.
 - OCR import candidates now include confidence and review metadata, with receipt garbage filtering for obvious non-product lines.
@@ -28,6 +31,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Grouped the pantry staple checklist into Korean home-cooking basics and a collapsed extra seasonings section.
 - Moved header account actions to the top-right area, restyled ingredient filters as a category toolbar, and made the manual memo field auto-grow.
 - Removed the internal storage scope display from the account page.
 - Simplified recipe recommendation cards around ingredient match rate, owned ingredients, missing ingredients, missing seasonings, and external search buttons.
