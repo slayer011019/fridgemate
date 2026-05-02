@@ -54,3 +54,5 @@ playwright-report/
 # 번들 분석
 stats.html
 bundle-stats.json
+# Added by code-review-graph
+.code-review-graph/
