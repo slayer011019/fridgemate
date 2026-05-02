@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { getImportCorrectionSuggestions, saveImportCorrectionsRemote } from '../api/importCorrectionsApi';
 import PageHeader from '../components/PageHeader';
 import OcrResultPanel from '../components/import/OcrResultPanel';
 import ParsedItemEditor from '../components/import/ParsedItemEditor';
@@ -11,8 +12,10 @@ import {
   toggleImportItemSelection,
   updateImportItem
 } from '../features/import/importSelection';
+import { useAuth } from '../hooks/useAuth';
 import { useIngredients } from '../hooks/useIngredients';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { isBackendEnabled } from '../utils/backendConfig';
 import { applyImportCorrections, saveImportCorrections } from '../utils/import/importLearning';
 import { parseImportText } from '../utils/importParser';
 import { runOcrWithProvider } from '../utils/ocr/ocrService';
@@ -39,6 +42,7 @@ function ImportEmptyPanel({ title, description }) {
 function ImportPage() {
   const navigate = useNavigate();
   const { ingredients, addIngredients, removeIngredient } = useIngredients();
+  const { isAuthenticated } = useAuth();
   const { trackEvent } = useAnalytics();
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
@@ -69,6 +73,33 @@ function ImportPage() {
   useEffect(() => {
     setItems(annotateDuplicateImportItems(applyImportCorrections(parseResult.candidates), ingredients));
   }, [ingredients, parseResult]);
+
+  useEffect(() => {
+    if (status !== 'success' || !isBackendEnabled() || !isAuthenticated || !parseResult.candidates.length) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    getImportCorrectionSuggestions(parseResult.candidates, { signal: controller.signal })
+      .then((payload) => {
+        const suggestions = payload?.suggestions || {};
+
+        setItems((current) =>
+          current.map((item) => ({
+            ...item,
+            correctionSuggestions: suggestions[item.id] || []
+          }))
+        );
+      })
+      .catch((suggestionError) => {
+        if (suggestionError?.name !== 'AbortError') {
+          console.warn('[ImportPage] Failed to load import correction suggestions.', suggestionError);
+        }
+      });
+
+    return () => controller.abort();
+  }, [isAuthenticated, parseResult, status]);
 
   const handleFileChange = (event) => {
     const nextFile = event.target.files?.[0];
@@ -152,6 +183,22 @@ function ImportPage() {
     setItems((current) => toggleImportItemSelection(current, id));
   };
 
+  const handleApplySuggestion = (id, suggestion) => {
+    setItems((current) =>
+      annotateDuplicateImportItems(
+        updateImportItem(current, id, {
+          name: suggestion.correctedName,
+          displayName: suggestion.correctedName,
+          normalizedName: suggestion.correctedName,
+          category: suggestion.category,
+          storageType: suggestion.storageType,
+          learnedCorrection: true
+        }),
+        ingredients
+      )
+    );
+  };
+
   const handleImport = async () => {
     const selectedRawItems = items.filter((item) => item.selected && item.name.trim());
     const selectedItems = toImportableItems(items);
@@ -169,6 +216,11 @@ function ImportPage() {
         deleted_item_count: items.length - selectedItems.length
       });
       saveImportCorrections(selectedRawItems);
+      if (isBackendEnabled() && isAuthenticated) {
+        saveImportCorrectionsRemote(selectedRawItems).catch((correctionError) => {
+          console.warn('[ImportPage] Failed to save remote import corrections.', correctionError);
+        });
+      }
       const existingIdsToRemove = [
         ...new Set(
           selectedRawItems
@@ -320,6 +372,7 @@ function ImportPage() {
           onToggleItem={handleToggleItem}
           onSelectAll={() => setItems((current) => setImportItemsSelected(current, true))}
           onDeselectAll={() => setItems((current) => setImportItemsSelected(current, false))}
+          onApplySuggestion={handleApplySuggestion}
           onImport={handleImport}
         />
       ) : null}
