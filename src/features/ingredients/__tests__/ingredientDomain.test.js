@@ -10,7 +10,7 @@ describe('ingredientDomain', () => {
   it('normalizes aliases and pantry staples through one shared map', () => {
     expect(normalizeIngredientName('달걀')).toBe('계란');
     expect(normalizeIngredientName('(파).')).toBe('대파');
-    expect(normalizeIngredientName('soy sauce')).toBe('간장');
+    expect(normalizeIngredientName('soy sauce')).toBe('진간장');
     expect(normalizeIngredientName('stock')).toBe('치킨스톡');
   });
 
