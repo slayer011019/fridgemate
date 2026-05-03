@@ -21,6 +21,7 @@ The app is intentionally simple enough for one developer to understand and maint
 
 For v1 release stabilization, see [docs/V1_STABILIZATION_PLAN.md](docs/V1_STABILIZATION_PLAN.md).
 For deployment checks, see [docs/DEPLOY_CHECKLIST.md](docs/DEPLOY_CHECKLIST.md).
+For MFDS public recipe source seeding, see [docs/recipe-seeding.md](docs/recipe-seeding.md).
 For product strategy, see [docs/BUSINESS_ROADMAP.md](docs/BUSINESS_ROADMAP.md).
 For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/ANALYTICS_EVENTS.md).
 
@@ -111,7 +112,8 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 ### Recipe Import
 
 - Food Safety Korea XML import stores recipe name, category, cooking method, raw ingredient text, tags, and optional nutrition
-- Public imports do not store `MANUAL01~20`, `MANUAL_IMG01~20`, or crawled recipe bodies
+- MFDS `COOKRCP01` JSON seeding can upsert public recipe rows into a Supabase `recipes` table with raw steps and source payloads
+- Existing frontend recommendation imports still avoid storing crawled recipe bodies
 - Recipe import, embeddings, and LLM normalization are v2/lab capabilities, not v1 release blockers
 
 ### OCR Import

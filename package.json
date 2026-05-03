@@ -22,12 +22,15 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-    "import-corrections:backfill": "node --env-file=.env scripts/backfillImportCorrectionEmbeddings.js"
+    "import-corrections:backfill": "node --env-file=.env scripts/backfillImportCorrectionEmbeddings.js",
+    "seed:recipes": "node scripts/seed-mfds-recipes.js"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
     "@sentry/react": "^10.49.0",
+    "@supabase/supabase-js": "^2.105.1",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
