@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo } from 'react';
 import { extraPantryStapleCategories, basicPantryStapleCategories, PANTRY_STATUS } from '../data/pantryStaples';
 
 const statusLabel = {
@@ -42,7 +42,6 @@ function PantryCategoryGroup({ title, items, pantryOwnership, onCycle }) {
 }
 
 function PantryStaplesPanel({ items, pantryOwnership, pantrySummary, onCycle }) {
-  const [showExtraPantry, setShowExtraPantry] = useState(false);
   const categorizedIds = useMemo(
     () =>
       new Set(
@@ -69,49 +68,46 @@ function PantryStaplesPanel({ items, pantryOwnership, pantrySummary, onCycle }) 
         </div>
       </div>
 
-      <div className="mt-4 space-y-4">
-        {basicPantryStapleCategories.map((category) => (
-          <PantryCategoryGroup
-            key={`basic-${category.title}`}
-            title={category.title}
-            items={category.items}
-            pantryOwnership={pantryOwnership}
-            onCycle={onCycle}
-          />
-        ))}
-
-        <div className="border-t border-slate-100 pt-3">
-          <button
-            type="button"
-            onClick={() => setShowExtraPantry((current) => !current)}
-            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-brand-200 hover:text-brand-700"
-            aria-expanded={showExtraPantry}
-          >
-            {showExtraPantry ? '추가 조미료 접기' : '추가 조미료 더보기'}
-          </button>
+      <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">기본 팬트리</p>
+            <p className="mt-1 text-xs muted">한식 집밥에서 자주 쓰는 20개를 먼저 확인하세요.</p>
+          </div>
+          {basicPantryStapleCategories.map((category) => (
+            <PantryCategoryGroup
+              key={`basic-${category.title}`}
+              title={category.title}
+              items={category.items}
+              pantryOwnership={pantryOwnership}
+              onCycle={onCycle}
+            />
+          ))}
         </div>
 
-        {showExtraPantry ? (
-          <div className="space-y-4 rounded-[16px] bg-slate-50/80 p-3">
-            {extraPantryStapleCategories.map((category) => (
-              <PantryCategoryGroup
-                key={`extra-${category.title}`}
-                title={category.title}
-                items={category.items}
-                pantryOwnership={pantryOwnership}
-                onCycle={onCycle}
-              />
-            ))}
-            {uncategorizedItems.length ? (
-              <PantryCategoryGroup
-                title={'기타'}
-                items={uncategorizedItems}
-                pantryOwnership={pantryOwnership}
-                onCycle={onCycle}
-              />
-            ) : null}
+        <div className="space-y-4 border-t border-slate-100 pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">추가 조미료</p>
+            <p className="mt-1 text-xs muted">있으면 추천 정확도를 더 보조하는 선택 재료입니다.</p>
           </div>
-        ) : null}
+          {extraPantryStapleCategories.map((category) => (
+            <PantryCategoryGroup
+              key={`extra-${category.title}`}
+              title={category.title}
+              items={category.items}
+              pantryOwnership={pantryOwnership}
+              onCycle={onCycle}
+            />
+          ))}
+          {uncategorizedItems.length ? (
+            <PantryCategoryGroup
+              title={'기타'}
+              items={uncategorizedItems}
+              pantryOwnership={pantryOwnership}
+              onCycle={onCycle}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );
