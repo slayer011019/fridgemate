@@ -29,7 +29,7 @@ For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/AN
 
 ## Current Status
 
-FridgeMate is currently being stabilized around a deployable v1 MVP. Larger OCR taxonomy, pgvector, and recipe-ranking expansion work is paused until the v1 auth, sync, CI, and deployment path is solid.
+FridgeMate is currently focused on deployable v1 stability. Larger OCR taxonomy, pgvector, and recipe-ranking expansion work is paused until the auth, sync, CI, and deployment path is reliable in production.
 
 Shipped and working:
 
@@ -44,6 +44,7 @@ Shipped and working:
 - Recipe import and hybrid recommendation backend scaffolding, treated as v2/lab work for deployment planning
 - MFDS `COOKRCP01` recipe source data seeded into Supabase as a v2 recommendation foundation
 - Vitest coverage for date logic, recommendations, import parsing, auth, IndexedDB, and `useIngredients`
+- Playwright coverage for local CRUD, OCR review, auth, guest import, manual sync, deletion sync, fallback, and expired-session flows
 
 Still intentionally limited:
 
@@ -51,7 +52,7 @@ Still intentionally limited:
 - Cross-device conflict handling is not implemented yet
 - Pantry staple ownership is still frontend/local-first oriented
 - Production deployment and long-term operations are the current stabilization focus
-- Browser E2E coverage exists as scaffolding but is not broad enough to be called complete
+- Browser E2E covers core MVP journeys but not every browser/device combination
 
 ## Recent Updates
 
@@ -61,10 +62,12 @@ Recent work focused on making the app more stable for MVP usage:
 - Added manual "server sync" from the account page for authenticated users
 - Added `POST /api/ingredients/sync` to replace the server ingredient list with the local snapshot
 - Added sync UI state: dirty, syncing, synced, error, last sync time, and error messages
+- Made manual sync use the authenticated API request path so expired access cookies can refresh and retry once
 - Stopped ingredient deletion from calling the server immediately
 - Kept guest import separate from server sync so login does not trigger automatic uploads
+- Seeded MFDS `COOKRCP01` recipe source rows into Supabase for later v2 recipe search/recommendation work
 - Expanded receipt OCR parsing and tests
-- Updated docs and changelog to reflect the local-first plus optional backend architecture
+- Updated release QA, deployment, seed, and roadmap docs around the current v1/v2 boundary
 
 ## Features
 
@@ -120,6 +123,8 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 - MFDS `COOKRCP01` JSON seeding can upsert public recipe rows into a Supabase `recipes` table with raw steps and source payloads
 - Supabase lab scripts can split seeded MFDS `ingredients_text` into a direct `recipe_ingredients` table for future recipe search experiments
 - Parser training export can write JSONL baseline labels from seeded MFDS ingredient text for future ML-assisted normalization
+- Seed command: `npm run seed:recipes`
+- Full seed instructions: [docs/recipe-seeding.md](docs/recipe-seeding.md)
 - Existing frontend recommendation imports still avoid storing crawled recipe bodies
 - Recipe import, embeddings, and LLM normalization are v2/lab capabilities, not v1 release blockers
 - Seeded MFDS data is a v2 foundation for future recipe search and recommendations, not a v1 recommendation UI change
@@ -334,6 +339,8 @@ DIRECT_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1.p
 
 For v1 deployment, leave AI and embedding keys empty unless you are intentionally testing lab features. OCR import still works through the existing browser parser and review flow without pgvector.
 
+MFDS recipe seeding also needs `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `FOODSAFETY_API_KEY` in local/server-only environment files. Never expose the Supabase service role key with a `VITE_` prefix.
+
 Then run:
 
 ```bash
@@ -382,16 +389,19 @@ Playwright E2E uses two dev-server projects:
 - Set `REDIS_URL` to share auth throttling and logout revocation across API instances.
 - Keep `AUTH_COOKIE_SECURE=true` in production so auth cookies are sent only over HTTPS.
 - Keep API keys out of client-visible environment variables.
+- `.env`, `.env.local`, and `.env.*.local` are ignored by git.
+- Keep `SUPABASE_SERVICE_ROLE_KEY` and `FOODSAFETY_API_KEY` in local/server scripts only.
 
 ## Deployment
 
 1. Add a PostgreSQL database and confirm `DATABASE_URL` is available to the backend service.
-2. Set backend environment variables: `JWT_SECRET`, `ALLOWED_ORIGINS`, `CLIENT_ORIGIN`, and optional AI keys.
+2. Set backend environment variables: `JWT_SECRET`, `ALLOWED_ORIGINS`, `CLIENT_ORIGIN`, cookie settings, and optional AI keys.
 3. Set frontend environment variables: `VITE_API_URL` and optionally `VITE_SENTRY_DSN`.
 4. Run Prisma migrations against the production database.
 5. Deploy the backend and frontend.
 6. Verify `GET /health`.
-7. Smoke test: sign up, log in, add an ingredient, sync from the account page, reload, and load recipe recommendations.
+7. Smoke test: sign up, log in, add a guest ingredient, import it after login, sync from the account page, reload, delete, sync again, and confirm the deleted item does not return.
+8. Use [docs/DEPLOY_CHECKLIST.md](docs/DEPLOY_CHECKLIST.md) and [docs/V1_RELEASE_QA.md](docs/V1_RELEASE_QA.md) as the release gate.
 
 ## v2 Expansion Plan
 

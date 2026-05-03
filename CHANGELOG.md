@@ -39,6 +39,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Refreshed the README around the current v1 deployment gate, MFDS seed completion, auth/manual-sync behavior, and v2 recipe boundaries.
 - Grouped the pantry staple checklist into Korean home-cooking basics and a collapsed extra seasonings section.
 - Moved header account actions to the top-right area, restyled ingredient filters as a category toolbar, and made the manual memo field auto-grow.
 - Removed the internal storage scope display from the account page.
