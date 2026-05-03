@@ -6,44 +6,130 @@ export const PANTRY_STATUS = {
 
 export const PANTRY_STATUS_ORDER = [PANTRY_STATUS.OWNED, PANTRY_STATUS.MISSING, PANTRY_STATUS.UNKNOWN];
 
-export const pantryStaples = [
-  { id: 'salt', name: '\uC18C\uAE08', category: 'basic', aliases: ['\uC18C\uAE08', 'salt'] },
-  { id: 'sugar', name: '\uC124\uD0D5', category: 'basic', aliases: ['\uC124\uD0D5', 'sugar'] },
-  { id: 'soy-sauce', name: '\uAC04\uC7A5', category: 'sauce', aliases: ['\uAC04\uC7A5', 'soy sauce'] },
-  { id: 'soup-soy-sauce', name: '\uAD6D\uAC04\uC7A5', category: 'sauce', aliases: ['\uAD6D\uAC04\uC7A5', 'soup soy sauce'] },
-  { id: 'cooking-oil', name: '\uC2DD\uC6A9\uC720', category: 'oil', aliases: ['\uC2DD\uC6A9\uC720', 'cooking oil'] },
-  { id: 'sesame-oil', name: '\uCC38\uAE30\uB984', category: 'oil', aliases: ['\uCC38\uAE30\uB984', 'sesame oil'] },
-  { id: 'pepper', name: '\uD6C4\uCD94', category: 'basic', aliases: ['\uD6C4\uCD94', 'pepper', 'black pepper'] },
-  { id: 'vinegar', name: '\uC2DD\uCD08', category: 'basic', aliases: ['\uC2DD\uCD08', 'vinegar'] },
-  { id: 'red-pepper-powder', name: '\uACE0\uCD27\uAC00\uB8E8', category: 'spice', aliases: ['\uACE0\uCD27\uAC00\uB8E8', 'red pepper powder'] },
-  { id: 'doenjang', name: '\uB41C\uC7A5', category: 'sauce', aliases: ['\uB41C\uC7A5', 'doenjang'] },
-  { id: 'gochujang', name: '\uACE0\uCD94\uC7A5', category: 'sauce', aliases: ['\uACE0\uCD94\uC7A5', 'gochujang'] },
-  { id: 'minced-garlic', name: '\uB2E4\uC9C4 \uB9C8\uB298', category: 'basic', aliases: ['\uB2E4\uC9C4 \uB9C8\uB298', 'minced garlic'] },
-  { id: 'olive-oil', name: '\uC62C\uB9AC\uBE0C\uC720', category: 'oil', aliases: ['\uC62C\uB9AC\uBE0C\uC720', 'olive oil'] },
-  { id: 'oyster-sauce', name: '\uAD74\uC18C\uC2A4', category: 'sauce', aliases: ['\uAD74\uC18C\uC2A4', 'oyster sauce'] },
-  { id: 'mirin', name: '\uB9DB\uC220', category: 'sauce', aliases: ['\uB9DB\uC220', 'mirin', 'cooking wine'] },
-  { id: 'stock', name: '\uCE58\uD0A8\uC2A4\uD1A1', category: 'stock', aliases: ['\uCE58\uD0A8\uC2A4\uD1A1', '\uB2E4\uC2DC\uB2E4', 'stock', 'chicken stock'] },
-  { id: 'ketchup', name: '\uCF00\uCC29', category: 'sauce', aliases: ['\uCF00\uCC29', 'ketchup'] },
-  { id: 'mayonnaise', name: '\uB9C8\uC694\uB124\uC988', category: 'sauce', aliases: ['\uB9C8\uC694\uB124\uC988', 'mayonnaise'] },
-  { id: 'ssamjang', name: '\uC30C\uC7A5', category: 'sauce', aliases: ['\uC30C\uC7A5', 'ssamjang'] },
-  { id: 'fish-sauce', name: '\uC561\uC82F', category: 'sauce', aliases: ['\uC561\uC82F', 'fish sauce'] },
-  { id: 'tuna-sauce', name: '\uCC38\uCE58\uC561', category: 'sauce', aliases: ['\uCC38\uCE58\uC561'] },
-  { id: 'starch-syrup', name: '\uBB3C\uC5FF', category: 'sweetener', aliases: ['\uBB3C\uC5FF', 'corn syrup'] },
-  { id: 'oligosaccharide', name: '\uC62C\uB9AC\uACE0\uB2F9', category: 'sweetener', aliases: ['\uC62C\uB9AC\uACE0\uB2F9'] },
-  { id: 'sesame-seeds', name: '\uCC38\uAE68', category: 'topping', aliases: ['\uCC38\uAE68', 'sesame seeds'] },
-  { id: 'sesame-salt', name: '\uAE68\uC18C\uAE08', category: 'topping', aliases: ['\uAE68\uC18C\uAE08'] },
-  { id: 'butter', name: '\uBC84\uD130', category: 'dairy', aliases: ['\uBC84\uD130', 'butter'] },
-  { id: 'flour', name: '\uBC00\uAC00\uB8E8', category: 'powder', aliases: ['\uBC00\uAC00\uB8E8', 'flour'] },
-  { id: 'frying-mix', name: '\uBD80\uCE68\uAC00\uB8E8', category: 'powder', aliases: ['\uBD80\uCE68\uAC00\uB8E8', 'pancake mix'] },
-  { id: 'starch', name: '\uC804\uBD84', category: 'powder', aliases: ['\uC804\uBD84', 'starch'] },
-  { id: 'curry-powder', name: '\uCE74\uB808\uAC00\uB8E8', category: 'spice', aliases: ['\uCE74\uB808\uAC00\uB8E8', 'curry powder'] },
-  { id: 'jjajang-powder', name: '\uC9DC\uC7A5\uAC00\uB8E8', category: 'sauce', aliases: ['\uC9DC\uC7A5\uAC00\uB8E8', 'black bean powder'] },
-  { id: 'tomato-sauce', name: '\uD30C\uC2A4\uD0C0 \uC18C\uC2A4', category: 'sauce', aliases: ['\uD30C\uC2A4\uD0C0 \uC18C\uC2A4', '\uD1A0\uB9C8\uD1A0 \uC18C\uC2A4', 'pasta sauce'] },
-  { id: 'chili-sauce', name: '\uCE60\uB9AC\uC18C\uC2A4', category: 'sauce', aliases: ['\uCE60\uB9AC\uC18C\uC2A4', 'chili sauce'] },
-  { id: 'mustard', name: '\uBA38\uC2A4\uD0C0\uB4DC', category: 'sauce', aliases: ['\uBA38\uC2A4\uD0C0\uB4DC', 'mustard'] },
-  { id: 'honey', name: '\uAFC0', category: 'sweetener', aliases: ['\uAFC0', 'honey'] },
-  { id: 'parsley', name: '\uD30C\uC2AC\uB9AC', category: 'herb', aliases: ['\uD30C\uC2AC\uB9AC', 'parsley'] }
+const PANTRY_STAPLE_DETAILS = {
+  '소금': { id: 'salt', category: 'basic', aliases: ['소금', 'salt'] },
+  '설탕': { id: 'sugar', category: 'basic', aliases: ['설탕', 'sugar'] },
+  '후추': { id: 'pepper', category: 'basic', aliases: ['후추', 'pepper', 'black pepper'] },
+  '식초': { id: 'vinegar', category: 'basic', aliases: ['식초', 'vinegar'] },
+  '진간장': { id: 'soy-sauce', category: 'sauce', aliases: ['진간장', '간장', 'soy sauce'] },
+  '국간장': { id: 'soup-soy-sauce', category: 'sauce', aliases: ['국간장', 'soup soy sauce'] },
+  '된장': { id: 'doenjang', category: 'sauce', aliases: ['된장', 'doenjang'] },
+  '고추장': { id: 'gochujang', category: 'sauce', aliases: ['고추장', 'gochujang'] },
+  '고춧가루': { id: 'red-pepper-powder', category: 'spice', aliases: ['고춧가루', '고추가루', 'red pepper powder'] },
+  '다진 마늘': { id: 'minced-garlic', category: 'basic', aliases: ['다진 마늘', 'minced garlic'] },
+  '부침가루': { id: 'frying-mix', category: 'powder', aliases: ['부침가루', 'pancake mix'] },
+  '전분': { id: 'starch', category: 'powder', aliases: ['전분', 'starch'] },
+  '참깨': { id: 'sesame-seeds', category: 'topping', aliases: ['참깨', 'sesame seeds'] },
+  '식용유': { id: 'cooking-oil', category: 'oil', aliases: ['식용유', 'cooking oil'] },
+  '참기름': { id: 'sesame-oil', category: 'oil', aliases: ['참기름', 'sesame oil'] },
+  '맛술': { id: 'mirin', category: 'sauce', aliases: ['맛술', 'mirin', 'cooking wine'] },
+  '물엿': { id: 'starch-syrup', category: 'sweetener', aliases: ['물엿', 'corn syrup'] },
+  '올리고당': { id: 'oligosaccharide', category: 'sweetener', aliases: ['올리고당'] },
+  '멸치액젓': { id: 'fish-sauce', category: 'sauce', aliases: ['멸치액젓', '액젓', 'fish sauce'] },
+  '참치액': { id: 'tuna-sauce', category: 'sauce', aliases: ['참치액'] },
+  '쌈장': { id: 'ssamjang', category: 'sauce', aliases: ['쌈장', 'ssamjang'] },
+  '새우젓': { id: 'salted-shrimp', category: 'sauce', aliases: ['새우젓'] },
+  '들기름': { id: 'perilla-oil', category: 'oil', aliases: ['들기름', 'perilla oil'] },
+  '올리브유': { id: 'olive-oil', category: 'oil', aliases: ['올리브유', 'olive oil'] },
+  '버터': { id: 'butter', category: 'dairy', aliases: ['버터', 'butter'] },
+  '다시다': { id: 'dashida', category: 'stock', aliases: ['다시다'] },
+  '다시마': { id: 'kelp', category: 'stock', aliases: ['다시마', 'kelp'] },
+  '국물용 멸치': { id: 'stock-anchovy', category: 'stock', aliases: ['국물용 멸치', '멸치'] },
+  '치킨스톡': { id: 'stock', category: 'stock', aliases: ['치킨스톡', 'stock', 'chicken stock'] },
+  '굴소스': { id: 'oyster-sauce', category: 'sauce', aliases: ['굴소스', 'oyster sauce'] },
+  '마요네즈': { id: 'mayonnaise', category: 'sauce', aliases: ['마요네즈', 'mayonnaise'] },
+  '케첩': { id: 'ketchup', category: 'sauce', aliases: ['케첩', '케찹', 'ketchup'] },
+  '파스타 소스': { id: 'tomato-sauce', category: 'sauce', aliases: ['파스타 소스', '토마토 소스', 'pasta sauce'] },
+  '밀가루': { id: 'flour', category: 'powder', aliases: ['밀가루', 'flour'] },
+  '카레가루': { id: 'curry-powder', category: 'spice', aliases: ['카레가루', 'curry powder'] },
+  '꿀': { id: 'honey', category: 'sweetener', aliases: ['꿀', 'honey'] },
+  '다진 생강': { id: 'minced-ginger', category: 'spice', aliases: ['다진 생강', 'minced ginger'] },
+  '깨소금': { id: 'sesame-salt', category: 'topping', aliases: ['깨소금'] }
+};
+
+export const BASIC_PANTRY_CATEGORIES = [
+  {
+    title: '기본 양념',
+    items: ['소금', '설탕', '후추', '식초']
+  },
+  {
+    title: '장류',
+    items: ['진간장', '국간장', '된장', '고추장']
+  },
+  {
+    title: '가루/향미',
+    items: ['고춧가루', '다진 마늘', '부침가루', '전분', '참깨']
+  },
+  {
+    title: '기름류',
+    items: ['식용유', '참기름']
+  },
+  {
+    title: '단맛/조림',
+    items: ['맛술', '물엿', '올리고당']
+  },
+  {
+    title: '액젓/감칠맛',
+    items: ['멸치액젓', '참치액']
+  }
 ];
+
+export const EXTRA_PANTRY_CATEGORIES = [
+  {
+    title: '장류',
+    items: ['쌈장', '새우젓']
+  },
+  {
+    title: '기름류',
+    items: ['들기름', '올리브유', '버터']
+  },
+  {
+    title: '국물 베이스',
+    items: ['다시다', '다시마', '국물용 멸치', '치킨스톡']
+  },
+  {
+    title: '소스류',
+    items: ['굴소스', '마요네즈', '케첩', '파스타 소스']
+  },
+  {
+    title: '가루류',
+    items: ['밀가루', '카레가루']
+  },
+  {
+    title: '향신료/향미',
+    items: ['다진 생강', '깨소금']
+  }
+];
+
+function buildPantryStaple(name) {
+  const detail = PANTRY_STAPLE_DETAILS[name];
+
+  if (!detail) {
+    throw new Error(`Missing pantry staple details for ${name}`);
+  }
+
+  return {
+    ...detail,
+    name
+  };
+}
+
+function buildCategory(category) {
+  return {
+    ...category,
+    items: category.items.map(buildPantryStaple)
+  };
+}
+
+export const pantryStapleCategories = [
+  ...BASIC_PANTRY_CATEGORIES.map(buildCategory),
+  ...EXTRA_PANTRY_CATEGORIES.map(buildCategory)
+];
+
+export const basicPantryStapleCategories = BASIC_PANTRY_CATEGORIES.map(buildCategory);
+export const extraPantryStapleCategories = EXTRA_PANTRY_CATEGORIES.map(buildCategory);
+
+export const pantryStaples = pantryStapleCategories.flatMap((category) => category.items);
 
 const pantryNameMap = pantryStaples.reduce((map, staple) => {
   staple.aliases.forEach((alias) => {

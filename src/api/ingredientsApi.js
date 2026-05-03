@@ -53,7 +53,7 @@ export function saveIngredients(ingredients) {
       },
       body: JSON.stringify({ items: ingredients })
     },
-    { errorClass: IngredientsApiError }
+    { authMode: 'required', errorClass: IngredientsApiError }
   );
 }
 

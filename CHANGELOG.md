@@ -7,12 +7,17 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- Added a v1 release QA checklist covering environment security, MFDS recipe seed boundaries, auth, guest import, manual sync, deployment, and smoke scenarios.
+- User-scoped OCR import correction storage with optional pgvector embeddings for similarity-based review suggestions.
+- Backend import correction APIs and OpenAI embedding configuration while preserving local import correction fallback.
+- Script for backfilling missing import correction embeddings after enabling OpenAI embeddings.
 - OCR import now detects source type before parsing and routes Coupang, Kurly, receipt, and generic shopping text separately.
 - Receipt OCR parsing now extracts grocery item rows from mobile and mart receipts before falling back to generic OCR parsing.
 - OCR import candidates now include confidence and review metadata, with receipt garbage filtering for obvious non-product lines.
 - Added a dedicated receipt text parser that reconstructs product name, unit price, quantity, total price, and discounts from pasted or OCR-extracted receipt text.
 - OCR import now supports directly pasting receipt OCR text into the review flow without re-running image OCR.
 - Added a Food Safety Korea recipe XML parser that keeps recipe names, raw ingredient text, tags, optional nutrition, and generated external search links without storing manual steps.
+- Added Supabase SQL and a Node seed script for importing MFDS `COOKRCP01` public recipe source rows into a `recipes` table.
 - Added recipe ingredient parsing and fridge-to-menu match scoring utilities for ingredient-based recipe recommendations.
 - Added recipe raw import storage, batch LLM ingredient normalization fallback, embedding text generation, OpenAI embedding service scaffolding, pgvector search, and hybrid recipe ranking.
 - Added manual ingredient sync from the account page, including dirty/syncing/synced/error UI state and persisted last sync time.
@@ -25,11 +30,14 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Global connection status feedback with online/offline and fallback notices.
 - Sync strategy scaffold documenting the current `last-write-wins` approach.
 - Playwright E2E scaffolding for local-only CRUD, auth, API fallback, and OCR review flows.
+- Added a v1 stabilization plan that pauses new taxonomy, pgvector, and recipe-ranking expansion until deployment basics are solid.
+- Added E2E coverage for guest-to-user import, manual sync, deletion sync, and expired-session handling.
 - Added `docs/BUSINESS_ROADMAP.md` to document product positioning, monetization, KPI focus, and exit options.
 - Added `docs/ANALYTICS_EVENTS.md` to define activation, OCR, retention, recommendation, and monetization event tracking.
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Grouped the pantry staple checklist into Korean home-cooking basics and a collapsed extra seasonings section.
 - Moved header account actions to the top-right area, restyled ingredient filters as a category toolbar, and made the manual memo field auto-grow.
 - Removed the internal storage scope display from the account page.
 - Simplified recipe recommendation cards around ingredient match rate, owned ingredients, missing ingredients, missing seasonings, and external search buttons.
@@ -43,6 +51,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Guest ingredient import now copies guest items into the authenticated local scope without automatically uploading them to the server.
 - Routed pantry-owned staples into recommendation scoring instead of keeping them UI-only.
 - Tightened deployment guidance around environment variables, smoke checks, and core journey verification.
+- Reworked the deployment checklist around v1 manual sync, auth cookies, Vercel, Railway, and Supabase verification.
 - Linked the business roadmap from the README so product and go-to-market direction are easier to find.
 - Linked the analytics event spec from the README so KPI instrumentation has a documented source of truth.
 - Hardened auth handling with normalized email uniqueness, shorter JWT defaults, logout token revocation, and rate-limited signup/login.
@@ -53,6 +62,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Simplified recipe, OCR import, and auth screen copy so the next step is clearer on mobile and desktop.
 
 ### Fixed
+- Manual ingredient sync now uses the authenticated API request path so a 401 can refresh the session and retry once.
 - Recipe recommendations no longer count recipes as "buy one more" when no core ingredients are currently owned.
 - Recommendation scoring now treats owned pantry staples as available ingredients.
 - Fallback and syncing state now surface clearer user feedback in the UI.

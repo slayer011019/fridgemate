@@ -89,8 +89,11 @@ export const serverConfig = {
   authRedisPrefix: process.env.AUTH_REDIS_PREFIX || 'fridgemate:auth',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   openAiApiKey: process.env.OPENAI_API_KEY || '',
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
   recipeEmbeddingModel: process.env.RECIPE_EMBEDDING_MODEL || 'text-embedding-3-small',
-  recipeEmbeddingDimensions: Number(process.env.RECIPE_EMBEDDING_DIMENSIONS || 1536)
+  recipeEmbeddingDimensions: Number(process.env.RECIPE_EMBEDDING_DIMENSIONS || 1536),
+  embeddingModel: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
+  embeddingDimensions: Number(process.env.EMBEDDING_DIMENSIONS || 512)
 };
 
 export function isAllowedOrigin(origin) {

@@ -20,12 +20,16 @@ Current product scope:
 
 The app is intentionally simple enough for one developer to understand and maintain, while still having clear boundaries between UI, local storage, backend APIs, auth, OCR, and recommendation logic.
 
-For product strategy, see [docs/BUSINESS_ROADMAP.md](docs/BUSINESS_ROADMAP.md).  
+For v1 release stabilization, see [docs/V1_STABILIZATION_PLAN.md](docs/V1_STABILIZATION_PLAN.md).
+For deployment checks, see [docs/DEPLOY_CHECKLIST.md](docs/DEPLOY_CHECKLIST.md).
+For v1 release QA, see [docs/V1_RELEASE_QA.md](docs/V1_RELEASE_QA.md).
+For MFDS public recipe source seeding, see [docs/recipe-seeding.md](docs/recipe-seeding.md).
+For product strategy, see [docs/BUSINESS_ROADMAP.md](docs/BUSINESS_ROADMAP.md).
 For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/ANALYTICS_EVENTS.md).
 
 ## Current Status
 
-FridgeMate is past the original v1 MVP and is currently in a v1.5-style portfolio build.
+FridgeMate is currently being stabilized around a deployable v1 MVP. Larger OCR taxonomy, pgvector, and recipe-ranking expansion work is paused until the v1 auth, sync, CI, and deployment path is solid.
 
 Shipped and working:
 
@@ -37,7 +41,8 @@ Shipped and working:
 - OCR import with review-before-save
 - Dedicated receipt parsing for grocery/mart-style OCR text
 - Rule-based recipe recommendations with pantry-aware scoring
-- Recipe import and hybrid recommendation backend scaffolding
+- Recipe import and hybrid recommendation backend scaffolding, treated as v2/lab work for deployment planning
+- MFDS `COOKRCP01` recipe source data seeded into Supabase as a v2 recommendation foundation
 - Vitest coverage for date logic, recommendations, import parsing, auth, IndexedDB, and `useIngredients`
 
 Still intentionally limited:
@@ -45,7 +50,7 @@ Still intentionally limited:
 - Server sync is one-way local-to-server replace, not two-way merge
 - Cross-device conflict handling is not implemented yet
 - Pantry staple ownership is still frontend/local-first oriented
-- Production deployment and long-term operations need final hardening
+- Production deployment and long-term operations are the current stabilization focus
 - Browser E2E coverage exists as scaffolding but is not broad enough to be called complete
 
 ## Recent Updates
@@ -58,8 +63,6 @@ Recent work focused on making the app more stable for MVP usage:
 - Added sync UI state: dirty, syncing, synced, error, last sync time, and error messages
 - Stopped ingredient deletion from calling the server immediately
 - Kept guest import separate from server sync so login does not trigger automatic uploads
-- Added Food Safety Korea recipe XML import utilities
-- Added recipe ingredient normalization, embedding scaffolding, vector search helpers, and hybrid recommendation services
 - Expanded receipt OCR parsing and tests
 - Updated docs and changelog to reflect the local-first plus optional backend architecture
 
@@ -105,7 +108,7 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 ### Recipe Recommendations
 
 - Rule-based scoring using fridge ingredients, pantry staples, and expiring items
-- Optional backend hybrid recommender with structured ingredient matching and pgvector similarity
+- Optional backend hybrid recommender scaffolding exists, but v1 deployment should rely on the rule-based recommendation path
 - Pantry staple support for oil, soy sauce, salt, and similar basics
 - Recipe cards show match rate, owned ingredients, missing ingredients, and missing seasonings
 - External search links for 10000recipe, YouTube, and Naver instead of storing cooking steps in-app
@@ -114,9 +117,10 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 ### Recipe Import
 
 - Food Safety Korea XML import stores recipe name, category, cooking method, raw ingredient text, tags, and optional nutrition
-- Public imports do not store `MANUAL01~20`, `MANUAL_IMG01~20`, or crawled recipe bodies
-- Recipe import stores raw payloads, parsed ingredients, embedding text, and embedding status
-- LLM ingredient normalization can run in batches and falls back to rule-based normalization
+- MFDS `COOKRCP01` JSON seeding can upsert public recipe rows into a Supabase `recipes` table with raw steps and source payloads
+- Existing frontend recommendation imports still avoid storing crawled recipe bodies
+- Recipe import, embeddings, and LLM normalization are v2/lab capabilities, not v1 release blockers
+- Seeded MFDS data is a v2 foundation for future recipe search and recommendations, not a v1 recommendation UI change
 
 ### OCR Import
 
@@ -126,6 +130,7 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 - Route Coupang, Kurly, receipt, and generic shopping text through separate parsers
 - Receipt parsing reconstructs product name, unit price, quantity, total price, and discounts
 - Learn user corrections for future imports
+- Existing parser rules, aliases, confidence metadata, unit extraction, and duplicate review handling should be preserved during v1 stabilization
 
 ## Tech Stack
 
@@ -144,7 +149,7 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 - PostgreSQL
 - JWT auth with `httpOnly` access and refresh cookies
 - Redis-backed auth throttling and logout token revocation with memory fallback
-- Optional pgvector recipe search
+- Optional pgvector scaffolding for v2/lab work
 
 ### Testing and Tooling
 
@@ -159,7 +164,7 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 
 - Tesseract.js
 - Anthropic API for optional AI suggestions
-- OpenAI-compatible embedding scaffolding for recipe vectors
+- OpenAI-compatible embedding scaffolding for v2/lab work
 
 ## Project Structure
 
@@ -311,6 +316,10 @@ REDIS_URL=redis://localhost:6379
 AUTH_REDIS_PREFIX=fridgemate:auth
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
+RECIPE_EMBEDDING_MODEL=text-embedding-3-small
+RECIPE_EMBEDDING_DIMENSIONS=1536
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIMENSIONS=512
 ```
 
 For Supabase, use the pooler URL for runtime database traffic and the direct/session URL for Prisma migrations:
@@ -319,6 +328,8 @@ For Supabase, use the pooler URL for runtime database traffic and the direct/ses
 DATABASE_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
 DIRECT_URL="postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres"
 ```
+
+For v1 deployment, leave AI and embedding keys empty unless you are intentionally testing lab features. OCR import still works through the existing browser parser and review flow without pgvector.
 
 Then run:
 
@@ -359,6 +370,7 @@ Playwright E2E uses two dev-server projects:
 
 - `local-only`: no backend URL, verifies IndexedDB CRUD and OCR review flow
 - `api-mode`: relative `/api` base URL with mocked responses, verifies auth, manual sync, and fallback behavior
+- v1 release QA checklist: [docs/V1_RELEASE_QA.md](docs/V1_RELEASE_QA.md)
 
 ## Security Notes
 
@@ -378,12 +390,14 @@ Playwright E2E uses two dev-server projects:
 6. Verify `GET /health`.
 7. Smoke test: sign up, log in, add an ingredient, sync from the account page, reload, and load recipe recommendations.
 
-## Suggested Next Improvements
+## v2 Expansion Plan
 
-- Add conflict-aware two-way sync using `updatedAt` and delete markers
+- Add conflict-aware two-way sync using `updatedAt` and `deletedAt` or tombstone markers
 - Add a server pull/download action so authenticated users can restore server data onto a new device
 - Persist pantry staple ownership per user
 - Harden auth recovery UX around expired sessions and offline fallback
-- Deploy the frontend and backend to stable public environments
+- Revisit pgvector-backed recipe and OCR correction suggestions after v1 is deployed
+- Split MFDS recipe rows into `recipe_ingredients`, add pgvector embeddings, and connect seeded recipes to recommendation UI
+- Harden OCR taxonomy/classifier behavior without replacing the existing parser abruptly
 - Expand Playwright coverage beyond the core journeys
 - Move shared recipe data and normalization logic into a dedicated shared module if the backend becomes permanent
