@@ -21,7 +21,7 @@ Do not start new work in these areas until v1 deploy stability is done:
 - large OCR classifier or taxonomy redesign
 - broad `CANONICAL_RULES` replacement
 - new pgvector tables or embedding workflows
-- recipe catalog seeding expansion
+- recipe catalog recommendation expansion beyond the completed MFDS source-data seed
 - recipe recommendation ranking overhaul
 
 Keep the existing OCR parser behavior intact:
@@ -85,7 +85,8 @@ Keep the existing OCR parser behavior intact:
 7. Portfolio docs
    - v1 implemented scope
    - v1 limitations
-   - v2 expansion plan: pgvector, richer recipe recommendation, taxonomy/classifier hardening, conflict-aware sync
+- v2 expansion plan: pgvector, richer recipe recommendation, taxonomy/classifier hardening, conflict-aware sync
+- MFDS `COOKRCP01` seed is documented as v2 foundation data, not as a v1 recommendation UI feature
 
 ## Done Criteria
 

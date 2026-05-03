@@ -7,6 +7,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- Added a v1 release QA checklist covering environment security, MFDS recipe seed boundaries, auth, guest import, manual sync, deployment, and smoke scenarios.
 - User-scoped OCR import correction storage with optional pgvector embeddings for similarity-based review suggestions.
 - Backend import correction APIs and OpenAI embedding configuration while preserving local import correction fallback.
 - Script for backfilling missing import correction embeddings after enabling OpenAI embeddings.
@@ -58,6 +59,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Simplified recipe, OCR import, and auth screen copy so the next step is clearer on mobile and desktop.
 
 ### Fixed
+- Manual ingredient sync now uses the authenticated API request path so a 401 can refresh the session and retry once.
 - Recipe recommendations no longer count recipes as "buy one more" when no core ingredients are currently owned.
 - Recommendation scoring now treats owned pantry staples as available ingredients.
 - Fallback and syncing state now surface clearer user feedback in the UI.

@@ -5,7 +5,7 @@ FridgeMate v1 deployment verification checklist for Vercel, Railway, Supabase, a
 ## Scope Gate
 
 - [ ] Do not add new OCR taxonomy/classifier work for this release.
-- [ ] Do not add new pgvector or recipe seeding work for this release.
+- [ ] Treat completed MFDS recipe seeding as data preparation only; do not add pgvector or recommendation UI work for this release.
 - [ ] Keep existing OCR parser behavior and tests intact.
 - [ ] Treat local IndexedDB as the working copy.
 - [ ] Keep server writes limited to the account-page manual sync button.
@@ -94,3 +94,4 @@ FridgeMate v1 deployment verification checklist for Vercel, Railway, Supabase, a
 - [ ] README separates v1 shipped scope from v2 expansion.
 - [ ] README lists current limitations.
 - [ ] README names pgvector, richer recommendations, taxonomy/classifier hardening, and conflict-aware sync as v2 work.
+- [ ] `docs/V1_RELEASE_QA.md` reflects the current auth, guest import, manual sync, deployment, and recipe-seeding boundaries.

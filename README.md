@@ -21,6 +21,7 @@ The app is intentionally simple enough for one developer to understand and maint
 
 For v1 release stabilization, see [docs/V1_STABILIZATION_PLAN.md](docs/V1_STABILIZATION_PLAN.md).
 For deployment checks, see [docs/DEPLOY_CHECKLIST.md](docs/DEPLOY_CHECKLIST.md).
+For v1 release QA, see [docs/V1_RELEASE_QA.md](docs/V1_RELEASE_QA.md).
 For MFDS public recipe source seeding, see [docs/recipe-seeding.md](docs/recipe-seeding.md).
 For product strategy, see [docs/BUSINESS_ROADMAP.md](docs/BUSINESS_ROADMAP.md).
 For KPI instrumentation and event naming, see [docs/ANALYTICS_EVENTS.md](docs/ANALYTICS_EVENTS.md).
@@ -40,6 +41,7 @@ Shipped and working:
 - Dedicated receipt parsing for grocery/mart-style OCR text
 - Rule-based recipe recommendations with pantry-aware scoring
 - Recipe import and hybrid recommendation backend scaffolding, treated as v2/lab work for deployment planning
+- MFDS `COOKRCP01` recipe source data seeded into Supabase as a v2 recommendation foundation
 - Vitest coverage for date logic, recommendations, import parsing, auth, IndexedDB, and `useIngredients`
 
 Still intentionally limited:
@@ -115,6 +117,7 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 - MFDS `COOKRCP01` JSON seeding can upsert public recipe rows into a Supabase `recipes` table with raw steps and source payloads
 - Existing frontend recommendation imports still avoid storing crawled recipe bodies
 - Recipe import, embeddings, and LLM normalization are v2/lab capabilities, not v1 release blockers
+- Seeded MFDS data is a v2 foundation for future recipe search and recommendations, not a v1 recommendation UI change
 
 ### OCR Import
 
@@ -364,6 +367,7 @@ Playwright E2E uses two dev-server projects:
 
 - `local-only`: no backend URL, verifies IndexedDB CRUD and OCR review flow
 - `api-mode`: relative `/api` base URL with mocked responses, verifies auth, manual sync, and fallback behavior
+- v1 release QA checklist: [docs/V1_RELEASE_QA.md](docs/V1_RELEASE_QA.md)
 
 ## Security Notes
 
@@ -385,12 +389,12 @@ Playwright E2E uses two dev-server projects:
 
 ## v2 Expansion Plan
 
-- Add conflict-aware two-way sync using `updatedAt` and delete markers
+- Add conflict-aware two-way sync using `updatedAt` and `deletedAt` or tombstone markers
 - Add a server pull/download action so authenticated users can restore server data onto a new device
 - Persist pantry staple ownership per user
 - Harden auth recovery UX around expired sessions and offline fallback
 - Revisit pgvector-backed recipe and OCR correction suggestions after v1 is deployed
-- Expand recipe recommendation ranking and recipe catalog seeding
+- Split MFDS recipe rows into `recipe_ingredients`, add pgvector embeddings, and connect seeded recipes to recommendation UI
 - Harden OCR taxonomy/classifier behavior without replacing the existing parser abruptly
 - Expand Playwright coverage beyond the core journeys
 - Move shared recipe data and normalization logic into a dedicated shared module if the backend becomes permanent
