@@ -96,10 +96,6 @@ export const EXTRA_PANTRY_CATEGORIES = [
     items: ['밀가루', '카레가루']
   },
   {
-    title: '단맛/조림',
-    items: ['꿀']
-  },
-  {
     title: '향신료/향미',
     items: ['다진 생강', '깨소금']
   }

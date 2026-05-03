@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { extraPantryStapleCategories, basicPantryStapleCategories, PANTRY_STATUS } from '../data/pantryStaples';
 
 const statusLabel = {
@@ -41,18 +41,7 @@ function PantryCategoryGroup({ title, items, pantryOwnership, onCycle }) {
   );
 }
 
-function PantryStaplesPanel({ items, pantryOwnership, pantrySummary, onCycle }) {
-  const categorizedIds = useMemo(
-    () =>
-      new Set(
-        [...basicPantryStapleCategories, ...extraPantryStapleCategories].flatMap((category) =>
-          category.items.map((item) => item.id)
-        )
-      ),
-    []
-  );
-  const uncategorizedItems = useMemo(() => items.filter((item) => !categorizedIds.has(item.id)), [categorizedIds, items]);
-
+function PantryStaplesPanel({ pantryOwnership, pantrySummary, onCycle }) {
   return (
     <div className="rounded-[20px] border border-white/70 bg-white/78 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -68,7 +57,7 @@ function PantryStaplesPanel({ items, pantryOwnership, pantrySummary, onCycle }) 
         </div>
       </div>
 
-      <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+      <div className="mt-4 grid gap-5 xl:grid-cols-2">
         <div className="space-y-4">
           <div>
             <p className="text-sm font-semibold text-slate-900">기본 팬트리</p>
@@ -99,14 +88,6 @@ function PantryStaplesPanel({ items, pantryOwnership, pantrySummary, onCycle }) 
               onCycle={onCycle}
             />
           ))}
-          {uncategorizedItems.length ? (
-            <PantryCategoryGroup
-              title={'기타'}
-              items={uncategorizedItems}
-              pantryOwnership={pantryOwnership}
-              onCycle={onCycle}
-            />
-          ) : null}
         </div>
       </div>
     </div>
