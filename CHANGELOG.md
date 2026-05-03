@@ -26,6 +26,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Global connection status feedback with online/offline and fallback notices.
 - Sync strategy scaffold documenting the current `last-write-wins` approach.
 - Playwright E2E scaffolding for local-only CRUD, auth, API fallback, and OCR review flows.
+- Added a v1 stabilization plan that pauses new taxonomy, pgvector, and recipe-ranking expansion until deployment basics are solid.
+- Added E2E coverage for guest-to-user import, manual sync, deletion sync, and expired-session handling.
 - Added `docs/BUSINESS_ROADMAP.md` to document product positioning, monetization, KPI focus, and exit options.
 - Added `docs/ANALYTICS_EVENTS.md` to define activation, OCR, retention, recommendation, and monetization event tracking.
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
@@ -44,6 +46,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Guest ingredient import now copies guest items into the authenticated local scope without automatically uploading them to the server.
 - Routed pantry-owned staples into recommendation scoring instead of keeping them UI-only.
 - Tightened deployment guidance around environment variables, smoke checks, and core journey verification.
+- Reworked the deployment checklist around v1 manual sync, auth cookies, Vercel, Railway, and Supabase verification.
 - Linked the business roadmap from the README so product and go-to-market direction are easier to find.
 - Linked the analytics event spec from the README so KPI instrumentation has a documented source of truth.
 - Hardened auth handling with normalized email uniqueness, shorter JWT defaults, logout token revocation, and rate-limited signup/login.

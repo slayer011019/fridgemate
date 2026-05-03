@@ -121,8 +121,41 @@ export async function gotoAndWait(page, path = '/') {
   await page.waitForFunction(() => window.__FRIDGEMATE_TEST__?.setupComplete !== false);
 }
 
-export async function mockApiSession(page, { user = DEFAULT_USER, ingredients = [] } = {}) {
+export async function waitForIngredientNames(page, scope, expectedNames) {
+  await page.waitForFunction(
+    async ({ scopeName, names }) => {
+      function getDatabaseName(value) {
+        const safeScope = String(value || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
+        return `fridgemate-db__${safeScope}`;
+      }
+
+      function openDatabase(name) {
+        return new Promise((resolve, reject) => {
+          const request = window.indexedDB.open(name, 1);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      const database = await openDatabase(getDatabaseName(scopeName));
+      const ingredients = await new Promise((resolve, reject) => {
+        const transaction = database.transaction('ingredients', 'readonly');
+        const request = transaction.objectStore('ingredients').getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+      database.close();
+
+      const currentNames = ingredients.map((ingredient) => ingredient.name).sort();
+      return JSON.stringify(currentNames) === JSON.stringify([...names].sort());
+    },
+    { scopeName: scope, names: expectedNames }
+  );
+}
+
+export async function mockApiSession(page, { user = DEFAULT_USER, ingredients = [], restoreSession = false } = {}) {
   const state = {
+    sessionActive: restoreSession,
     user,
     ingredients: [...ingredients]
   };
@@ -134,16 +167,28 @@ export async function mockApiSession(page, { user = DEFAULT_USER, ingredients = 
       body: JSON.stringify(body)
     });
 
-  await page.route('**/api/auth/me', (route) => jsonResponse(route, state.user));
-  await page.route('**/api/auth/logout', (route) => route.fulfill({ status: 204, body: '' }));
+  await page.route('**/api/auth/me', (route) =>
+    state.sessionActive ? jsonResponse(route, state.user) : jsonResponse(route, { message: 'Authentication is required.' }, 401)
+  );
+  await page.route('**/api/auth/refresh', (route) =>
+    state.sessionActive
+      ? jsonResponse(route, { user: state.user })
+      : jsonResponse(route, { message: 'The current session is no longer valid.' }, 401)
+  );
+  await page.route('**/api/auth/logout', (route) => {
+    state.sessionActive = false;
+    return route.fulfill({ status: 204, body: '' });
+  });
   await page.route('**/api/auth/login', async (route) => {
     const credentials = JSON.parse(route.request().postData() || '{}');
+    state.sessionActive = true;
+    state.user = {
+      ...state.user,
+      email: credentials.email || state.user.email
+    };
     await jsonResponse(route, {
       token: 'test-token',
-      user: {
-        ...state.user,
-        email: credentials.email || state.user.email
-      }
+      user: state.user
     });
   });
 
@@ -155,6 +200,17 @@ export async function mockApiSession(page, { user = DEFAULT_USER, ingredients = 
       updatedAt: `2026-04-14T09:00:0${index}.000Z`
     }));
     state.ingredients = [...savedItems, ...state.ingredients];
+    await jsonResponse(route, savedItems);
+  });
+
+  await page.route('**/api/ingredients/sync', async (route) => {
+    const payload = JSON.parse(route.request().postData() || '{}');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    const savedItems = items.map((ingredient, index) => ({
+      ...ingredient,
+      updatedAt: ingredient.updatedAt || `2026-04-14T11:00:${String(index).padStart(2, '0')}.000Z`
+    }));
+    state.ingredients = savedItems;
     await jsonResponse(route, savedItems);
   });
 
