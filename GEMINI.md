@@ -142,6 +142,37 @@ The `recipes` table is public-readable, but insert/update/delete should not be a
 
 Recipe seeding should only be done through a Node/local/server script using a service role key.
 
+## Context7 Usage
+
+When working on FridgeMate, use Context7 for up-to-date documentation before making changes involving:
+
+- React
+- Vite
+- Supabase
+- Playwright
+- Railway
+- Vercel
+- Node.js package APIs
+
+Do not rely on outdated library behavior when changing auth, sync, deployment, or test code.
+
+Context7 should be used for documentation lookup only. It should not change the current v1 scope.
+
+Current v1 scope remains:
+
+- Authentication stabilization
+- Manual sync behavior
+- Deployment QA
+- Cookie/CORS verification
+- Documentation consistency
+
+Do not add these unless explicitly requested:
+
+- pgvector recommendation
+- recipe recommendation UI
+- recipe_ingredients parsing
+- OCR taxonomy expansion
+
 ---
 
 ## Security Rules
