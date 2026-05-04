@@ -118,6 +118,8 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 
 - Food Safety Korea XML import stores recipe name, category, cooking method, raw ingredient text, tags, and optional nutrition
 - MFDS `COOKRCP01` JSON seeding can upsert public recipe rows into a Supabase `recipes` table with raw steps and source payloads
+- Supabase lab scripts can split seeded MFDS `ingredients_text` into a direct `recipe_ingredients` table for future recipe search experiments
+- Parser training export can write JSONL baseline labels from seeded MFDS ingredient text for future ML-assisted normalization
 - Existing frontend recommendation imports still avoid storing crawled recipe bodies
 - Recipe import, embeddings, and LLM normalization are v2/lab capabilities, not v1 release blockers
 - Seeded MFDS data is a v2 foundation for future recipe search and recommendations, not a v1 recommendation UI change
@@ -159,6 +161,7 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 - ESLint
 - Prettier
 - GitHub Actions
+- Code Review Graph workflow notes in [docs/code-review-graph.md](docs/code-review-graph.md)
 
 ### OCR and AI
 
@@ -397,7 +400,7 @@ Playwright E2E uses two dev-server projects:
 - Persist pantry staple ownership per user
 - Harden auth recovery UX around expired sessions and offline fallback
 - Revisit pgvector-backed recipe and OCR correction suggestions after v1 is deployed
-- Split MFDS recipe rows into `recipe_ingredients`, add pgvector embeddings, and connect seeded recipes to recommendation UI
+- Connect the Supabase MFDS `recipe_ingredients` lab data to Prisma-backed recommendations, add pgvector embeddings, and expose it in the recommendation UI
 - Harden OCR taxonomy/classifier behavior without replacing the existing parser abruptly
 - Expand Playwright coverage beyond the core journeys
 - Move shared recipe data and normalization logic into a dedicated shared module if the backend becomes permanent

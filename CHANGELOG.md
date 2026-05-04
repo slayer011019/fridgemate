@@ -18,6 +18,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - OCR import now supports directly pasting receipt OCR text into the review flow without re-running image OCR.
 - Added a Food Safety Korea recipe XML parser that keeps recipe names, raw ingredient text, tags, optional nutrition, and generated external search links without storing manual steps.
 - Added Supabase SQL and a Node seed script for importing MFDS `COOKRCP01` public recipe source rows into a `recipes` table.
+- Added a Supabase `recipe_ingredients` SQL script and MFDS ingredient parsing CLI for splitting seeded recipe ingredient text into normalized chunks.
+- Added a recipe parser training export script that writes JSONL baseline labels for future ML-assisted parsing.
 - Added recipe ingredient parsing and fridge-to-menu match scoring utilities for ingredient-based recipe recommendations.
 - Added recipe raw import storage, batch LLM ingredient normalization fallback, embedding text generation, OpenAI embedding service scaffolding, pgvector search, and hybrid recipe ranking.
 - Added manual ingredient sync from the account page, including dirty/syncing/synced/error UI state and persisted last sync time.

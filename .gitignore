@@ -56,3 +56,6 @@ stats.html
 bundle-stats.json
 # Local code review graph
 .code-review-graph/
+
+# Local ML/parser training exports
+data/training/*.jsonl
