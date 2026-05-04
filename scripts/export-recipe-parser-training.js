@@ -98,7 +98,8 @@ function buildParsedExample({ recipe, ingredient, index, minConfidence }) {
     },
     label: {
       action: 'parse',
-      rawName: ingredient.raw_name,
+      rawName: ingredient.raw_text,
+      parsedRawName: ingredient.raw_name,
       normalizedName: ingredient.normalized_name,
       canonicalName: ingredient.canonical_name,
       amount: ingredient.amount,
@@ -131,6 +132,7 @@ function buildSkippedExample({ recipe, skipped, index }) {
     },
     label: {
       action: 'skip',
+      rawName: skipped.line,
       reason: skipped.reason
     },
     metadata: {

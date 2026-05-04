@@ -25,7 +25,8 @@
     "import-corrections:backfill": "node --env-file=.env scripts/backfillImportCorrectionEmbeddings.js",
     "seed:recipes": "node --env-file=.env scripts/seed-mfds-recipes.js",
     "parse:recipe-ingredients": "node --env-file=.env scripts/parse-recipe-ingredients.js",
-    "export:recipe-parser-training": "node --env-file=.env scripts/export-recipe-parser-training.js"
+    "export:recipe-parser-training": "node --env-file=.env scripts/export-recipe-parser-training.js",
+    "label:recipe-parser-training": "node scripts/label-review.js"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",

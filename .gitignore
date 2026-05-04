@@ -59,3 +59,5 @@ bundle-stats.json
 
 # Local ML/parser training exports
 data/training/*.jsonl
+data/training/*.gold.jsonl
+data/training/*.progress.json

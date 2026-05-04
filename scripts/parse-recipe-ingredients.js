@@ -2,6 +2,11 @@ import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import { EXACT_ALIASES } from './lib/ingredientAliases.js';
+import {
+  ALL_UNIT_TOKENS,
+  buildUnitAlternation,
+  normalizeUnit
+} from './lib/unitNormalizer.js';
 
 const SOURCE = 'MFDS_COOKRCP01';
 
@@ -17,17 +22,19 @@ const FRACTIONS = {
   '⅞': 0.875,
 };
 
-const UNITS = [
-  'g', 'kg', 'ml', 'L', 'l', '개', '알', '마리', '장', '줄기', '뿌리', '쪽', '포기', '모', '컵',
-  '큰술', '작은술', '숟가락', '스푼', '티스푼', '약간', '적당량', '봉', '팩', '통', '캔', '병', '묶음', '단', '인분'
-];
+const HTML_TAG_PATTERN = /<[^>]*>/g;
+const BR_TAG_PATTERN = /<br\s*\/?>/gi;
+const SERVING_INFO_PATTERN = /^\d+\s*인분(?:\s*기준)?$/;
+const METADATA_LINE_PATTERN = /^(?:\d+\s*인분(?:\s*기준)?|기준)$/;
+const UNIT_ALTERNATION = buildUnitAlternation();
+const QUANTITY_PATTERN = /(\d*\.?\d+|\d*\s*[⅓⅔¼¾½⅛⅜⅝⅞]+|\d+\/\d+)$/;
 
 const HEADER_PATTERN = /^[[·\s]*(고명|양념장|소스|드레싱|육수|재료|반죽|튀김옷|마리네이드)[\s:\]]*$/;
 
 const LEADING_SECTION_PATTERN = /^[[·●\s]*(주재료|부재료|재료|양념장|소스|드레싱|육수|고명|반죽|튀김옷|마리네이드)\s*[>:\]]\s*/;
 const NOISE_WORDS = ['선택', '장식용', '고명용', '생략가능', '기호에 따라', '취향껏', '채', '다진 것', '송송 썬 것'];
 const NOISE_CHARS = /^[():,·●:\s]+$/;
-const NUMERIC_FRAGMENT_PATTERN = /^[0-9]+(\.[0-9]+)?\s*(g|kg|ml|l|L|개|큰술|작은술|컵|알|장|뿌리|포기|쪽|팩|봉)\)?$/;
+const NUMERIC_FRAGMENT_PATTERN = new RegExp(`^[0-9]+(?:\\.[0-9]+)?\\s*(?:${UNIT_ALTERNATION})\\)?$`);
 
 function requireEnv(name) {
   const value = process.env[name]?.trim();
@@ -79,6 +86,67 @@ function parseFraction(text) {
   return hasMatch ? total : null;
 }
 
+function stripHtml(text) {
+  return String(text || '')
+    .replace(BR_TAG_PATTERN, '\n')
+    .replace(HTML_TAG_PATTERN, '')
+    .trim();
+}
+
+function normalizeIngredientsText(text) {
+  return String(text || '')
+    .replace(BR_TAG_PATTERN, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+}
+
+function splitRespectingParens(text) {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+
+  for (const char of String(text || '')) {
+    if (char === '(') {
+      depth += 1;
+    } else if (char === ')') {
+      depth = Math.max(0, depth - 1);
+    }
+
+    if (char === ',' && depth === 0) {
+      const trimmed = current.trim();
+      if (trimmed) {
+        parts.push(trimmed);
+      }
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  const trimmed = current.trim();
+  if (trimmed) {
+    parts.push(trimmed);
+  }
+
+  return parts;
+}
+
+function isMetadataLine(text) {
+  return METADATA_LINE_PATTERN.test(String(text || '').trim());
+}
+
+function cleanDetailText(text) {
+  return String(text || '')
+    .replace(/^[,·\s]+|[,·\s]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isAmountOnlyText(text) {
+  return QUANTITY_PATTERN.test(String(text || '').trim());
+}
+
 function isHeaderLine(line, recipeName) {
   const trimmed = line.trim();
   if (!trimmed) return { skip: true, reason: 'empty' };
@@ -93,45 +161,63 @@ function isHeaderLine(line, recipeName) {
 function extractQuantity(text) {
   let amount = null;
   let unit = null;
-  let remainingText = text;
+  let remainingText = String(text || '').trim();
 
-  // Sort units by length descending
-  const sortedUnits = [...UNITS].sort((a, b) => b.length - a.length);
+  for (const token of ALL_UNIT_TOKENS) {
+    if (!remainingText.endsWith(token)) {
+      continue;
+    }
 
-  for (const u of sortedUnits) {
-    if (text.endsWith(u)) {
-      unit = u;
-      const partBeforeUnit = text.slice(0, -u.length).trim();
-      
-      const amountMatch = partBeforeUnit.match(/(\d*\.?\d+|\d*\s*[⅓⅔¼¾½⅛⅜⅝⅞]+|\d+\/\d+)$/);
-      if (amountMatch) {
-        const amountStr = amountMatch[0];
-        amount = parseFraction(amountStr);
-        remainingText = partBeforeUnit.slice(0, -amountStr.length).trim();
-      } else {
-        remainingText = partBeforeUnit;
-      }
+    const partBeforeUnit = remainingText.slice(0, -token.length).trim();
+    const amountMatch = partBeforeUnit.match(QUANTITY_PATTERN);
+
+    if (amountMatch) {
+      const amountStr = amountMatch[0];
+      amount = parseFraction(amountStr);
+      unit = normalizeUnit(token);
+      remainingText = partBeforeUnit.slice(0, -amountStr.length).trim();
+      return { amount, unit, remainingText };
+    }
+
+    const normalizedUnit = normalizeUnit(token);
+    if (normalizedUnit === '약간' || normalizedUnit === '적당량') {
+      unit = normalizedUnit;
+      remainingText = partBeforeUnit;
       return { amount, unit, remainingText };
     }
   }
 
-  const amountOnlyMatch = text.match(/(\d*\.?\d+|\d*\s*[⅓⅔¼¾½⅛⅜⅝⅞]+|\d+\/\d+)$/);
-  if (amountOnlyMatch) {
+  const amountOnlyMatch = remainingText.match(QUANTITY_PATTERN);
+  if (amountOnlyMatch && isAmountOnlyText(remainingText)) {
     const amountStr = amountOnlyMatch[0];
     amount = parseFraction(amountStr);
-    remainingText = text.slice(0, -amountStr.length).trim();
+    remainingText = remainingText.slice(0, -amountStr.length).trim();
     return { amount, unit: null, remainingText };
   }
 
-  return { amount: null, unit: null, remainingText: text };
+  return { amount: null, unit: null, remainingText };
 }
 
 function parseIngredientChunk(chunk) {
-  const raw_text = chunk.trim();
-  if (!raw_text || NOISE_CHARS.test(raw_text)) return null;
+  const originalChunk = String(chunk || '').trim();
+  const raw_text = stripHtml(originalChunk);
+  if (!raw_text) {
+    return HTML_TAG_PATTERN.test(originalChunk) ? { skip: true, reason: 'html_tag_only' } : null;
+  }
+  if (NOISE_CHARS.test(raw_text)) return null;
 
   let processed = raw_text.replace(/^\[[^\]]+\]/, '').replace(/^·/, '').trim();
+  if (!processed) {
+    return { skip: true, reason: 'html_tag_only' };
+  }
+
   processed = processed.replace(LEADING_SECTION_PATTERN, '').trim();
+  if (!processed) {
+    return { skip: true, reason: 'html_tag_only' };
+  }
+  if (isMetadataLine(processed) || SERVING_INFO_PATTERN.test(processed)) {
+    return { skip: true, reason: 'metadata' };
+  }
 
   let amount = null;
   let unit = null;
@@ -139,11 +225,9 @@ function parseIngredientChunk(chunk) {
   let detail = '';
   let lowConfidenceReason = null;
 
-  // 1. Try to extract primary quantity from main text (ignoring parentheses for now)
   const textWithoutParen = processed.replace(/\([^)]+\)/g, '').trim();
   const qPrimary = extractQuantity(textWithoutParen);
   
-  // 2. Try to extract secondary quantity from parentheses
   const parenMatch = processed.match(/\(([^)]+)\)/);
   let qSecondary = { amount: null, unit: null, remainingText: '' };
   if (parenMatch) {
@@ -152,54 +236,53 @@ function parseIngredientChunk(chunk) {
   }
 
   if (qPrimary.amount !== null || qPrimary.unit !== null) {
-      amount = qPrimary.amount;
-      unit = qPrimary.unit;
-      raw_name = qPrimary.remainingText;
-      // If we found primary, the paren content is detail
-      if (parenMatch) {
-          const parenContent = parenMatch[1].trim();
-          if (!NOISE_WORDS.includes(parenContent)) {
-              detail = parenContent;
-          }
+    amount = qPrimary.amount;
+    unit = qPrimary.unit;
+    raw_name = qPrimary.remainingText;
+    if (parenMatch) {
+      const parenContent = cleanDetailText(parenMatch[1]);
+      if (!NOISE_WORDS.includes(parenContent)) {
+        detail = parenContent;
       }
+    }
   } else if (qSecondary.amount !== null || qSecondary.unit !== null) {
-      amount = qSecondary.amount;
-      unit = qSecondary.unit;
-      raw_name = textWithoutParen;
-      if (qSecondary.remainingText && !NOISE_WORDS.includes(qSecondary.remainingText)) {
-          detail = qSecondary.remainingText;
+    amount = qSecondary.amount;
+    unit = qSecondary.unit;
+    raw_name = textWithoutParen;
+    if (qSecondary.remainingText) {
+      const nextDetail = cleanDetailText(qSecondary.remainingText);
+      if (nextDetail && !NOISE_WORDS.includes(nextDetail)) {
+        detail = nextDetail;
       }
+    }
   } else {
-      raw_name = textWithoutParen;
-      if (parenMatch) {
-          const parenContent = parenMatch[1].trim();
-          if (!NOISE_WORDS.includes(parenContent)) {
-              detail = parenContent;
-          }
+    raw_name = textWithoutParen;
+    if (parenMatch) {
+      const parenContent = cleanDetailText(parenMatch[1]);
+      if (parenContent && !NOISE_WORDS.includes(parenContent)) {
+        detail = parenContent;
       }
+    }
   }
 
-  // Final name cleanup
   raw_name = raw_name.replace(LEADING_SECTION_PATTERN, '').replace(/[)\]:·,]+$/, '').trim();
   
-  // Skip if it looks like just noise or only quantity without name
   const isNumericFragment = NUMERIC_FRAGMENT_PATTERN.test(raw_text) || 
                             NUMERIC_FRAGMENT_PATTERN.test(raw_name) || 
                             (normalizeIngredientName(raw_name) && NUMERIC_FRAGMENT_PATTERN.test(normalizeIngredientName(raw_name)));
 
   if (!raw_name || NOISE_CHARS.test(raw_name) || isNumericFragment) {
-      if (amount !== null || unit !== null || isNumericFragment) {
-          return { skip: true, reason: 'numeric_unit_fragment' };
-      }
-      return null;
+    if (amount !== null || unit !== null || isNumericFragment) {
+      return { skip: true, reason: 'numeric_unit_fragment' };
+    }
+    return null;
   }
 
   const normalized_name = normalizeIngredientName(raw_name);
   if (!normalized_name || (normalized_name.length <= 1 && amount === null && unit === null)) {
-      return null;
+    return null;
   }
 
-  // Lookup alias using raw_name (trimmed) and space-normalized raw_name
   const trimmedName = raw_name.trim();
   const spaceNormalizedName = trimmedName.replace(/\s+/g, ' ');
   const aliasName = EXACT_ALIASES[trimmedName] || EXACT_ALIASES[spaceNormalizedName] || normalized_name;
@@ -207,19 +290,19 @@ function parseIngredientChunk(chunk) {
 
   let confidence = 0.5;
   if (normalized_name) {
-      if (amount !== null && unit !== null) {
-          confidence = 0.95;
-          lowConfidenceReason = null;
-      } else if (unit === '약간' || unit === '적당량') {
-          confidence = 0.8;
-          lowConfidenceReason = null;
-      } else if (amount !== null || unit !== null) {
-          confidence = 0.85;
-          lowConfidenceReason = null;
-      } else {
-          confidence = 0.65;
-          lowConfidenceReason = 'No numeric amount detected';
-      }
+    if (amount !== null && unit !== null) {
+      confidence = 0.95;
+      lowConfidenceReason = null;
+    } else if (unit === '약간' || unit === '적당량') {
+      confidence = 0.8;
+      lowConfidenceReason = null;
+    } else if (amount !== null || unit !== null) {
+      confidence = 0.85;
+      lowConfidenceReason = null;
+    } else {
+      confidence = 0.65;
+      lowConfidenceReason = 'No numeric amount detected';
+    }
   }
 
   if (normalized_name.length > 25) {
@@ -254,7 +337,7 @@ function normalizeIngredientName(rawName) {
 function parseIngredientsText(ingredientsText, recipeName) {
   if (!ingredientsText) return { chunks: [], skipped: [] };
 
-  const lines = ingredientsText.split(/\r?\n/);
+  const lines = normalizeIngredientsText(ingredientsText).split(/\n+/);
   const chunks = [];
   const skipped = [];
 
@@ -265,7 +348,7 @@ function parseIngredientsText(ingredientsText, recipeName) {
       continue;
     }
 
-    const parts = line.split(',');
+    const parts = splitRespectingParens(line);
     for (const part of parts) {
       const parsed = parseIngredientChunk(part);
       if (!parsed) continue;

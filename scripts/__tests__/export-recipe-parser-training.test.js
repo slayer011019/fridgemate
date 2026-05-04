@@ -33,7 +33,8 @@ describe('recipe parser training export', () => {
         input: expect.objectContaining({ rawText: '연두부 75g(3/4모)' }),
         label: expect.objectContaining({
           action: 'parse',
-          rawName: '연두부',
+          rawName: '연두부 75g(3/4모)',
+          parsedRawName: '연두부',
           normalizedName: '연두부',
           amount: 75,
           unit: 'g'
@@ -44,6 +45,8 @@ describe('recipe parser training export', () => {
         input: expect.objectContaining({ rawText: '계란 1개' }),
         label: expect.objectContaining({
           action: 'parse',
+          rawName: '계란 1개',
+          parsedRawName: '계란',
           canonicalName: '달걀',
           amount: 1,
           unit: '개'
@@ -53,6 +56,7 @@ describe('recipe parser training export', () => {
         input: expect.objectContaining({ rawText: '설탕 1' }),
         label: expect.objectContaining({
           action: 'parse',
+          rawName: '설탕 1',
           normalizedName: '설탕',
           amount: 1,
           unit: null
@@ -60,13 +64,13 @@ describe('recipe parser training export', () => {
         metadata: expect.objectContaining({ needsReview: false })
       }),
       expect.objectContaining({
-        label: { action: 'skip', reason: 'recipe title' }
+        label: expect.objectContaining({ action: 'skip', reason: 'recipe title' })
       }),
       expect.objectContaining({
-        label: { action: 'skip', reason: 'header' }
+        label: expect.objectContaining({ action: 'skip', reason: 'header' })
       }),
       expect.objectContaining({
-        label: { action: 'skip', reason: 'numeric_unit_fragment' }
+        label: expect.objectContaining({ action: 'skip', reason: 'numeric_unit_fragment' })
       })
     ]);
   });
@@ -80,14 +84,15 @@ describe('recipe parser training export', () => {
 
     expect(examples).toHaveLength(1);
     expect(examples[0]).toMatchObject({
-      label: {
-        action: 'parse',
-        rawName: '닭고기(가슴살',
-        normalizedName: '닭고기(가슴살',
-        canonicalName: '닭고기(가슴살',
-        amount: null,
-        unit: null
-      },
+        label: {
+          action: 'parse',
+          rawName: '닭고기(가슴살',
+          parsedRawName: '닭고기(가슴살',
+          normalizedName: '닭고기(가슴살',
+          canonicalName: '닭고기(가슴살',
+          amount: null,
+          unit: null
+        },
       metadata: {
         confidence: 0.65,
         needsReview: true,
@@ -97,13 +102,13 @@ describe('recipe parser training export', () => {
   });
 
   it('parses CLI options for bounded and all exports', () => {
-    expect(parseArgs(['--limit=500', '--output=tmp/examples.jsonl', '--no-skipped'])).toMatchObject({
-      includeSkipped: false,
-      limit: 500,
-      lowConfidenceOnly: false,
-      minConfidence: 0.7,
-      output: 'tmp/examples.jsonl'
-    });
+      expect(parseArgs(['--limit=500', '--output=tmp/examples.jsonl', '--no-skipped'])).toMatchObject({
+        includeSkipped: false,
+        limit: 500,
+        lowConfidenceOnly: false,
+        minConfidence: 0.7,
+        output: 'tmp/examples.jsonl'
+      });
     expect(parseArgs(['--all', '--low-confidence-only', '--min-confidence=0.85'])).toMatchObject({
       includeSkipped: true,
       limit: 0,

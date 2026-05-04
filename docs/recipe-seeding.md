@@ -82,6 +82,16 @@ npm run export:recipe-parser-training -- --low-confidence-only --output=data/tra
 
 The default output is `data/training/recipe-parser-examples.jsonl`, which is ignored by Git. Each JSONL row includes the raw ingredient chunk, full recipe ingredient context, parser label, confidence metadata, and `needsReview`. Treat these rows as baseline labels for review and future model training, not as hand-verified ground truth.
 
+Use `scripts/label-review.js` to turn the low-confidence export into a gold set:
+
+```bash
+npm run label:recipe-parser-training -- --input data/training/review-needed-v2.jsonl
+npm run label:recipe-parser-training -- --input data/training/review-needed-v2.jsonl --output data/training/review-needed-v2.gold.jsonl
+npm run label:recipe-parser-training -- --input data/training/review-needed-v2.jsonl --stats
+```
+
+The labeler writes progress and gold output files next to the input file, and those outputs stay ignored by Git.
+
 ## Out of Scope
 
 This seed does not add:
