@@ -128,12 +128,12 @@
 
   .app-frame {
     @apply mx-auto flex w-full flex-col gap-4 px-4 pb-8 pt-3 sm:gap-5 sm:px-6 sm:pt-4;
-    max-width: 100%;
+    max-width: 72rem;
   }
 
   .app-header-frame {
     @apply mx-auto w-full px-4 sm:px-6;
-    max-width: 100%;
+    max-width: 72rem;
   }
 
   .stats-grid {
@@ -167,15 +167,15 @@
 @media (min-width: 1280px) {
   @layer components {
     .app-frame {
-      max-width: 96rem;
-      padding-left: 2.5rem;
-      padding-right: 2.5rem;
+      max-width: 72rem;
+      padding-left: 2rem;
+      padding-right: 2rem;
     }
 
     .app-header-frame {
-      max-width: 96rem;
-      padding-left: 2.5rem;
-      padding-right: 2.5rem;
+      max-width: 72rem;
+      padding-left: 2rem;
+      padding-right: 2rem;
     }
 
     .stats-grid {
@@ -195,15 +195,15 @@
 @media (min-width: 1536px) {
   @layer components {
     .app-frame {
-      max-width: 108rem;
-      padding-left: 3rem;
-      padding-right: 3rem;
+      max-width: 72rem;
+      padding-left: 2rem;
+      padding-right: 2rem;
     }
 
     .app-header-frame {
-      max-width: 108rem;
-      padding-left: 3rem;
-      padding-right: 3rem;
+      max-width: 72rem;
+      padding-left: 2rem;
+      padding-right: 2rem;
     }
   }
 }
