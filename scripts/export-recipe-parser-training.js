@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
-import { parseIngredientsText } from './parse-recipe-ingredients.js';
+import { parseIngredientsText, repairMojibakeText } from './parse-recipe-ingredients.js';
 
 const SOURCE = 'MFDS_COOKRCP01';
 const DEFAULT_LIMIT = 100;
@@ -80,6 +80,8 @@ async function readRecipes({ supabase, limit }) {
 
 function buildParsedExample({ recipe, ingredient, index, minConfidence }) {
   const needsReview = ingredient.confidence < minConfidence;
+  const recipeName = repairMojibakeText(recipe.name);
+  const fullIngredientsText = repairMojibakeText(recipe.ingredients_text);
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -90,11 +92,11 @@ function buildParsedExample({ recipe, ingredient, index, minConfidence }) {
     recipe: {
       id: recipe.id,
       externalId: recipe.external_id || null,
-      name: recipe.name
+      name: recipeName
     },
     input: {
       rawText: ingredient.raw_text,
-      fullIngredientsText: recipe.ingredients_text
+      fullIngredientsText
     },
     label: {
       action: 'parse',
@@ -115,6 +117,9 @@ function buildParsedExample({ recipe, ingredient, index, minConfidence }) {
 }
 
 function buildSkippedExample({ recipe, skipped, index }) {
+  const recipeName = repairMojibakeText(recipe.name);
+  const fullIngredientsText = repairMojibakeText(recipe.ingredients_text);
+
   return {
     schemaVersion: SCHEMA_VERSION,
     task: 'recipe_ingredient_parse',
@@ -124,11 +129,11 @@ function buildSkippedExample({ recipe, skipped, index }) {
     recipe: {
       id: recipe.id,
       externalId: recipe.external_id || null,
-      name: recipe.name
+      name: recipeName
     },
     input: {
       rawText: skipped.line,
-      fullIngredientsText: recipe.ingredients_text
+      fullIngredientsText
     },
     label: {
       action: 'skip',

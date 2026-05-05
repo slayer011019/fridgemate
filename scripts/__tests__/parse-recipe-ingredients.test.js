@@ -1,14 +1,97 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildRecipeIngredientPayloadKey,
+  dedupeRecipeIngredientRows,
   extractQuantity,
   isHeaderLine,
+  normalizeRawText,
   normalizeIngredientName,
   parseFraction,
   parseIngredientChunk,
-  parseIngredientsText
+  parseIngredientsText,
+  repairMojibakeText
 } from '../parse-recipe-ingredients.js';
 
 describe('MFDS recipe ingredient parser', () => {
+  it('dedupes recipe ingredient upsert rows by recipe id and normalized raw text', () => {
+    const rows = [
+      {
+        recipe_id: 'recipe-a',
+        raw_text: 'salt   pinch',
+        canonical_name: 'salt',
+        confidence: 0.65
+      },
+      {
+        recipe_id: 'recipe-a',
+        raw_text: ' salt pinch ',
+        canonical_name: 'fine salt',
+        confidence: 0.95
+      },
+      {
+        recipe_id: 'recipe-b',
+        raw_text: 'salt pinch',
+        canonical_name: 'salt',
+        confidence: 0.65
+      }
+    ];
+
+    const result = dedupeRecipeIngredientRows(rows);
+
+    expect(normalizeRawText(' salt   pinch ')).toBe('salt pinch');
+    expect(buildRecipeIngredientPayloadKey(rows[0])).toBe('recipe-a::salt pinch');
+    expect(result.skippedCount).toBe(1);
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows).toContain(rows[1]);
+    expect(result.rows).toContain(rows[2]);
+    expect(result.duplicateExamples).toEqual([
+      {
+        recipe_id: 'recipe-a',
+        raw_text: 'salt pinch',
+        kept: {
+          canonical_name: 'fine salt',
+          confidence: 0.95
+        },
+        skipped: {
+          canonical_name: 'salt',
+          confidence: 0.65
+        }
+      }
+    ]);
+  });
+
+  it('keeps the first duplicate recipe ingredient row when confidence is tied', () => {
+    const first = {
+      recipe_id: 'recipe-a',
+      raw_text: 'water 1 cup',
+      canonical_name: 'water',
+      confidence: 0.85
+    };
+    const second = {
+      recipe_id: 'recipe-a',
+      raw_text: ' water 1 cup ',
+      canonical_name: 'filtered water',
+      confidence: 0.85
+    };
+
+    const result = dedupeRecipeIngredientRows([first, second]);
+
+    expect(result.skippedCount).toBe(1);
+    expect(result.rows).toEqual([first]);
+    expect(result.duplicateExamples[0]).toMatchObject({
+      kept: { canonical_name: 'water', confidence: 0.85 },
+      skipped: { canonical_name: 'filtered water', confidence: 0.85 }
+    });
+  });
+
+  it('repairs CP949 mojibake before parsing', () => {
+    expect(repairMojibakeText('\u8e30\uafa9\uaf62')).toBe('\ubc84\uc12f');
+    expect(parseIngredientChunk('\u8e30\uafa9\uaf62 20g')).toMatchObject({
+      raw_name: '\ubc84\uc12f',
+      amount: 20,
+      unit: 'g'
+    });
+  });
+
   it('parses unicode, slash, and decimal quantities', () => {
     expect(parseFraction('1½')).toBe(1.5);
     expect(parseFraction('3/4')).toBe(0.75);
@@ -40,11 +123,13 @@ describe('MFDS recipe ingredient parser', () => {
 
   it('skips recipe titles, section headers, and numeric fragments', () => {
     expect(isHeaderLine('양념장', '새우 두부 계란찜')).toMatchObject({ skip: true, reason: 'header' });
+    expect(isHeaderLine('주재료', '북어비빔밥')).toMatchObject({ skip: true, reason: 'header' });
     expect(isHeaderLine('새우 두부 계란찜', '새우 두부 계란찜')).toMatchObject({
       skip: true,
       reason: 'recipe title'
     });
     expect(parseIngredientChunk('20g')).toMatchObject({ skip: true, reason: 'numeric_unit_fragment' });
+    expect(parseIngredientChunk('곁들임')).toMatchObject({ skip: true, reason: 'header' });
   });
 
   it('normalizes low-salt prefixes and exact aliases', () => {
@@ -98,6 +183,35 @@ describe('MFDS recipe ingredient parser', () => {
       amount: 0.5,
       unit: '큰술',
       confidence: 0.95
+    });
+  });
+
+  it('extracts quantities from multiple or descriptive parenthetical groups', () => {
+    expect(parseIngredientChunk('대파(1대)')).toMatchObject({
+      raw_name: '대파',
+      amount: 1,
+      unit: '대'
+    });
+    expect(parseIngredientChunk('스파게티면(건면)(5g)')).toMatchObject({
+      raw_name: '스파게티면',
+      canonical_name: '스파게티면 건면',
+      amount: 5,
+      unit: 'g'
+    });
+    expect(parseIngredientChunk('달걀지단(3개 분량)')).toMatchObject({
+      raw_name: '달걀지단',
+      canonical_name: '달걀지단 분량',
+      amount: 3,
+      unit: '개'
+    });
+    expect(parseIngredientChunk('대파(15cm)')).toMatchObject({
+      raw_name: '대파',
+      amount: 15,
+      unit: 'cm'
+    });
+    expect(parseIngredientChunk('3가지색 소면(분홍, 초록, 흰색) 각 25g씩')).toMatchObject({
+      amount: 25,
+      unit: 'g'
     });
   });
 

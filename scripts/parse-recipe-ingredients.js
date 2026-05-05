@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
+import iconv from 'iconv-lite';
 import { EXACT_ALIASES } from './lib/ingredientAliases.js';
 import {
   ALL_UNIT_TOKENS,
@@ -34,7 +35,34 @@ const HEADER_PATTERN = /^[[·\s]*(고명|양념장|소스|드레싱|육수|재�
 const LEADING_SECTION_PATTERN = /^[[·●\s]*(주재료|부재료|재료|양념장|소스|드레싱|육수|고명|반죽|튀김옷|마리네이드)\s*[>:\]]\s*/;
 const NOISE_WORDS = ['선택', '장식용', '고명용', '생략가능', '기호에 따라', '취향껏', '채', '다진 것', '송송 썬 것'];
 const NOISE_CHARS = /^[():,·●:\s]+$/;
+const METADATA_CHUNK_WORDS = new Set(['주재료', '부재료', '양념', '양념장', '소스', '고명', '곁들임']);
 const NUMERIC_FRAGMENT_PATTERN = new RegExp(`^[0-9]+(?:\\.[0-9]+)?\\s*(?:${UNIT_ALTERNATION})\\)?$`);
+
+function textQualityScore(text) {
+  const value = String(text || '');
+  const hangulCount = (value.match(/[\uac00-\ud7a3]/g) || []).length;
+  const cjkCount = (value.match(/[\u3400-\u9fff\uf900-\ufaff]/g) || []).length;
+  const replacementCount = (value.match(/\ufffd/g) || []).length;
+  const questionRuns = (value.match(/\?{2,}/g) || []).join('').length;
+
+  return (hangulCount * 3) - (cjkCount * 1.5) - (replacementCount * 6) - questionRuns;
+}
+
+function repairMojibakeText(text) {
+  const original = String(text || '');
+  if (!original) return original;
+
+  try {
+    const repaired = iconv.decode(iconv.encode(original, 'cp949'), 'utf8');
+    return textQualityScore(repaired) > textQualityScore(original) + 0.5 ? repaired : original;
+  } catch {
+    return original;
+  }
+}
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function requireEnv(name) {
   const value = process.env[name]?.trim();
@@ -87,14 +115,14 @@ function parseFraction(text) {
 }
 
 function stripHtml(text) {
-  return String(text || '')
+  return repairMojibakeText(text)
     .replace(BR_TAG_PATTERN, '\n')
     .replace(HTML_TAG_PATTERN, '')
     .trim();
 }
 
 function normalizeIngredientsText(text) {
-  return String(text || '')
+  return repairMojibakeText(text)
     .replace(BR_TAG_PATTERN, '\n')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n');
@@ -152,6 +180,7 @@ function isHeaderLine(line, recipeName) {
   if (!trimmed) return { skip: true, reason: 'empty' };
   if (trimmed === recipeName) return { skip: true, reason: 'recipe title' };
   if (HEADER_PATTERN.test(trimmed)) return { skip: true, reason: 'header' };
+  if (METADATA_CHUNK_WORDS.has(trimmed)) return { skip: true, reason: 'header' };
   if (trimmed.endsWith(':')) return { skip: true, reason: 'header' };
   if (trimmed.length < 2 && !/\d/.test(trimmed)) return { skip: true, reason: 'noise' };
   if (NOISE_CHARS.test(trimmed)) return { skip: true, reason: 'noise' };
@@ -164,6 +193,19 @@ function extractQuantity(text) {
   let remainingText = String(text || '').trim();
 
   for (const token of ALL_UNIT_TOKENS) {
+    const quantityWithTrailingTextMatch = remainingText.match(
+      new RegExp(`(\\d*\\.?\\d+|\\d+\\/\\d+)\\s*(${escapeRegExp(token)})(?=\\s|$|[),]|씩)`)
+    );
+
+    if (quantityWithTrailingTextMatch) {
+      amount = parseFraction(quantityWithTrailingTextMatch[1]);
+      unit = normalizeUnit(quantityWithTrailingTextMatch[2]);
+      remainingText = `${remainingText.slice(0, quantityWithTrailingTextMatch.index)} ${remainingText.slice(
+        quantityWithTrailingTextMatch.index + quantityWithTrailingTextMatch[0].length
+      )}`.replace(/\s+/g, ' ').trim();
+      return { amount, unit, remainingText };
+    }
+
     if (!remainingText.endsWith(token)) {
       continue;
     }
@@ -218,6 +260,9 @@ function parseIngredientChunk(chunk) {
   if (isMetadataLine(processed) || SERVING_INFO_PATTERN.test(processed)) {
     return { skip: true, reason: 'metadata' };
   }
+  if (METADATA_CHUNK_WORDS.has(processed)) {
+    return { skip: true, reason: 'header' };
+  }
 
   let amount = null;
   let unit = null;
@@ -228,41 +273,42 @@ function parseIngredientChunk(chunk) {
   const textWithoutParen = processed.replace(/\([^)]+\)/g, '').trim();
   const qPrimary = extractQuantity(textWithoutParen);
   
-  const parenMatch = processed.match(/\(([^)]+)\)/);
+  const parenMatches = [...processed.matchAll(/\(([^)]+)\)/g)];
+  const parenContents = parenMatches.map((match) => match[1].trim());
   let qSecondary = { amount: null, unit: null, remainingText: '' };
-  if (parenMatch) {
-    const parenContent = parenMatch[1].trim();
-    qSecondary = extractQuantity(parenContent);
+  let quantityParenContent = null;
+  for (const parenContent of parenContents) {
+    const nextQuantity = extractQuantity(parenContent);
+    if (nextQuantity.amount !== null || nextQuantity.unit !== null) {
+      qSecondary = nextQuantity;
+      quantityParenContent = parenContent;
+      break;
+    }
   }
 
   if (qPrimary.amount !== null || qPrimary.unit !== null) {
     amount = qPrimary.amount;
     unit = qPrimary.unit;
     raw_name = qPrimary.remainingText;
-    if (parenMatch) {
-      const parenContent = cleanDetailText(parenMatch[1]);
-      if (!NOISE_WORDS.includes(parenContent)) {
-        detail = parenContent;
-      }
-    }
+    detail = parenContents
+      .map(cleanDetailText)
+      .filter((parenContent) => parenContent && !NOISE_WORDS.includes(parenContent))
+      .join(' ');
   } else if (qSecondary.amount !== null || qSecondary.unit !== null) {
     amount = qSecondary.amount;
     unit = qSecondary.unit;
     raw_name = textWithoutParen;
-    if (qSecondary.remainingText) {
-      const nextDetail = cleanDetailText(qSecondary.remainingText);
-      if (nextDetail && !NOISE_WORDS.includes(nextDetail)) {
-        detail = nextDetail;
-      }
-    }
+    detail = parenContents
+      .map((parenContent) => (parenContent === quantityParenContent ? qSecondary.remainingText : parenContent))
+      .map(cleanDetailText)
+      .filter((parenContent) => parenContent && !NOISE_WORDS.includes(parenContent))
+      .join(' ');
   } else {
     raw_name = textWithoutParen;
-    if (parenMatch) {
-      const parenContent = cleanDetailText(parenMatch[1]);
-      if (parenContent && !NOISE_WORDS.includes(parenContent)) {
-        detail = parenContent;
-      }
-    }
+    detail = parenContents
+      .map(cleanDetailText)
+      .filter((parenContent) => parenContent && !NOISE_WORDS.includes(parenContent))
+      .join(' ');
   }
 
   raw_name = raw_name.replace(LEADING_SECTION_PATTERN, '').replace(/[)\]:·,]+$/, '').trim();
@@ -334,15 +380,66 @@ function normalizeIngredientName(rawName) {
   return name || null;
 }
 
+function normalizeRawText(rawText) {
+  return String(rawText || '').trim().replace(/\s+/g, ' ');
+}
+
+function buildRecipeIngredientPayloadKey(row) {
+  return `${row.recipe_id}::${normalizeRawText(row.raw_text)}`;
+}
+
+function dedupeRecipeIngredientRows(rows) {
+  const byKey = new Map();
+  const duplicateExamples = [];
+
+  for (const row of rows) {
+    const key = buildRecipeIngredientPayloadKey(row);
+    const existing = byKey.get(key);
+
+    if (!existing) {
+      byKey.set(key, row);
+      continue;
+    }
+
+    const keepNext = Number(row.confidence || 0) > Number(existing.confidence || 0);
+    const kept = keepNext ? row : existing;
+    const skipped = keepNext ? existing : row;
+
+    byKey.set(key, kept);
+
+    if (duplicateExamples.length < 10) {
+      duplicateExamples.push({
+        recipe_id: row.recipe_id,
+        raw_text: normalizeRawText(row.raw_text),
+        kept: {
+          canonical_name: kept.canonical_name,
+          confidence: kept.confidence
+        },
+        skipped: {
+          canonical_name: skipped.canonical_name,
+          confidence: skipped.confidence
+        }
+      });
+    }
+  }
+
+  return {
+    rows: [...byKey.values()],
+    skippedCount: rows.length - byKey.size,
+    duplicateExamples
+  };
+}
+
 function parseIngredientsText(ingredientsText, recipeName) {
   if (!ingredientsText) return { chunks: [], skipped: [] };
 
   const lines = normalizeIngredientsText(ingredientsText).split(/\n+/);
+  const normalizedRecipeName = repairMojibakeText(recipeName);
   const chunks = [];
   const skipped = [];
 
   for (const line of lines) {
-    const check = isHeaderLine(line, recipeName);
+    const check = isHeaderLine(line, normalizedRecipeName);
     if (check.skip) {
       skipped.push({ line, reason: check.reason });
       continue;
@@ -429,6 +526,8 @@ async function run() {
   let lowConfidenceCount = 0;
   const ingredientStats = {};
   const failureExamples = [];
+  let duplicatePayloadSkippedCount = 0;
+  const duplicatePayloadExamples = [];
 
   for (const recipe of allRecipes) {
     const { chunks: parsedIngredients, skipped } = parseIngredientsText(recipe.ingredients_text, recipe.name);
@@ -455,11 +554,6 @@ async function run() {
       }
     }
 
-    if (isDryRun) {
-      upsertedCount += parsedIngredients.length;
-      continue;
-    }
-
     const rowsToUpsert = parsedIngredients.map(ing => ({
       recipe_id: recipe.id,
       raw_text: ing.raw_text,
@@ -473,18 +567,40 @@ async function run() {
       updated_at: new Date().toISOString()
     }));
 
+    const dedupedPayload = dedupeRecipeIngredientRows(rowsToUpsert);
+    duplicatePayloadSkippedCount += dedupedPayload.skippedCount;
+    skippedTotal += dedupedPayload.skippedCount;
+    skippedStats.duplicate_payload_key = (skippedStats.duplicate_payload_key || 0) + dedupedPayload.skippedCount;
+
+    for (const example of dedupedPayload.duplicateExamples) {
+      if (duplicatePayloadExamples.length >= 10) break;
+      duplicatePayloadExamples.push(example);
+    }
+
+    if (isDryRun) {
+      upsertedCount += dedupedPayload.rows.length;
+      continue;
+    }
+
     const { error: upsertError } = await supabase
       .from('recipe_ingredients')
-      .upsert(rowsToUpsert, {
+      .upsert(dedupedPayload.rows, {
         onConflict: 'recipe_id, raw_text'
       });
 
     if (upsertError) {
-      console.error(`Error upserting for recipe ${recipe.id}:`, upsertError.message);
+      console.error(`Error upserting for recipe ${recipe.id} (${recipe.name}):`, upsertError.message);
+      const duplicateKeys = rowsToUpsert
+        .map(row => buildRecipeIngredientPayloadKey(row))
+        .filter((key, index, keys) => keys.indexOf(key) !== index);
+
+      if (duplicateKeys.length > 0) {
+        console.error('Duplicate payload keys detected before dedupe:', [...new Set(duplicateKeys)].slice(0, 10));
+      }
       continue;
     }
 
-    upsertedCount += rowsToUpsert.length;
+    upsertedCount += dedupedPayload.rows.length;
   }
 
   console.log('\n--- Processing Summary ---');
@@ -492,10 +608,22 @@ async function run() {
   console.log(`Total chunks parsed: ${totalChunksCount}`);
   console.log(`${isDryRun ? 'Dry run (simulated upsert)' : 'Inserted/updated'}: ${upsertedCount}`);
   console.log(`Total skipped: ${skippedTotal}`);
+  console.log(`Skipped duplicate payload rows: ${duplicatePayloadSkippedCount}`);
   Object.entries(skippedStats).forEach(([reason, count]) => {
     console.log(`  - ${reason}: ${count}`);
   });
   console.log(`Low confidence (< 0.7): ${lowConfidenceCount} (${((lowConfidenceCount/totalChunksCount)*100).toFixed(1)}%)`);
+
+  if (duplicatePayloadExamples.length > 0) {
+    console.log('\n--- Duplicate Payload Examples (First 10) ---');
+    duplicatePayloadExamples.forEach((ex, i) => {
+      console.log(
+        `${i + 1}. recipe_id=${ex.recipe_id} raw_text="${ex.raw_text}" ` +
+        `kept=${ex.kept.canonical_name}/${Number(ex.kept.confidence).toFixed(2)} ` +
+        `skipped=${ex.skipped.canonical_name}/${Number(ex.skipped.confidence).toFixed(2)}`
+      );
+    });
+  }
 
   console.log('\n--- Top 10 Normalized Ingredients ---');
   Object.entries(ingredientStats)
@@ -515,12 +643,16 @@ async function run() {
 }
 
 export {
+  buildRecipeIngredientPayloadKey,
+  dedupeRecipeIngredientRows,
   extractQuantity,
   isHeaderLine,
+  normalizeRawText,
   normalizeIngredientName,
   parseFraction,
   parseIngredientChunk,
-  parseIngredientsText
+  parseIngredientsText,
+  repairMojibakeText
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
