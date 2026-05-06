@@ -69,7 +69,7 @@ function Header() {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={`shrink-0 rounded-full px-3 py-2 text-sm font-semibold ${
+                  className={`shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold ${
                     isActive
                       ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/20'
                       : 'text-slate-600 hover:bg-white/95 hover:text-slate-900'
