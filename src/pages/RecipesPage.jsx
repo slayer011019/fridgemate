@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react';
 import PageHeader from '../components/PageHeader';
 import PantryStaplesPanel from '../components/PantryStaplesPanel';
-import RecommendationSection from '../components/RecommendationSection';
-import RecipeExternalLinks from '../components/RecipeExternalLinks';
+import RecommendationRow from '../components/RecommendationRow';
 import StatCard from '../components/StatCard';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useDBRecommendations } from '../hooks/useDBRecommendations';
 import { useRecipesPageModel } from '../hooks/useRecipesPageModel';
-import { isOcrEnabled } from '../utils/backendConfig';
 
 function RecipesPage() {
-  const ocrEnabled = isOcrEnabled();
   const { trackEvent } = useAnalytics();
   const lastViewSignatureRef = useRef('');
   const {
@@ -17,21 +15,24 @@ function RecipesPage() {
     pantryOwnership,
     pantrySummary,
     cyclePantryStatus,
+    ownedPantryItems,
     loading,
-    error,
+    ingredients,
     summary,
     missingBasicIngredients,
     activeIngredientCount,
+    localRecommendations,
     readyRecommendations,
     buyOneRecommendations,
     useSoonRecommendations,
     ownedPantryCount,
     fridgeInsight,
-    sectionStats,
-    aiRecommendations,
-    aiLoading,
-    aiError
+    sectionStats
   } = useRecipesPageModel();
+  const dbRecommendationsState = useDBRecommendations({
+    ingredients,
+    pantryItems: ownedPantryItems
+  });
 
   useEffect(() => {
     if (loading) {
@@ -155,112 +156,33 @@ function RecipesPage() {
         </div>
       </section>
 
-      {error ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
-
-      <RecommendationSection
-        title={'\uC9C0\uAE08 \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694'}
-        description={'\uD544\uC218 \uC7AC\uB8CC\uAC00 \uBAA8\uB450 \uB9DE\uB294 \uB808\uC2DC\uD53C\uC608\uC694. \uC624\uB298 \uBC14\uB85C \uD574\uBA39\uAE30 \uC88B\uC544\uC694.'}
-        recipes={readyRecommendations}
-        onRecipeSelect={handleRecommendationSelect('ready')}
-        emptyTitle={'\uC544\uC9C1 \uBC14\uB85C \uB9CC\uB4E4 \uC218 \uC788\uB294 \uB808\uC2DC\uD53C\uAC00 \uC5C6\uC5B4\uC694'}
-        emptyDescription={'\uACC4\uB780, \uC591\uD30C, \uB300\uD30C \uAC19\uC740 \uAE30\uBCF8 \uC7AC\uB8CC 2~3\uAC1C\uB9CC \uB354 \uCC44\uC6B0\uBA74 \uBC14\uB85C \uD574\uBCFC \uC218 \uC788\uB294 \uBA54\uB274\uAC00 \uB298\uC5B4\uB0A0 \uAC00\uB2A5\uC131\uC774 \uCEE4\uC694.'}
-        emptyActionLabel={'\uC7AC\uB8CC \uCD94\uAC00\uD558\uAE30'}
-        emptyActionTo={'/ingredients/new'}
-        secondaryActionLabel={ocrEnabled ? 'OCR\uB85C \uBD88\uB7EC\uC624\uAE30' : undefined}
-        secondaryActionTo={ocrEnabled ? '/import' : undefined}
-        suggestedIngredients={missingBasicIngredients}
+      <RecommendationRow
+        title={'재료 기반 추천'}
+        description={'현재 재료와 팬트리 기본 재료를 기존 로컬 점수 계산으로 정렬했어요.'}
+        recipes={localRecommendations}
+        loading={loading}
+        onRecipeSelect={handleRecommendationSelect('local')}
+        emptyTitle={'아직 추천할 레시피가 없어요'}
+        emptyDescription={
+          missingBasicIngredients.length
+            ? `${missingBasicIngredients.slice(0, 3).join(', ')} 같은 기본 재료를 추가하면 추천 폭이 넓어져요.`
+            : '재료를 추가하면 바로 만들 수 있는 메뉴를 정리해드릴게요.'
+        }
       />
 
-      <RecommendationSection
-        title={'\uD558\uB098\uB9CC \uB354 \uC0AC\uBA74 \uB3FC\uC694'}
-        description={'\uC774\uBBF8 \uAC00\uC9C4 \uC7AC\uB8CC\uAC00 \uC77C\uBD80 \uB9DE\uACE0, \uD544\uC218 \uC7AC\uB8CC\uAC00 \uB531 1\uAC1C\uB9CC \uBD80\uC871\uD55C \uB808\uC2DC\uD53C\uB4E4\uC785\uB2C8\uB2E4.'}
-        recipes={buyOneRecommendations}
-        onRecipeSelect={handleRecommendationSelect('buy_one_more')}
-        emptyTitle={'\uC9C0\uAE08\uC740 \uD55C \uAC1C \uBD80\uC871\uD55C \uB808\uC2DC\uD53C\uAC00 \uC5C6\uC5B4\uC694'}
-        emptyDescription={'\uC7A5\uBCF4\uAE30 \uB54C \uD544\uC694\uD55C \uAE30\uBCF8 \uC7AC\uB8CC\uB97C \uC870\uAE08\uC529 \uCC44\uC6B0\uBA74 \u2018\uD558\uB098\uB9CC \uB354 \uC0AC\uBA74 \uB3FC\uC694\u2019 \uC139\uC158\uC774 \uAC00\uC7A5 \uBE68\uB9AC \uB290\uB294 \uD3B8\uC774\uC5D0\uC694.'}
-        emptyActionLabel={'\uC7AC\uB8CC \uBAA9\uB85D \uBCF4\uAE30'}
-        emptyActionTo={'/ingredients'}
-        secondaryActionLabel={'\uC7AC\uB8CC \uCD94\uAC00\uD558\uAE30'}
-        secondaryActionTo={'/ingredients/new'}
-        suggestedIngredients={missingBasicIngredients}
+      <RecommendationRow
+        title={'AI 추천'}
+        description={'DB 레시피 카탈로그에서 현재 재료와 비슷한 후보를 찾아 보여줘요.'}
+        recipes={dbRecommendationsState.recommendations}
+        loading={dbRecommendationsState.loading}
+        error={dbRecommendationsState.error}
+        hidden={dbRecommendationsState.hidden}
+        needsLogin={dbRecommendationsState.needsLogin}
+        observeRef={dbRecommendationsState.rowRef}
+        onRecipeSelect={handleRecommendationSelect('ai')}
+        emptyTitle={'AI 추천 후보가 아직 없어요'}
+        emptyDescription={'DB 레시피 카탈로그에 매칭되는 후보가 생기면 이 행에 표시됩니다.'}
       />
-
-      <RecommendationSection
-        title={'\uBE68\uB9AC \uC368\uC57C \uD560 \uC7AC\uB8CC\uB85C \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694'}
-        description={'\uC77C\uBD80 \uC7AC\uB8CC\uAC00 \uB9DE\uB294 \uBA54\uB274 \uC911\uC5D0\uC11C\uB3C4 \uC18C\uBE44 \uC6B0\uC120\uC21C\uC704\uAC00 \uC788\uB294 \uD6C4\uBCF4\uB97C \uBA3C\uC800 \uBCF4\uC5EC\uC918\uC694.'}
-        recipes={useSoonRecommendations}
-        onRecipeSelect={handleRecommendationSelect('use_soon')}
-        emptyTitle={'\uC9C0\uAE08 \uCC98\uB9AC\uD558\uBA74 \uC88B\uC740 \uC7AC\uB8CC \uC911\uC2EC \uCD94\uCC9C\uC740 \uC544\uC9C1 \uC801\uC5B4\uC694'}
-        emptyDescription={'\uC720\uD1B5\uAE30\uD55C\uC774 \uAC00\uAE4C\uC6B4 \uC7AC\uB8CC\uAC00 \uC0DD\uAE30\uAC70\uB098 \uAE30\uBCF8 \uC7AC\uB8CC\uAC00 \uC870\uAE08 \uB354 \uC313\uC774\uBA74 \uC18C\uBE44 \uC6B0\uC120 \uCD94\uCC9C\uC774 \uB354 \uC790\uC5F0\uC2A4\uB7FD\uAC8C \uB298\uC5B4\uB0A9\uB2C8\uB2E4.'}
-        emptyActionLabel={ocrEnabled ? 'OCR\uB85C \uC7AC\uB8CC \uBD88\uB7EC\uC624\uAE30' : undefined}
-        emptyActionTo={ocrEnabled ? '/import' : undefined}
-        secondaryActionLabel={'\uC7AC\uB8CC \uCD94\uAC00\uD558\uAE30'}
-        secondaryActionTo={'/ingredients/new'}
-        suggestedIngredients={missingBasicIngredients}
-      />
-
-      <section className="space-y-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">{'AI \uCD94\uCC9C \uB808\uC2DC\uD53C'}</h3>
-            <p className="mt-1 text-sm leading-5.5 muted">
-              {'AI \uC81C\uC548\uC740 \uADDC\uCE59 \uAE30\uBC18 \uCD94\uCC9C\uC744 \uBCF8 \uB4A4 \uC0C8\uB85C\uC6B4 \uC870\uD569\uC744 \uBCF4\uACE0 \uC2F6\uC744 \uB54C \uD655\uC778\uD558\uBA74 \uC88B\uC2B5\uB2C8\uB2E4.'}
-            </p>
-          </div>
-          {aiRecommendations.length ? <span className="badge bg-white text-slate-500">{`\uB808\uC2DC\uD53C ${aiRecommendations.length}\uAC1C`}</span> : null}
-        </div>
-
-        {aiLoading ? <div className="card text-sm muted">{'AI \uCD94\uCC9C\uC744 \uC0DD\uC131\uD558\uB294 \uC911\uC774\uC5D0\uC694...'}</div> : null}
-        {aiError ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{aiError}</div> : null}
-
-        {!aiLoading && !aiRecommendations.length ? (
-          <div className="rounded-[20px] border border-dashed border-slate-200 bg-white/70 p-4">
-            <p className="text-base font-semibold text-slate-900">{'AI \uCD94\uCC9C\uC744 \uC544\uC9C1 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694'}</p>
-            <p className="mt-2 text-sm leading-6 muted">
-              {'\uBCF4\uC720 \uC7AC\uB8CC\uAC00 \uC788\uC5B4\uC57C \uCD94\uCC9C\uD560 \uC218 \uC788\uACE0, Claude \uD638\uCD9C\uC774 \uC2E4\uD328\uD558\uBA74 \uADDC\uCE59 \uAE30\uBC18 \uACB0\uACFC\uB85C \uB300\uCCB4\uB3FC\uC694.'}
-            </p>
-          </div>
-        ) : null}
-
-        {aiRecommendations.length ? (
-          <div className="content-grid-2">
-            {aiRecommendations.map((recipe, index) => (
-              <article key={`${recipe.title}-${index}`} className="card overflow-hidden">
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="kicker">{'AI \uC81C\uC548'}</p>
-                      <h3 className="mt-2 text-lg font-semibold text-slate-900">{recipe.title}</h3>
-                      <p className="mt-1.5 text-sm leading-6 muted">{recipe.description}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {recipe.cookingTime ? <span className="badge bg-white text-slate-600">{recipe.cookingTime}</span> : null}
-                      {recipe.difficulty ? <span className="badge bg-white text-slate-600">{recipe.difficulty}</span> : null}
-                    </div>
-                  </div>
-
-                  <div className="soft-panel">
-                    <p className="text-sm font-semibold text-slate-900">{'\uC0AC\uC6A9 \uC7AC\uB8CC'}</p>
-                    <p className="mt-1.5 text-sm leading-6 muted">{(recipe.ingredients || []).join(', ') || '\uC815\uBCF4 \uC5C6\uC74C'}</p>
-                  </div>
-
-                  {(recipe.tags || []).length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {recipe.tags.map((tag) => (
-                        <span key={tag} className="badge bg-brand-50 text-brand-700">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  <RecipeExternalLinks title={recipe.title} />
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
-      </section>
     </div>
   );
 }

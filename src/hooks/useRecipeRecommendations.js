@@ -7,7 +7,7 @@ import { isBackendEnabled } from '../utils/backendConfig';
 import { buildRecipeRecommendations } from '../utils/recommendations';
 
 function shouldFallbackToLocalRecommendations(error) {
-  return error instanceof RecipesApiError;
+  return error instanceof RecipesApiError && (!error.status || error.status >= 500);
 }
 
 export function useRecipeRecommendations(pantryItems = []) {

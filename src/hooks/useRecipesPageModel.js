@@ -1,15 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { aiSuggestRecipes, RecipesApiError } from '../api/recipesApi';
+import { useMemo } from 'react';
 import { PANTRY_STATUS } from '../data/pantryStaples';
 import {
   getMissingBasicIngredients,
   getSectionHelperText,
   splitRecommendationsByReadiness
 } from '../features/recipes/recommendationSections';
-import { useAuth } from './useAuth';
 import { usePantryStaples } from './usePantryStaples';
-import { useRecipeRecommendations } from './useRecipeRecommendations';
-import { isBackendEnabled } from '../utils/backendConfig';
+import { useLocalRecommendations } from './useLocalRecommendations';
 import { getDashboardSummary } from '../utils/date';
 
 function getFridgeInsight({ activeIngredientCount, recommendationCoverage, expiringSoon }) {
@@ -56,7 +53,6 @@ function buildSectionStats({ loading, readyRecommendations, buyOneRecommendation
 }
 
 export function useRecipesPageModel() {
-  const { isAuthenticated } = useAuth();
   const { pantryStaples, pantryOwnership, pantrySummary, cyclePantryStatus } = usePantryStaples();
   const ownedPantryItems = useMemo(
     () =>
@@ -65,10 +61,7 @@ export function useRecipesPageModel() {
         .map((staple) => staple.name),
     [pantryOwnership, pantryStaples]
   );
-  const { recommendations, loading, error, ingredients } = useRecipeRecommendations(ownedPantryItems);
-  const [aiRecommendations, setAiRecommendations] = useState([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState('');
+  const { recommendations, loading, ingredients } = useLocalRecommendations(ownedPantryItems);
   const summary = useMemo(() => getDashboardSummary(ingredients), [ingredients]);
   const missingBasicIngredients = useMemo(() => getMissingBasicIngredients(ingredients), [ingredients]);
   const activeIngredientCount = useMemo(() => ingredients.filter((ingredient) => !ingredient.consumed).length, [ingredients]);
@@ -104,73 +97,23 @@ export function useRecipesPageModel() {
     [buyOneRecommendations, loading, readyRecommendations, useSoonRecommendations]
   );
 
-  useEffect(() => {
-    const activeIngredients = ingredients.filter((ingredient) => !ingredient.consumed);
-
-    if (!isBackendEnabled() || !isAuthenticated || !activeIngredients.length) {
-      setAiRecommendations([]);
-      setAiError('');
-      setAiLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadAiSuggestions = async () => {
-      setAiLoading(true);
-      setAiError('');
-
-      try {
-        const suggestions = await aiSuggestRecipes(activeIngredients);
-
-        if (!isMounted) {
-          return;
-        }
-
-        setAiRecommendations(Array.isArray(suggestions) ? suggestions : []);
-      } catch (nextError) {
-        if (!isMounted) {
-          return;
-        }
-
-        if (nextError instanceof RecipesApiError) {
-          setAiError(nextError.message || 'AI 추천을 불러오지 못했어요.');
-        } else {
-          setAiError('AI 추천을 불러오지 못했어요.');
-        }
-        setAiRecommendations([]);
-      } finally {
-        if (isMounted) {
-          setAiLoading(false);
-        }
-      }
-    };
-
-    loadAiSuggestions();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [ingredients, isAuthenticated]);
-
   return {
     pantryStaples,
     pantryOwnership,
     pantrySummary,
     cyclePantryStatus,
+    ownedPantryItems,
     loading,
-    error,
+    ingredients,
     summary,
     missingBasicIngredients,
     activeIngredientCount,
+    localRecommendations: recommendations,
     readyRecommendations,
     buyOneRecommendations,
     useSoonRecommendations,
     ownedPantryCount,
     fridgeInsight,
-    sectionStats,
-    aiRecommendations,
-    aiLoading,
-    aiError
+    sectionStats
   };
 }

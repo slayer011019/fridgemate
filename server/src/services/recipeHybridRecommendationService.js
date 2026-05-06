@@ -95,7 +95,7 @@ function buildHybridResult(recipe, structuredScore, vectorScore = 0) {
 
 /**
  * @param {Array<{name?: string, normalizedName?: string, expiresAt?: string, expiryDate?: string}>} userIngredients
- * @param {{ prismaClient?: Object, limit?: number, vectorSearch?: Function }} [options]
+ * @param {{ prismaClient?: Object, limit?: number, pantryItems?: string[], vectorSearch?: Function }} [options]
  * @returns {Promise<Array<Object>>}
  */
 export async function recommendRecipes(userIngredients = [], options = {}) {
@@ -121,7 +121,8 @@ export async function recommendRecipes(userIngredients = [], options = {}) {
     return {
       recipe: mappedRecipe,
       structuredScore: getRecipeMatchScore(expandedUserIngredients, mappedRecipe.ingredients, {
-        recipeId: recipe.id
+        recipeId: recipe.id,
+        pantryItems: options.pantryItems
       })
     };
   });

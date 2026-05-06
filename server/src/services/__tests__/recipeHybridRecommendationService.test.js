@@ -56,4 +56,40 @@ describe('recipeHybridRecommendationService', () => {
     });
     expect(recommendations[0].finalScore).toBeCloseTo(recommendations[0].structuredScore * 0.7 + 0.74 * 0.3, 2);
   });
+
+  it('counts owned pantry items when scoring database recipes', async () => {
+    const prismaClient = {
+      ingredientAlias: {
+        findMany: vi.fn(async () => [])
+      },
+      recipe: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'recipe-pantry',
+            name: '간장 계란밥',
+            category: '한그릇',
+            cookingMethod: '비비기',
+            rawIngredientsText: '밥, 계란, 간장',
+            ingredients: [
+              { rawName: '밥', normalizedName: '밥', ingredientType: 'main', section: 'main' },
+              { rawName: '달걀', normalizedName: '계란', ingredientType: 'main', section: 'main' },
+              { rawName: '간장', normalizedName: '간장', ingredientType: 'main', section: 'main' }
+            ]
+          }
+        ])
+      }
+    };
+    const recommendations = await recommendRecipes([{ name: '밥' }, { name: '계란' }], {
+      pantryItems: ['간장'],
+      prismaClient,
+      vectorSearch: async () => []
+    });
+
+    expect(recommendations[0]).toMatchObject({
+      recipeId: 'recipe-pantry',
+      canMakeNow: true,
+      matchedIngredients: ['밥', '계란', '진간장'],
+      missingIngredients: []
+    });
+  });
 });

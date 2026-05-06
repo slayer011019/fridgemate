@@ -110,7 +110,7 @@ export async function getRecipeRecommendations({ userId, ingredients, pantryItem
     Array.isArray(ingredients) && ingredients.length ? ingredients : await getStoredIngredients(userId);
 
   try {
-    const hybridRecommendations = await recommendHybridRecipes(inputIngredients);
+    const hybridRecommendations = await recommendHybridRecipes(inputIngredients, { pantryItems });
 
     if (hybridRecommendations.length) {
       return hybridRecommendations;

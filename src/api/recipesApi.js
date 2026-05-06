@@ -24,7 +24,7 @@ export function getRecipeRecommendations(ingredients = [], pantryItems = []) {
         pantryItems: pantryItems.map((item) => String(item || '').trim()).filter(Boolean)
       })
     },
-    { errorClass: RecipesApiError }
+    { authMode: 'required', errorClass: RecipesApiError }
   );
 }
 
@@ -45,6 +45,6 @@ export function aiSuggestRecipes(ingredients = []) {
         }))
       })
     },
-    { errorClass: RecipesApiError }
+    { authMode: 'required', errorClass: RecipesApiError }
   );
 }

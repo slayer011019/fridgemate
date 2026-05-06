@@ -40,8 +40,8 @@ Shipped and working:
 - Guest ingredient import after login without automatic server upload
 - OCR import with review-before-save
 - Dedicated receipt parsing for grocery/mart-style OCR text
-- Rule-based recipe recommendations with pantry-aware scoring
-- Recipe import and hybrid recommendation backend scaffolding, treated as v2/lab work for deployment planning
+- DB-backed recipe recommendations in backend-connected mode, with local rule-based fallback
+- Recipe import and hybrid recommendation backend scaffolding for seeded MFDS recipe data
 - MFDS `COOKRCP01` recipe source data seeded into Supabase as a v2 recommendation foundation
 - Vitest coverage for date logic, recommendations, import parsing, auth, IndexedDB, and `useIngredients`
 - Playwright coverage for local CRUD, OCR review, auth, guest import, manual sync, deletion sync, fallback, and expired-session flows
@@ -65,7 +65,7 @@ Recent work focused on making the app more stable for MVP usage:
 - Made manual sync use the authenticated API request path so expired access cookies can refresh and retry once
 - Stopped ingredient deletion from calling the server immediately
 - Kept guest import separate from server sync so login does not trigger automatic uploads
-- Seeded MFDS `COOKRCP01` recipe source rows into Supabase for later v2 recipe search/recommendation work
+- Routed recipe recommendations through the seeded recipe database when backend mode and login are available
 - Expanded receipt OCR parsing and tests
 - Updated release QA, deployment, seed, and roadmap docs around the current v1/v2 boundary
 
@@ -110,8 +110,11 @@ This is a last-write-wins MVP sync strategy. It is deliberately simpler than two
 
 ### Recipe Recommendations
 
-- Rule-based scoring using fridge ingredients, pantry staples, and expiring items
-- Optional backend hybrid recommender scaffolding exists, but v1 deployment should rely on the rule-based recommendation path
+- The recipes page renders a horizontal "재료 기반 추천" row immediately from bundled seed recipes with no network call
+- The "AI 추천" row calls the backend recommendation API only after the row enters the viewport
+- Logged-out users see a login CTA in the AI row; network and 5xx failures hide that row quietly, while 4xx errors render inline
+- Local-only and backend failure states keep the local rule-based row available
+- Scoring uses fridge ingredients, pantry staples, and expiring items
 - Pantry staple support for oil, soy sauce, salt, and similar basics
 - Recipe cards show match rate, owned ingredients, missing ingredients, and missing seasonings
 - External search links for 10000recipe, YouTube, and Naver instead of storing cooking steps in-app
@@ -250,11 +253,24 @@ Login
 ### Recipe Recommendations
 
 ```text
-RecipesPage / HomePage
+HomePage
   -> useRecipeRecommendations
-  -> local recommendation engine
-  -> optional backend recommendation API
+  -> backend recommendation API in authenticated backend mode
+  -> DB-backed hybrid recommender
+  -> local recommendation engine fallback
   -> pantry staples merged into available ingredients
+```
+
+Recipes page row behavior:
+
+```text
+RecipesPage
+  -> useLocalRecommendations
+  -> RecommendationRow "재료 기반 추천" renders immediately
+  -> useDBRecommendations
+  -> IntersectionObserver enters viewport
+  -> /api/recipes/recommendations with pantryItems
+  -> RecommendationRow "AI 추천"
 ```
 
 ## Authentication and Persistence

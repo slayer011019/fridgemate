@@ -7,6 +7,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- Added a shared horizontal recommendation row component and a lazy DB recommendation hook that waits for viewport entry before calling the recommendation API.
 - Added a v1 release QA checklist covering environment security, MFDS recipe seed boundaries, auth, guest import, manual sync, deployment, and smoke scenarios.
 - User-scoped OCR import correction storage with optional pgvector embeddings for similarity-based review suggestions.
 - Backend import correction APIs and OpenAI embedding configuration while preserving local import correction fallback.
@@ -39,6 +40,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Refactored the recipes page into a two-row layout: instant local seed recommendations first, lazy DB-backed AI recommendations second.
+- Home and recipe-page recommendation previews now use the DB-backed recommendation API first in authenticated backend mode, then fall back to local seed recipes for network or server failures.
+- DB-backed hybrid recipe scoring now counts owned pantry staples the same way the local recommendation engine does.
 - Refreshed the README around the current v1 deployment gate, MFDS seed completion, auth/manual-sync behavior, and v2 recipe boundaries.
 - Grouped the pantry staple checklist into Korean home-cooking basics and a collapsed extra seasonings section.
 - Moved header account actions to the top-right area, restyled ingredient filters as a category toolbar, and made the manual memo field auto-grow.

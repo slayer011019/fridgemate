@@ -1,8 +1,9 @@
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../useIngredients.js', () => ({
-  useIngredients: () => ({
+vi.mock('../useRecipeRecommendations.js', () => ({
+  useRecipeRecommendations: () => ({
+    recommendations: [{ id: 'r1', title: '간장 계란밥', score: 80 }],
     ingredients: [
       { id: '1', name: '계란', expiryDate: '2026-03-20', consumed: false },
       { id: '2', name: '밥', expiryDate: '2026-03-28', consumed: false }
@@ -13,6 +14,7 @@ vi.mock('../useIngredients.js', () => ({
 
 vi.mock('../usePantryStaples.js', () => ({
   usePantryStaples: () => ({
+    pantryStaples: [{ id: 'salt', name: '소금' }],
     pantryOwnership: { salt: 'owned' }
   })
 }));
@@ -25,7 +27,7 @@ describe('useHomePageModel', () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.summary.total).toBe(2);
     expect(result.current.urgentCount).toBeGreaterThanOrEqual(0);
-    expect(Array.isArray(result.current.topRecommendations)).toBe(true);
+    expect(result.current.topRecommendations).toEqual([{ id: 'r1', title: '간장 계란밥', score: 80 }]);
     expect(Array.isArray(result.current.upcomingItems)).toBe(true);
   });
 });

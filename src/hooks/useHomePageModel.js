@@ -1,18 +1,24 @@
 import { useMemo } from 'react';
-import { seedRecipes } from '../data/seedRecipes';
+import { PANTRY_STATUS } from '../data/pantryStaples';
 import { getUpcomingIngredients } from '../features/ingredients/ingredientSelectors';
-import { useIngredients } from './useIngredients';
 import { usePantryStaples } from './usePantryStaples';
+import { useRecipeRecommendations } from './useRecipeRecommendations';
 import { getDashboardSummary } from '../utils/date';
-import { getTopRecommendations } from '../utils/recommendations';
 
 export function useHomePageModel() {
-  const { ingredients, loading } = useIngredients();
-  const { pantryOwnership } = usePantryStaples();
+  const { pantryStaples, pantryOwnership } = usePantryStaples();
+  const ownedPantryItems = useMemo(
+    () =>
+      (pantryStaples || [])
+        .filter((staple) => pantryOwnership?.[staple.id] === PANTRY_STATUS.OWNED)
+        .map((staple) => staple.name),
+    [pantryOwnership, pantryStaples]
+  );
+  const { recommendations, ingredients, loading } = useRecipeRecommendations(ownedPantryItems);
   const summary = useMemo(() => getDashboardSummary(ingredients), [ingredients]);
   const topRecommendations = useMemo(
-    () => getTopRecommendations(seedRecipes, ingredients, 3, { pantryOwnership }),
-    [ingredients, pantryOwnership]
+    () => recommendations.filter((recipe) => recipe.score > 0).slice(0, 3),
+    [recommendations]
   );
   const upcomingItems = useMemo(() => getUpcomingIngredients(ingredients, 4), [ingredients]);
   const urgentCount = summary.expired + summary.expiringSoon;
