@@ -8,6 +8,13 @@ import {
   waitForIngredientNames
 } from './support/testApp';
 
+async function clickServerBackupButton(page) {
+  const backupButton = page.getByRole('button', { name: '서버에 백업하기' });
+  await expect(backupButton).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await backupButton.click();
+}
+
 test('protected account route redirects to login and returns after successful login', async ({ page }) => {
   await seedBrowserState(page);
   await mockApiSession(page, { user: DEFAULT_USER });
@@ -73,7 +80,7 @@ test('guest ingredients can be imported after login and synced manually', async 
   await expect(page.getByText('동기화되지 않은 변경사항').locator('..').getByText('있습니다')).toBeVisible();
   await waitForIngredientNames(page, 'user:user-1', ['감자']);
 
-  await page.getByRole('button', { name: /변경사항 서버에 저장|서버와 동기화/ }).click();
+  await clickServerBackupButton(page);
   await expect(page.getByText('현재 로컬 재료 목록을 서버에 저장했습니다.')).toBeVisible();
   expect(apiState.ingredients.map((ingredient) => ingredient.name)).toContain('감자');
 
@@ -88,7 +95,7 @@ test('guest ingredients can be imported after login and synced manually', async 
   expect(apiState.ingredients.map((ingredient) => ingredient.name)).toContain('감자');
 
   await gotoAndWait(page, '/account');
-  await page.getByRole('button', { name: /변경사항 서버에 저장|서버와 동기화/ }).click();
+  await clickServerBackupButton(page);
   await expect(page.getByText('현재 로컬 재료 목록을 서버에 저장했습니다.')).toBeVisible();
   expect(apiState.ingredients.map((ingredient) => ingredient.name)).not.toContain('감자');
 });
