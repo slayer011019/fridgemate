@@ -2,12 +2,10 @@ import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
-import RecipeCard from '../components/RecipeCard';
-import StatCard from '../components/StatCard';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useHomePageModel } from '../hooks/useHomePageModel';
 import { isOcrEnabled } from '../utils/backendConfig';
-import { getCategoryLabel, getStorageLabel } from '../utils/displayText';
+import { getCategoryLabel, getStorageLabel, joinIngredientLabels } from '../utils/displayText';
 import { getExpiryLabel, getRemainingDays } from '../utils/date';
 
 function HomePage() {
@@ -15,6 +13,11 @@ function HomePage() {
   const { trackEvent } = useAnalytics();
   const lastViewSignatureRef = useRef('');
   const { loading, summary, topRecommendations, upcomingItems, urgentCount } = useHomePageModel();
+  const summaryItems = [
+    { label: '\uC804\uCCB4 \uC7AC\uB8CC', value: loading ? '...' : summary.total },
+    { label: '\uC6B0\uC120 \uCC98\uB9AC', value: loading ? '...' : urgentCount },
+    { label: '\uC624\uB298 \uD560 \uC77C', value: loading ? '...' : topRecommendations.length }
+  ];
 
   useEffect(() => {
     if (loading) {
@@ -60,32 +63,21 @@ function HomePage() {
         }
       />
 
-      <section className="stats-grid">
-        <StatCard
-          label={'\uC804\uCCB4 \uC7AC\uB8CC'}
-          value={loading ? '...' : summary.total}
-          helper={'\uD604\uC7AC \uBCF4\uC720 \uC911\uC778 \uD56D\uBAA9 \uAE30\uC900'}
-        />
-        <StatCard
-          label={'\uC6B0\uC120 \uCC98\uB9AC'}
-          value={loading ? '...' : urgentCount}
-          tone="warning"
-          helper={'\uACE7 \uB9CC\uB8CC + \uC774\uBBF8 \uC9C0\uB09C \uD56D\uBAA9'}
-        />
-        <StatCard
-          label={'\uC624\uB298 \uD560 \uC77C'}
-          value={loading ? '...' : topRecommendations.length}
-          tone="default"
-          helper={'\uBC14\uB85C \uBCFC \uB9CC\uD55C \uCD94\uCC9C \uBA54\uB274'}
-        />
+      <section className="glass-card grid grid-cols-3 divide-x divide-brand-100/70 px-2 py-3">
+        {summaryItems.map((item) => (
+          <div key={item.label} className="px-3 text-center">
+            <p className="text-2xl font-semibold leading-none text-slate-900">{item.value}</p>
+            <p className="mt-1.5 text-[11px] font-semibold text-slate-500">{item.label}</p>
+          </div>
+        ))}
       </section>
 
-      <section className="card">
+      <section className="card space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="kicker">{'\uC624\uB298 \uBA3C\uC800 \uBCFC \uBAA9\uB85D'}</p>
-            <h3 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">{'\uC720\uD1B5\uAE30\uD55C \uC784\uBC15 \uB9AC\uC2A4\uD2B8'}</h3>
-            <p className="mt-2 text-sm leading-5.5 muted">
+            <h3 className="mt-1.5 text-lg font-semibold text-slate-900 sm:text-xl">{'\uC720\uD1B5\uAE30\uD55C \uC784\uBC15 \uB9AC\uC2A4\uD2B8'}</h3>
+            <p className="mt-1.5 text-sm leading-5.5 muted">
               {'\uACE7 \uC368\uC57C \uD558\uB294 \uC7AC\uB8CC\uB97C \uC55E\uCABD\uC5D0 \uC815\uB82C\uD574 \uC18C\uBE44 \uC21C\uC11C\uB97C \uBE60\uB974\uAC8C \uC815\uD558\uAC8C \uD569\uB2C8\uB2E4.'}
             </p>
           </div>
@@ -94,9 +86,10 @@ function HomePage() {
           </Link>
         </div>
 
-        <div className="content-grid-2 mt-4 gap-2.5">
+        <div className="content-grid-2 gap-2.5">
           {!loading && !upcomingItems.length ? (
             <EmptyState
+              compact
               title={'\uC544\uC9C1 \uC800\uC7A5\uB41C \uC7AC\uB8CC\uAC00 \uC5C6\uC5B4\uC694'}
               description={'\uCCAB \uC7AC\uB8CC\uB97C \uCD94\uAC00\uD558\uBA74 \uC720\uD1B5\uAE30\uD55C \uAD00\uB9AC\uC640 \uC74C\uC2DD\uBB3C \uB0AD\uBE44 \uC904\uC774\uAE30\uB97C \uBC14\uB85C \uC2DC\uC791\uD560 \uC218 \uC788\uC5B4\uC694.'}
             />
@@ -116,12 +109,12 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="kicker">{'\uC624\uB298 \uACE0\uB97C \uBA54\uB274'}</p>
-            <h3 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">{'\uCD94\uCC9C \uB808\uC2DC\uD53C \uBBF8\uB9AC\uBCF4\uAE30'}</h3>
-            <p className="mt-2 text-sm leading-5.5 muted">
+            <h3 className="mt-1.5 text-lg font-semibold text-slate-900 sm:text-xl">{'\uCD94\uCC9C \uB808\uC2DC\uD53C \uBBF8\uB9AC\uBCF4\uAE30'}</h3>
+            <p className="mt-1.5 text-sm leading-5.5 muted">
               {'\uBC14\uB85C \uD560 \uC218 \uC788\uB294 \uAC83\uBD80\uD130 \uBBF8\uB9AC \uBCF4\uACE0, \uC0C1\uC138 \uD310\uB2E8\uC740 \uB808\uC2DC\uD53C \uD398\uC774\uC9C0\uC5D0\uC11C \uC774\uC5B4\uAC00\uC138\uC694.'}
             </p>
           </div>
@@ -130,9 +123,10 @@ function HomePage() {
           </Link>
         </div>
 
-        <div className="mt-4">
+        <div>
           {!loading && !topRecommendations.length ? (
             <EmptyState
+              compact
               title={'\uC544\uC9C1 \uCD94\uCC9C \uAC00\uB2A5\uD55C \uB808\uC2DC\uD53C\uAC00 \uC5C6\uC5B4\uC694'}
               description={'\uBCF4\uC720 \uC911\uC778 \uC7AC\uB8CC\uB97C \uCD94\uAC00\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uC798 \uB9DE\uB294 \uB808\uC2DC\uD53C\uAC00 \uB098\uD0C0\uB0A9\uB2C8\uB2E4.'}
             />
@@ -140,7 +134,23 @@ function HomePage() {
 
           <div className="content-grid-3">
             {topRecommendations.map((recipe) => (
-              <RecipeCard key={recipe.id} recipe={recipe} />
+              <article key={recipe.id} className="soft-panel">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-semibold text-slate-900">{recipe.title || recipe.name}</p>
+                    <p className="mt-1 text-xs leading-5 muted">
+                      {recipe.canMakeNow ? '\uC9C0\uAE08 \uAC00\uB2A5' : recipe.missingCore?.length === 1 ? '\uD558\uB098\uB9CC \uBD80\uC871' : '\uC7AC\uB8CC \uB9E4\uCE6D'}
+                    </p>
+                  </div>
+                  <span className="badge bg-slate-900 text-white">{recipe.matchRateLabel || `${Math.round((recipe.matchRate || 0) * 100)}%`}</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 muted">
+                  {joinIngredientLabels(recipe.matchedIngredients || recipe.matchedCore || []) || '\uBCF4\uC720 \uC7AC\uB8CC\uB97C \uB354 \uCD94\uAC00\uD574\uBCF4\uC138\uC694'}
+                </p>
+                {recipe.missingCore?.length ? (
+                  <p className="mt-1 text-xs leading-5 text-rose-700">{`\uBD80\uC871: ${joinIngredientLabels(recipe.missingCore)}`}</p>
+                ) : null}
+              </article>
             ))}
           </div>
         </div>

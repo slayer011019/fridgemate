@@ -3,15 +3,17 @@ import { useAuth } from '../hooks/useAuth';
 import { isOcrEnabled } from '../utils/backendConfig';
 
 const navItems = [
-  { label: '\uD648', to: '/', match: (pathname) => pathname === '/' },
+  { label: '\uD648', icon: '\u2302', to: '/', match: (pathname) => pathname === '/' },
   {
     label: '\uB0C9\uC7A5\uACE0 \uBCF4\uAE30',
+    shortLabel: '\uB0C9\uC7A5\uACE0',
+    icon: '\u25A3',
     to: '/ingredients',
     match: (pathname) => pathname === '/ingredients' || /^\/ingredients\/[^/]+\/edit$/.test(pathname)
   },
-  { label: '\uC9C1\uC811 \uC785\uB825', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
-  { label: '\uC0AC\uC9C4\uC73C\uB85C \uB4F1\uB85D', to: '/import', match: (pathname) => pathname.startsWith('/import') },
-  { label: '\uBA54\uB274 \uCD94\uCC9C', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
+  { label: '\uC9C1\uC811 \uC785\uB825', shortLabel: '\uC785\uB825', icon: '+', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
+  { label: '\uC0AC\uC9C4\uC73C\uB85C \uB4F1\uB85D', shortLabel: '\uC0AC\uC9C4', icon: '\u25A1', to: '/import', match: (pathname) => pathname.startsWith('/import') },
+  { label: '\uBA54\uB274 \uCD94\uCC9C', shortLabel: '\uCD94\uCC9C', icon: '\u25CE', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
 ];
 
 function Header() {
@@ -61,7 +63,7 @@ function Header() {
             </div>
           </div>
 
-          <nav className="primary-nav glass-card touch-pan-x flex w-full max-w-full items-center gap-1.5 overflow-x-auto p-1.5">
+          <nav className="primary-nav glass-card touch-pan-x flex w-full max-w-full items-center gap-1 overflow-x-auto p-1">
             {visibleNavItems.map((item) => {
               const isActive = item.match(location.pathname);
 
@@ -69,13 +71,16 @@ function Header() {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={`shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold ${
+                  className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold sm:px-3 ${
                     isActive
                       ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/20'
                       : 'text-slate-600 hover:bg-white/95 hover:text-slate-900'
                   }`}
                 >
-                  {item.label}
+                  <span aria-hidden="true" className="text-[13px] leading-none">
+                    {item.icon}
+                  </span>
+                  <span>{item.shortLabel || item.label}</span>
                 </NavLink>
               );
             })}
