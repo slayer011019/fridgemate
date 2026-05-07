@@ -106,8 +106,12 @@ export function saveIngredientsInRepository({
   });
 }
 
-export async function syncIngredientsToServerInRepository(ingredients = []) {
+export async function pushIngredientsToServerInRepository(ingredients = []) {
   return ingredientsApi.saveIngredients(ingredients);
+}
+
+export async function pullIngredientsFromServerInRepository() {
+  return ingredientsApi.pullIngredientsFromServer();
 }
 
 export function removeIngredientFromRepository({ id, scope, useApi, allowFallback = !useApi }) {

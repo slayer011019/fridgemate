@@ -18,6 +18,7 @@ const apiMocks = {
   getIngredientById: vi.fn(),
   saveIngredient: vi.fn(),
   saveIngredients: vi.fn(),
+  pullIngredientsFromServer: vi.fn(),
   deleteIngredient: vi.fn()
 };
 
@@ -47,6 +48,7 @@ vi.mock('../../api/ingredientsApi.js', () => ({
   getIngredientById: (...args) => apiMocks.getIngredientById(...args),
   saveIngredient: (...args) => apiMocks.saveIngredient(...args),
   saveIngredients: (...args) => apiMocks.saveIngredients(...args),
+  pullIngredientsFromServer: (...args) => apiMocks.pullIngredientsFromServer(...args),
   deleteIngredient: (...args) => apiMocks.deleteIngredient(...args)
 }));
 
@@ -136,6 +138,7 @@ function resetMockState() {
   apiMocks.getIngredientById.mockResolvedValue(undefined);
   apiMocks.saveIngredient.mockImplementation(async (ingredient) => ingredient);
   apiMocks.saveIngredients.mockImplementation(async (ingredients) => ingredients);
+  apiMocks.pullIngredientsFromServer.mockResolvedValue([]);
   apiMocks.deleteIngredient.mockResolvedValue(undefined);
 
   dbMocks.getAllIngredients.mockResolvedValue([]);
@@ -437,6 +440,34 @@ describe('useIngredients', () => {
       expect(response).toEqual({ ok: false, message: '로그인이 필요합니다.' });
       expect(apiMocks.saveIngredients).not.toHaveBeenCalled();
       expect(result.current.syncStatus).toBe('error');
+    });
+
+    it('pulls server ingredients into the local cache on request', async () => {
+      backendState.enabled = true;
+      backendState.preferredDataSource = 'api';
+      setAuthenticatedMode();
+      const remoteIngredients = [createIngredient('remote-1', { name: 'server-item' })];
+      apiMocks.pullIngredientsFromServer.mockResolvedValue(remoteIngredients);
+
+      const { result } = await renderUseIngredients();
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let response;
+      await act(async () => {
+        response = await result.current.pullIngredientsFromServer();
+      });
+
+      expect(response).toEqual({ ok: true, syncedCount: 1 });
+      expect(apiMocks.pullIngredientsFromServer).toHaveBeenCalledTimes(1);
+      expect(dbMocks.replaceIngredients).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: 'remote-1', syncState: 'clean' })],
+        { scope: 'user:user-1' }
+      );
+      expect(result.current.ingredients).toEqual([expect.objectContaining({ id: 'remote-1', syncState: 'clean' })]);
+      expect(result.current.syncStatus).toBe('synced');
     });
   });
 

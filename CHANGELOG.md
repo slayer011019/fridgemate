@@ -7,6 +7,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- Added an account-page server pull action so authenticated users can replace the local device cache with their server ingredient list.
 - Added a shared horizontal recommendation row component and a lazy DB recommendation hook that waits for viewport entry before calling the recommendation API.
 - Added a v1 release QA checklist covering environment security, MFDS recipe seed boundaries, auth, guest import, manual sync, deployment, and smoke scenarios.
 - User-scoped OCR import correction storage with optional pgvector embeddings for similarity-based review suggestions.
@@ -40,6 +41,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Split account-page manual sync into explicit server backup and server pull actions with confirmation prompts.
 - Refactored the recipes page into a two-row layout: instant local seed recommendations first, lazy DB-backed AI recommendations second.
 - Home and recipe-page recommendation previews now use the DB-backed recommendation API first in authenticated backend mode, then fall back to local seed recipes for network or server failures.
 - DB-backed hybrid recipe scoring now counts owned pantry staples the same way the local recommendation engine does.

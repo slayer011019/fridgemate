@@ -2,7 +2,8 @@ import {
   findIngredientInRepository,
   ingredientCache,
   loadIngredientsFromRepository,
-  syncIngredientsToServerInRepository
+  pullIngredientsFromServerInRepository,
+  pushIngredientsToServerInRepository
 } from './ingredientRepository';
 import { buildScopeOptions, createEmptySyncSummary, getScopeState } from './ingredientsScopeState';
 import { markIngredientAsSynced, syncIngredientSnapshot } from '../../utils/syncStrategy';
@@ -296,7 +297,7 @@ export function createCrudActions({
   };
 }
 
-export function createManualSyncAction({
+export function createPushAction({
   isAuthenticated,
   storageScope,
   commitIngredients,
@@ -306,7 +307,7 @@ export function createManualSyncAction({
   setSyncError,
   setError
 }) {
-  return async function syncIngredientsToServer() {
+  return async function pushIngredientsToServer() {
     if (!isAuthenticated) {
       const message = '로그인이 필요합니다.';
       setSyncStatus('error');
@@ -322,7 +323,7 @@ export function createManualSyncAction({
 
     try {
       const localIngredients = await ingredientCache.getAll(buildScopeOptions(storageScope));
-      const syncedIngredients = await syncIngredientsToServerInRepository(
+      const syncedIngredients = await pushIngredientsToServerInRepository(
         localIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ({
           ...ingredient,
           clientId: ingredient.clientId || ingredient.id
@@ -348,6 +349,50 @@ export function createManualSyncAction({
       const message = nextError.message || 'API request could not reach the server.';
       setSyncStatus('error');
       setHasUnsyncedChanges(true);
+      setSyncError(message);
+      setError(message);
+      return { ok: false, message };
+    }
+  };
+}
+
+export function createPullAction({
+  isAuthenticated,
+  storageScope,
+  commitIngredients,
+  setSyncStatus,
+  setSyncError,
+  setError
+}) {
+  return async function pullIngredientsFromServer() {
+    if (!isAuthenticated) {
+      const message = '로그인이 필요합니다.';
+      setSyncStatus('error');
+      setSyncError(message);
+      setError(message);
+      return { ok: false, message };
+    }
+
+    setSyncStatus('syncing');
+    setSyncError(null);
+    setError('');
+
+    try {
+      const remoteIngredients = await pullIngredientsFromServerInRepository();
+      const nextIngredients = remoteIngredients.map((ingredient) => markIngredientAsSynced(ingredient));
+
+      await ingredientCache.replaceAll(nextIngredients, buildScopeOptions(storageScope));
+      commitIngredients(nextIngredients, storageScope);
+      setSyncStatus('synced');
+      setSyncError(null);
+
+      return {
+        ok: true,
+        syncedCount: nextIngredients.length
+      };
+    } catch (nextError) {
+      const message = nextError.message || 'API request could not reach the server.';
+      setSyncStatus('error');
       setSyncError(message);
       setError(message);
       return { ok: false, message };

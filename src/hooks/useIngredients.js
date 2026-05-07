@@ -2,7 +2,8 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import {
   createCrudActions,
   createLoadIngredientsAction,
-  createManualSyncAction,
+  createPullAction,
+  createPushAction,
   createRepositoryCommandRunner
 } from '../features/ingredients/ingredientsActions';
 import { createEmptySyncSummary, getScopeState } from '../features/ingredients/ingredientsScopeState';
@@ -131,15 +132,28 @@ export function IngredientsProvider({ children }) {
     [commitIngredients, commitSyncSummary, markDirty, runRepositoryCommand, storageScope]
   );
 
-  const syncIngredientsToServer = useMemo(
+  const pushIngredientsToServer = useMemo(
     () =>
-      createManualSyncAction({
+      createPushAction({
         isAuthenticated: backendSyncAvailable,
         storageScope,
         commitIngredients,
         setSyncStatus,
         setHasUnsyncedChanges,
         setLastSyncedAt,
+        setSyncError,
+        setError
+      }),
+    [backendSyncAvailable, commitIngredients, storageScope]
+  );
+
+  const pullIngredientsFromServer = useMemo(
+    () =>
+      createPullAction({
+        isAuthenticated: backendSyncAvailable,
+        storageScope,
+        commitIngredients,
+        setSyncStatus,
         setSyncError,
         setError
       }),
@@ -161,7 +175,9 @@ export function IngredientsProvider({ children }) {
       clearError,
       markIngredientsDirty: markDirty,
       loadIngredients,
-      syncIngredientsToServer,
+      syncIngredientsToServer: pushIngredientsToServer,
+      pushIngredientsToServer,
+      pullIngredientsFromServer,
       addIngredient,
       addIngredients,
       updateIngredient,
@@ -182,10 +198,11 @@ export function IngredientsProvider({ children }) {
       loadIngredients,
       loading,
       markDirty,
+      pullIngredientsFromServer,
+      pushIngredientsToServer,
       removeIngredient,
       syncError,
       syncSummary,
-      syncIngredientsToServer,
       syncStatus,
       updateIngredient
     ]

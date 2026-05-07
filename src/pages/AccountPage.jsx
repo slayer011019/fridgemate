@@ -9,8 +9,9 @@ function AccountPage() {
     lastSyncedAt,
     loadIngredients,
     markIngredientsDirty,
+    pullIngredientsFromServer,
+    pushIngredientsToServer,
     syncError,
-    syncIngredientsToServer,
     syncStatus
   } = useIngredients();
 
@@ -20,27 +21,12 @@ function AccountPage() {
     await loadIngredients({ force: true });
   };
 
-  const handleSyncIngredients = async () => {
-    await syncIngredientsToServer();
-  };
-
   const formattedLastSyncedAt = lastSyncedAt
     ? new Intl.DateTimeFormat('ko-KR', {
         dateStyle: 'medium',
         timeStyle: 'short'
       }).format(new Date(lastSyncedAt))
     : '아직 동기화하지 않았습니다.';
-
-  const syncButtonText =
-    syncStatus === 'syncing'
-      ? '동기화 중...'
-      : syncStatus === 'error'
-        ? '다시 동기화'
-        : hasUnsyncedChanges
-          ? '변경사항 서버에 저장'
-          : syncStatus === 'synced'
-            ? '동기화 완료'
-            : '서버와 동기화';
 
   return (
     <div className="section-shell">
@@ -117,14 +103,27 @@ function AccountPage() {
           <button
             className="btn-primary"
             disabled={!user || syncStatus === 'syncing'}
-            onClick={handleSyncIngredients}
+            onClick={async () => {
+              if (window.confirm('현재 이 기기의 재료 목록으로 서버 데이터를 덮어씁니다. 계속할까요?')) {
+                await pushIngredientsToServer();
+              }
+            }}
             type="button"
           >
-            {user ? syncButtonText : '로그인 후 동기화 가능'}
+            {syncStatus === 'syncing' ? '백업 중...' : '서버에 백업하기'}
           </button>
-          <p className="text-xs leading-5 muted">
-            MVP 동기화는 현재 기기의 재료 목록으로 서버 목록을 대체하는 last-write-wins 방식입니다.
-          </p>
+          <button
+            className="btn-secondary"
+            disabled={!user || syncStatus === 'syncing'}
+            onClick={async () => {
+              if (window.confirm('서버에 저장된 재료 목록으로 현재 기기의 재료 목록을 덮어씁니다. 계속할까요?')) {
+                await pullIngredientsFromServer();
+              }
+            }}
+            type="button"
+          >
+            {syncStatus === 'syncing' ? '가져오는 중...' : '서버에서 가져오기'}
+          </button>
         </div>
       </section>
 

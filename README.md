@@ -94,13 +94,14 @@ Recent work focused on making the app more stable for MVP usage:
 Authenticated users can sync from the account page.
 
 - The account page shows sync status, unsynced changes, last sync time, and errors
-- Pressing the sync button reads the current IndexedDB ingredient list
+- "서버에 백업하기" reads the current IndexedDB ingredient list
 - The app posts the full local snapshot to `POST /api/ingredients/sync`
 - The backend replaces the user's server ingredient list with that local snapshot
+- "서버에서 가져오기" replaces the current device cache with the authenticated server ingredient list
 - Server sync upserts each ingredient by `clientId` to avoid duplicate rows on repeated sync
 - `lastSyncedAt` is stored in `localStorage` under `fridgemate-last-synced-at`
 
-This is a last-write-wins MVP sync strategy. It is deliberately simpler than two-way merge and can later evolve into `updatedAt`-based conflict resolution with delete markers.
+This is an explicit overwrite MVP sync strategy. Backup makes the current device list win; pull makes the server list win.
 
 ### Expiry Awareness
 
@@ -232,11 +233,17 @@ UI action
 ### Manual Server Sync
 
 ```text
-Account page sync button
-  -> syncIngredientsToServer()
+Account page backup button
+  -> pushIngredientsToServer()
   -> read current IndexedDB snapshot
   -> POST /api/ingredients/sync
   -> upsert by clientId and remove server rows missing from the local snapshot
+  -> mark syncStatus as synced or error
+
+Account page pull button
+  -> pullIngredientsFromServer()
+  -> GET /api/ingredients
+  -> replace current IndexedDB snapshot
   -> mark syncStatus as synced or error
 ```
 
