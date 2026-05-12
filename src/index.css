@@ -125,11 +125,15 @@
   }
 
   .app-frame {
-    @apply mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pb-10 pt-4 sm:gap-5 sm:px-6 sm:pt-5 lg:px-8 xl:px-10;
+    @apply flex w-full flex-col gap-4 pb-10 pt-4 sm:gap-5 sm:pt-5;
   }
 
   .app-header-frame {
-    @apply mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 xl:px-10;
+    @apply mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10;
+  }
+
+  .app-nav-frame {
+    @apply mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10;
   }
 
   .section-shell {
@@ -183,19 +187,6 @@
 
 @media (max-width: 640px) {
   @layer components {
-    .app-frame {
-      max-width: 100% !important;
-      padding-left: 1rem !important;
-      padding-right: 1rem !important;
-      padding-top: 0.75rem !important;
-    }
-
-    .app-header-frame {
-      max-width: 100% !important;
-      padding-left: 1rem !important;
-      padding-right: 1rem !important;
-    }
-
     .section-shell {
       border-radius: 20px;
       padding: 0.5rem;

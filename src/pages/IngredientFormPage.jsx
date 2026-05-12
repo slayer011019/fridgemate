@@ -95,7 +95,7 @@ function IngredientFormPage() {
   };
 
   return (
-    <div className="section-shell">
+    <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
       <PageHeader
         eyebrow={isEditMode ? '\uC7AC\uB8CC \uC218\uC815' : '\uC7AC\uB8CC \uCD94\uAC00'}
         title={isEditMode ? '\uC7AC\uB8CC \uC815\uBCF4\uB97C \uB2E4\uC2DC \uC815\uB9AC\uD558\uC138\uC694' : '\uC0C8 \uC7AC\uB8CC\uB97C \uAE30\uB85D\uD558\uC138\uC694'}

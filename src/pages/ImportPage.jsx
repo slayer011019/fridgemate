@@ -234,7 +234,7 @@ function ImportPage() {
   };
 
   return (
-    <div className="section-shell">
+    <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
       <PageHeader
         eyebrow={'\uC0AC\uC9C4 \uB4F1\uB85D'}
         title={'\uC0AC\uC9C4\uC5D0\uC11C \uC7AC\uB8CC \uD6C4\uBCF4\uB97C \uBA3C\uC800 \uAC00\uC838\uC624\uC138\uC694'}

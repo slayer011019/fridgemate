@@ -76,7 +76,7 @@ function RecipesPage() {
   };
 
   return (
-    <div className="section-shell">
+    <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
       <PageHeader
         eyebrow={'\uB808\uC2DC\uD53C'}
         title={'\uC9C0\uAE08 \uB9CC\uB4E4 \uC218 \uC788\uB294 \uBA54\uB274\uB97C \uBE60\uB974\uAC8C \uACE0\uB974\uC138\uC694'}

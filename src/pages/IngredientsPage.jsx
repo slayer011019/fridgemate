@@ -130,7 +130,7 @@ function IngredientsPage() {
   }, [duplicateCleanupPlan, removeIngredient, trackEvent]);
 
   return (
-    <div className="section-shell">
+    <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
       <PageHeader
         eyebrow={'\uC7AC\uB8CC \uAD00\uB9AC'}
         title={'\uC7AC\uB8CC\uB97C \uBE60\uB974\uAC8C \uCC3E\uACE0, \uC9C0\uAE08 \uC4F0\uC2E4 \uAC83\uBD80\uD130 \uC815\uB9AC\uD558\uC138\uC694'}

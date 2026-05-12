@@ -24,8 +24,8 @@ function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/60 bg-[#fbf8f2]/90 backdrop-blur-xl">
-      <div className="app-header-frame">
-        <div className="flex flex-col gap-3 py-3">
+      <div className="py-3">
+        <div className="app-header-frame mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 flex-1">
               <p className="kicker">FridgeMate</p>
@@ -62,7 +62,9 @@ function Header() {
               )}
             </div>
           </div>
+        </div>
 
+        <div className="app-nav-frame mx-auto mt-3 w-full max-w-4xl px-4 sm:px-6 lg:px-10">
           <nav className="primary-nav glass-card touch-pan-x flex w-full max-w-full items-center gap-1.5 overflow-x-auto p-1.5">
             {visibleNavItems.map((item) => {
               const isActive = item.match(location.pathname);

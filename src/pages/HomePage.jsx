@@ -55,7 +55,7 @@ function HomePage() {
   }, [loading, summary.total, topRecommendations.length, trackEvent, urgentCount]);
 
   return (
-    <div className="section-shell">
+    <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
       <PageHeader
         eyebrow={'\uB300\uC2DC\uBCF4\uB4DC'}
         title={'\uC624\uB298 \uCC98\uB9AC\uD560 \uC7AC\uB8CC\uC640 \uB9CC\uB4E4 \uC218 \uC788\uB294 \uBA54\uB274\uB97C \uD55C\uBC88\uC5D0 \uBCF4\uC138\uC694'}
