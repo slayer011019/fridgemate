@@ -29,6 +29,7 @@ function RecipesPage() {
     fridgeInsight,
     sectionStats
   } = useRecipesPageModel();
+  const recommendationEmptyMessage = !loading && activeIngredientCount === 0 ? '재료를 등록하면 추천을 시작할 수 있어요' : '';
   const dbRecommendationsState = useDBRecommendations({
     ingredients,
     pantryItems: ownedPantryItems
@@ -89,18 +90,21 @@ function RecipesPage() {
           label={'\uC9C0\uAE08 \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694'}
           value={sectionStats.ready.value}
           helper={sectionStats.ready.helper}
+          emptyMessage={recommendationEmptyMessage}
         />
         <StatCard
           label={'\uD558\uB098\uB9CC \uB354 \uC0AC\uBA74 \uB3FC\uC694'}
           value={sectionStats.buyOne.value}
           tone="warning"
           helper={sectionStats.buyOne.helper}
+          emptyMessage={recommendationEmptyMessage}
         />
         <StatCard
           label={'\uBE68\uB9AC \uC368\uC57C \uD560 \uC7AC\uB8CC \uC911\uC2EC'}
           value={sectionStats.useSoon.value}
           tone="danger"
           helper={sectionStats.useSoon.helper}
+          emptyMessage={recommendationEmptyMessage}
         />
       </section>
 
@@ -168,6 +172,8 @@ function RecipesPage() {
             ? `${missingBasicIngredients.slice(0, 3).join(', ')} 같은 기본 재료를 추가하면 추천 폭이 넓어져요.`
             : '재료를 추가하면 바로 만들 수 있는 메뉴를 정리해드릴게요.'
         }
+        emptyActionLabel={'재료 등록하러 가기'}
+        emptyActionTo="/ingredients/new"
       />
 
       <RecommendationRow
@@ -182,6 +188,8 @@ function RecipesPage() {
         onRecipeSelect={handleRecommendationSelect('ai')}
         emptyTitle={'AI 추천 후보가 아직 없어요'}
         emptyDescription={'DB 레시피 카탈로그에 매칭되는 후보가 생기면 이 행에 표시됩니다.'}
+        emptyActionLabel={'재료 등록하러 가기'}
+        emptyActionTo="/ingredients/new"
       />
     </div>
   );

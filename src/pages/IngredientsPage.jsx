@@ -211,8 +211,11 @@ function IngredientsPage() {
 
       {!loading && !filteredIngredients.length ? (
         <EmptyState
+          icon="🥕"
           title={'\uD604\uC7AC \uC870\uAC74\uC5D0 \uB9DE\uB294 \uC7AC\uB8CC\uAC00 \uC5C6\uC5B4\uC694'}
           description={'\uD544\uD130\uB97C \uBC14\uAFB8\uAC70\uB098 \uC0C8 \uC7AC\uB8CC\uB97C \uCD94\uAC00\uD574\uC11C \uBAA9\uB85D\uC744 \uCC44\uC6CC\uBCF4\uC138\uC694.'}
+          actionLabel={'\uC7AC\uB8CC \uCD94\uAC00\uD558\uAE30'}
+          actionTo="/ingredients/new"
         />
       ) : null}
 

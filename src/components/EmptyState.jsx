@@ -1,9 +1,27 @@
-function EmptyState({ title, description, compact = false }) {
+import { Link } from 'react-router-dom';
+
+function EmptyState({ title, description, compact = false, actionLabel = '', actionTo = '', icon = '🥕', className = '' }) {
   return (
-    <div className={`card border-dashed border-brand-100/70 bg-white/65 text-center ${compact ? 'py-3' : ''}`}>
-      <div className={`${compact ? 'h-7 w-7 text-sm' : 'h-10 w-10 text-lg'} mx-auto flex items-center justify-center rounded-full bg-brand-50 text-brand-700`}>◎</div>
-      <h3 className={`${compact ? 'mt-2 text-sm' : 'mt-3 text-lg'} font-semibold text-slate-900`}>{title}</h3>
-      <p className={`${compact ? 'mt-1 text-xs leading-5' : 'mt-1.5 text-sm leading-5.5'} mx-auto max-w-md muted`}>{description}</p>
+    <div
+      className={`rounded-3xl border border-dashed border-stone-100 bg-white/70 p-5 text-center shadow-sm ${
+        compact ? 'py-4' : 'py-7'
+      } ${className}`}
+    >
+      <div className={`${compact ? 'text-4xl' : 'text-5xl'} mx-auto leading-none`} aria-hidden="true">
+        {icon}
+      </div>
+      <h3 className={`${compact ? 'mt-3 text-base' : 'mt-4 text-lg'} font-semibold text-stone-800`}>{title}</h3>
+      <p className={`${compact ? 'mt-1.5 text-sm leading-5' : 'mt-2 text-sm leading-6'} mx-auto max-w-md text-stone-500`}>
+        {description}
+      </p>
+      {actionLabel && actionTo ? (
+        <Link
+          to={actionTo}
+          className="mt-4 inline-flex min-h-[2.5rem] items-center justify-center rounded-full bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
+        >
+          {actionLabel}
+        </Link>
+      ) : null}
     </div>
   );
 }

@@ -33,8 +33,8 @@ function RecipeCard({ recipe, onSelect }) {
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               {recipe.category ? <p className="kicker">{recipe.category}</p> : null}
-              {recipe.useSoon ? <span className="badge bg-amber-100 text-amber-800">빨리 써야 해요</span> : null}
-              {recipe.canMakeNow ? <span className="badge bg-brand-50 text-brand-700">지금 가능</span> : null}
+              {recipe.useSoon ? <span className="badge border border-rose-100 bg-rose-50 text-rose-700">빨리 써야 할 재료 중심</span> : null}
+              {recipe.canMakeNow ? <span className="badge border border-green-100 bg-green-50 text-green-700">지금 만들 수 있어요</span> : null}
             </div>
             <h3 className="text-lg font-semibold text-slate-900">{recipeName}</h3>
             {recipe.reason ? (

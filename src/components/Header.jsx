@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { isOcrEnabled } from '../utils/backendConfig';
 
 const navItems = [
-  { label: '\uD648', icon: '\u2302', to: '/', match: (pathname) => pathname === '/' },
+  { label: '\uD648', shortLabel: '\uD648', icon: '\u2302', to: '/', match: (pathname) => pathname === '/' },
   {
     label: '\uB0C9\uC7A5\uACE0 \uBCF4\uAE30',
     shortLabel: '\uB0C9\uC7A5\uACE0',
@@ -11,9 +11,9 @@ const navItems = [
     to: '/ingredients',
     match: (pathname) => pathname === '/ingredients' || /^\/ingredients\/[^/]+\/edit$/.test(pathname)
   },
-  { label: '\uC9C1\uC811 \uC785\uB825', shortLabel: '\uC785\uB825', icon: '+', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
-  { label: '\uC0AC\uC9C4\uC73C\uB85C \uB4F1\uB85D', shortLabel: '\uC0AC\uC9C4', icon: '\u25A1', to: '/import', match: (pathname) => pathname.startsWith('/import') },
-  { label: '\uBA54\uB274 \uCD94\uCC9C', shortLabel: '\uCD94\uCC9C', icon: '\u25CE', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
+  { label: '\uC9C1\uC811 \uC785\uB825', shortLabel: '\uCD94\uAC00', icon: '+', to: '/ingredients/new', match: (pathname) => pathname === '/ingredients/new' },
+  { label: '\uC0AC\uC9C4\uC73C\uB85C \uB4F1\uB85D', shortLabel: '\uC0AC\uC9C4 \uB4F1\uB85D', icon: '\u25A1', to: '/import', match: (pathname) => pathname.startsWith('/import') },
+  { label: '\uBA54\uB274 \uCD94\uCC9C', shortLabel: '\uBA54\uB274 \uCD94\uCC9C', icon: '\u25CE', to: '/recipes', match: (pathname) => pathname.startsWith('/recipes') }
 ];
 
 function Header() {
@@ -63,7 +63,7 @@ function Header() {
             </div>
           </div>
 
-          <nav className="primary-nav glass-card touch-pan-x flex w-full max-w-full items-center gap-1 overflow-x-auto p-1">
+          <nav className="primary-nav glass-card touch-pan-x flex w-full max-w-full items-center gap-1.5 overflow-x-auto p-1.5">
             {visibleNavItems.map((item) => {
               const isActive = item.match(location.pathname);
 
@@ -71,10 +71,10 @@ function Header() {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-semibold sm:px-3 ${
+                  className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium ${
                     isActive
-                      ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/20'
-                      : 'text-slate-600 hover:bg-white/95 hover:text-slate-900'
+                      ? 'bg-green-600 text-white shadow-sm'
+                      : 'text-stone-600 hover:bg-green-50 hover:text-green-700'
                   }`}
                 >
                   <span aria-hidden="true" className="text-[13px] leading-none">

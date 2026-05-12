@@ -29,6 +29,8 @@ function RecommendationRow({
   needsLogin = false,
   emptyTitle = '추천할 레시피가 아직 없어요',
   emptyDescription = '재료를 조금 더 추가하면 추천 후보가 늘어납니다.',
+  emptyActionLabel = '',
+  emptyActionTo = '',
   loginCtaTo = '/login',
   onRecipeSelect,
   observeRef
@@ -79,9 +81,26 @@ function RecommendationRow({
       ) : null}
 
       {!needsLogin && !error && !loading && !recipes.length ? (
-        <div className="rounded-[16px] border border-dashed border-slate-200 bg-white/80 p-4">
-          <p className="text-base font-semibold text-slate-900">{emptyTitle}</p>
-          <p className="mt-1.5 text-sm leading-6 muted">{emptyDescription}</p>
+        <div className="rounded-3xl border border-dashed border-stone-100 bg-white/70 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <div className="text-4xl leading-none" aria-hidden="true">
+                🍳
+              </div>
+              <div>
+                <p className="text-base font-semibold text-stone-800">{emptyTitle}</p>
+                <p className="mt-1.5 text-sm leading-6 text-stone-500">{emptyDescription}</p>
+              </div>
+            </div>
+            {emptyActionLabel && emptyActionTo ? (
+              <Link
+                to={emptyActionTo}
+                className="inline-flex min-h-[2.5rem] items-center justify-center rounded-full bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
+              >
+                {emptyActionLabel}
+              </Link>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </section>

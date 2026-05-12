@@ -13,10 +13,23 @@ function HomePage() {
   const { trackEvent } = useAnalytics();
   const lastViewSignatureRef = useRef('');
   const { loading, summary, topRecommendations, upcomingItems, urgentCount } = useHomePageModel();
+  const isEmptyDashboard = !loading && summary.total === 0 && urgentCount === 0 && topRecommendations.length === 0;
   const summaryItems = [
-    { label: '\uC804\uCCB4 \uC7AC\uB8CC', value: loading ? '...' : summary.total },
-    { label: '\uC6B0\uC120 \uCC98\uB9AC', value: loading ? '...' : urgentCount },
-    { label: '\uC624\uB298 \uD560 \uC77C', value: loading ? '...' : topRecommendations.length }
+    {
+      label: '\uC804\uCCB4 \uC7AC\uB8CC',
+      value: loading ? '...' : isEmptyDashboard ? '--' : summary.total,
+      className: 'border-green-100 bg-green-50/70'
+    },
+    {
+      label: '\uC6B0\uC120 \uCC98\uB9AC',
+      value: loading ? '...' : isEmptyDashboard ? '\uD655\uC778 \uC804' : urgentCount,
+      className: 'border-amber-100 bg-amber-50/70'
+    },
+    {
+      label: '\uC624\uB298 \uD560 \uC77C',
+      value: loading ? '...' : isEmptyDashboard ? '\uC5C6\uC74C' : topRecommendations.length,
+      className: 'border-rose-100 bg-rose-50/70'
+    }
   ];
 
   useEffect(() => {
@@ -63,11 +76,11 @@ function HomePage() {
         }
       />
 
-      <section className="glass-card grid grid-cols-3 divide-x divide-brand-100/70 px-2 py-3">
+      <section className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {summaryItems.map((item) => (
-          <div key={item.label} className="px-3 text-center">
-            <p className="text-2xl font-semibold leading-none text-slate-900">{item.value}</p>
-            <p className="mt-1.5 text-[11px] font-semibold text-slate-500">{item.label}</p>
+          <div key={item.label} className={`rounded-[22px] border px-4 py-4 text-center shadow-sm ${item.className}`}>
+            <p className="text-2xl font-semibold leading-none text-stone-800">{item.value}</p>
+            <p className="mt-1.5 text-[11px] font-semibold text-stone-500">{item.label}</p>
           </div>
         ))}
       </section>
@@ -90,8 +103,12 @@ function HomePage() {
           {!loading && !upcomingItems.length ? (
             <EmptyState
               compact
+              className="md:col-span-2"
+              icon="🧺"
               title={'\uC544\uC9C1 \uC800\uC7A5\uB41C \uC7AC\uB8CC\uAC00 \uC5C6\uC5B4\uC694'}
               description={'\uCCAB \uC7AC\uB8CC\uB97C \uCD94\uAC00\uD558\uBA74 \uC720\uD1B5\uAE30\uD55C \uAD00\uB9AC\uC640 \uC74C\uC2DD\uBB3C \uB0AD\uBE44 \uC904\uC774\uAE30\uB97C \uBC14\uB85C \uC2DC\uC791\uD560 \uC218 \uC788\uC5B4\uC694.'}
+              actionLabel={'\uCCAB \uC7AC\uB8CC \uCD94\uAC00\uD558\uAE30'}
+              actionTo="/ingredients/new"
             />
           ) : null}
 
@@ -127,8 +144,12 @@ function HomePage() {
           {!loading && !topRecommendations.length ? (
             <EmptyState
               compact
+              className="md:col-span-2 xl:col-span-3"
+              icon="🍳"
               title={'\uC544\uC9C1 \uCD94\uCC9C \uAC00\uB2A5\uD55C \uB808\uC2DC\uD53C\uAC00 \uC5C6\uC5B4\uC694'}
               description={'\uBCF4\uC720 \uC911\uC778 \uC7AC\uB8CC\uB97C \uCD94\uAC00\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uC798 \uB9DE\uB294 \uB808\uC2DC\uD53C\uAC00 \uB098\uD0C0\uB0A9\uB2C8\uB2E4.'}
+              actionLabel={'\uC7AC\uB8CC \uB4F1\uB85D\uD558\uB7EC \uAC00\uAE30'}
+              actionTo="/ingredients/new"
             />
           ) : null}
 

@@ -113,8 +113,8 @@ function IngredientFormPage() {
         <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{submitError || error}</div>
       ) : null}
 
-      <form className="card space-y-4" onSubmit={handleSubmit}>
-        <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+      <form className="card space-y-5" onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
           <section className="soft-panel space-y-4">
             <div>
               <p className="kicker">{'\uAE30\uBCF8 \uC815\uBCF4'}</p>
@@ -189,8 +189,8 @@ function IngredientFormPage() {
           </section>
         </div>
 
-        <div className="flex flex-wrap gap-3 border-t border-white/70 pt-1">
-          <button type="submit" className="btn-primary" disabled={loading || submitting}>
+        <div className="flex flex-col gap-3 border-t border-white/70 pt-1 sm:flex-row sm:flex-wrap">
+          <button type="submit" className="btn-primary w-full sm:w-auto" disabled={loading || submitting}>
             {loading
               ? '\uBD88\uB7EC\uC624\uB294 \uC911...'
               : submitting
@@ -199,7 +199,7 @@ function IngredientFormPage() {
                   ? '\uC218\uC815 \uC800\uC7A5'
                   : '\uC7AC\uB8CC \uCD94\uAC00'}
           </button>
-          <Link to="/ingredients" className="btn-secondary">
+          <Link to="/ingredients" className="btn-secondary w-full sm:w-auto">
             {'\uCDE8\uC18C'}
           </Link>
         </div>
