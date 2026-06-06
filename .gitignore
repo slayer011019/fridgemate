@@ -50,6 +50,8 @@ tesseract-cache/
 .vitest/
 test-results/
 playwright-report/
+.playwright-mcp/
+playwright/.cache/
 
 # 번들 분석
 stats.html
@@ -57,7 +59,20 @@ bundle-stats.json
 # Local code review graph
 .code-review-graph/
 
+# Local AI/tooling folders
+.claude/
+CLAUDE.md
+
 # Local ML/parser training exports
 data/training/*.jsonl
 data/training/*.gold.jsonl
 data/training/*.progress.json
+data/training/*.csv
+recommendation-training.jsonl
+recommendation-training.csv
+
+# Local screenshots and UI snapshots
+*-snapshot.md
+home-desktop.png
+resp-mobile.md
+resp-tablet.md
