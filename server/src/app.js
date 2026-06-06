@@ -3,9 +3,11 @@ import express from 'express';
 import { authRoutes } from './routes/authRoutes.js';
 import { ingredientRoutes } from './routes/ingredientRoutes.js';
 import { importCorrectionRoutes } from './routes/importCorrectionRoutes.js';
+import { recommendationEventRoutes } from './routes/recommendationEventRoutes.js';
 import { recipeRoutes } from './routes/recipeRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { isAllowedOrigin } from './config.js';
+import { optionalAuth } from './middleware/optionalAuth.js';
 import { requireAuth } from './middleware/requireAuth.js';
 
 export function createApp() {
@@ -41,6 +43,7 @@ export function createApp() {
   app.use('/api/ingredients', requireAuth, ingredientRoutes);
   app.use('/api/import', requireAuth, importCorrectionRoutes);
   app.use('/api/recipes', requireAuth, recipeRoutes);
+  app.use('/api/recommendation-events', optionalAuth, recommendationEventRoutes);
 
   app.use('/api', (_request, response) => {
     response.status(404).json({

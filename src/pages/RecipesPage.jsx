@@ -165,6 +165,7 @@ function RecipesPage() {
         description={'현재 재료와 팬트리 기본 재료를 기존 로컬 점수 계산으로 정렬했어요.'}
         recipes={localRecommendations}
         loading={loading}
+        source="rule"
         onRecipeSelect={handleRecommendationSelect('local')}
         emptyTitle={'아직 추천할 레시피가 없어요'}
         emptyDescription={
@@ -185,6 +186,7 @@ function RecipesPage() {
         hidden={dbRecommendationsState.hidden}
         needsLogin={dbRecommendationsState.needsLogin}
         observeRef={dbRecommendationsState.rowRef}
+        source="hybrid"
         onRecipeSelect={handleRecommendationSelect('ai')}
         emptyTitle={'AI 추천 후보가 아직 없어요'}
         emptyDescription={'DB 레시피 카탈로그에 매칭되는 후보가 생기면 이 행에 표시됩니다.'}

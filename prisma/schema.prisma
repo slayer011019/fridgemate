@@ -18,6 +18,7 @@ model User {
   ingredients       Ingredient[]
   authSessions      AuthSession[]
   importCorrections ImportCorrection[]
+  recommendationEvents RecommendationEvent[]
 }
 
 model AuthSession {
@@ -169,4 +170,27 @@ model ImportCorrection {
   @@unique([userId, sourceKey])
   @@index([userId, updatedAt])
   @@index([userId, lastUsedAt])
+}
+
+model RecommendationEvent {
+  id                     String   @id @default(cuid())
+  userId                 String?
+  user                   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  recipeId               String
+  eventType              String
+  sessionId              String?
+  rank                   Int?
+  score                  Float?
+  matchRate              Float?
+  missingIngredientCount Int?
+  urgentMatchCount       Int?
+  canMakeNow             Boolean?
+  source                 String?
+  metadata               Json?
+  createdAt              DateTime @default(now())
+
+  @@index([userId])
+  @@index([recipeId])
+  @@index([eventType])
+  @@index([createdAt])
 }

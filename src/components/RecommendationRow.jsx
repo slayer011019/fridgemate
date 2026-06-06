@@ -1,6 +1,11 @@
-import { memo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import RecipeCard from './RecipeCard';
+import { saveRecommendationEvent } from '../api/recommendationEventsApi';
+
+function getRecipeKey(recipe = {}) {
+  return String(recipe.recipeId || recipe.id || recipe.sourceRecipeId || recipe.title || recipe.name || '').trim();
+}
 
 function SkeletonCard() {
   return (
@@ -33,8 +38,51 @@ function RecommendationRow({
   emptyActionTo = '',
   loginCtaTo = '/login',
   onRecipeSelect,
-  observeRef
+  observeRef,
+  source = ''
 }) {
+  const impressedRecipeIdsRef = useRef(new Set());
+  const rankedRecipes = useMemo(
+    () =>
+      recipes.map((recipe, index) => ({
+        ...recipe,
+        _recommendationRank: index + 1,
+        _recommendationSource: source || recipe._recommendationSource || null
+      })),
+    [recipes, source]
+  );
+
+  useEffect(() => {
+    if (hidden || needsLogin || error || loading || !rankedRecipes.length) {
+      return;
+    }
+
+    rankedRecipes.forEach((recipe) => {
+      const recipeId = getRecipeKey(recipe);
+
+      if (!recipeId || impressedRecipeIdsRef.current.has(recipeId)) {
+        return;
+      }
+
+      impressedRecipeIdsRef.current.add(recipeId);
+      saveRecommendationEvent(recipe, 'impression', {
+        rank: recipe._recommendationRank,
+        source: recipe._recommendationSource
+      }).catch(() => {});
+    });
+  }, [error, hidden, loading, needsLogin, rankedRecipes]);
+
+  const handleRecipeSelect = (recipe) => {
+    saveRecommendationEvent(recipe, 'click', {
+      rank: recipe._recommendationRank,
+      source: recipe._recommendationSource
+    }).catch(() => {});
+
+    if (typeof onRecipeSelect === 'function') {
+      onRecipeSelect(recipe);
+    }
+  };
+
   if (hidden) {
     return null;
   }
@@ -46,7 +94,7 @@ function RecommendationRow({
           <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">{title}</h3>
           {description ? <p className="mt-1 text-sm leading-6 muted">{description}</p> : null}
         </div>
-        {recipes.length ? <span className="badge bg-white text-slate-500">{`레시피 ${recipes.length}개`}</span> : null}
+      {rankedRecipes.length ? <span className="badge bg-white text-slate-500">{`레시피 ${rankedRecipes.length}개`}</span> : null}
       </div>
 
       {needsLogin ? (
@@ -70,17 +118,17 @@ function RecommendationRow({
         </div>
       ) : null}
 
-      {!needsLogin && !error && !loading && recipes.length ? (
+      {!needsLogin && !error && !loading && rankedRecipes.length ? (
         <div className="flex snap-x gap-3 overflow-x-auto pb-3">
-          {recipes.map((recipe) => (
+          {rankedRecipes.map((recipe) => (
             <div key={recipe.id || recipe.recipeId || recipe.title} className="min-w-[300px] flex-[0_0_300px] snap-start sm:min-w-[380px] sm:flex-[0_0_380px]">
-              <RecipeCard recipe={recipe} onSelect={onRecipeSelect} />
+              <RecipeCard recipe={recipe} onSelect={handleRecipeSelect} />
             </div>
           ))}
         </div>
       ) : null}
 
-      {!needsLogin && !error && !loading && !recipes.length ? (
+      {!needsLogin && !error && !loading && !rankedRecipes.length ? (
         <div className="rounded-3xl border border-dashed border-stone-100 bg-white/70 p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-3">

@@ -7,6 +7,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- Added recommendation event persistence for impression and click feature snapshots, plus a training-data export script for future ML ranking experiments.
 - Added an account-page server pull action so authenticated users can replace the local device cache with their server ingredient list.
 - Added a shared horizontal recommendation row component and a lazy DB recommendation hook that waits for viewport entry before calling the recommendation API.
 - Added a v1 release QA checklist covering environment security, MFDS recipe seed boundaries, auth, guest import, manual sync, deployment, and smoke scenarios.
