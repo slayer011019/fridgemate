@@ -57,6 +57,7 @@ Implemented:
 - Optional backend AI recipe suggestions when `ANTHROPIC_API_KEY` is configured
 - Recommendation event collection for impressions and clicks so future ranking models can learn from real usage
 - Training-data export to JSONL or CSV for future model experiments
+- Recipe embedding groundwork for future pgvector candidate search
 
 Experimental or planned:
 
@@ -216,6 +217,8 @@ DIRECT_URL=postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=publi
 JWT_SECRET=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
+RECIPE_EMBEDDING_MODEL=text-embedding-3-small
+RECIPE_EMBEDDING_DIMENSIONS=1536
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 FOODSAFETY_API_KEY=
@@ -227,6 +230,7 @@ Rules:
 - Keep all service role keys server-side only.
 - Do not expose private keys with a `VITE_` prefix.
 - Leave optional AI keys empty when testing the core app.
+- Keep `RECIPE_EMBEDDING_DIMENSIONS` aligned with the `recipe_embeddings.embedding` vector dimension.
 
 ## Database / Prisma Setup
 
@@ -348,6 +352,18 @@ npm run export:recommendation-training -- --format=csv --output=data/training/re
 ```
 
 This export is intended for offline analysis and future model-ranking experiments. It is not required for normal app usage.
+
+## Recipe Embedding Groundwork
+
+Recipe embeddings are stored vectors for semantic candidate retrieval; storing them is not model training. The first safe step uses a separate production-compatible `recipe_embeddings` table keyed to the existing Supabase-shaped `recipes.id` UUID, leaving the production `recipes` table unchanged.
+
+Dry-run the embedding text and content hash pipeline:
+
+```bash
+npm run recipes:embed -- --dry-run --limit=10
+```
+
+Semantic retrieval should use pgvector to fetch candidates, then rule-based reranking should prioritize owned ingredients, expiring ingredients, and low missing-ingredient counts. Ranking model training is future work and requires enough recommendation event history.
 
 ## Roadmap
 

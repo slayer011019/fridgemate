@@ -37,6 +37,8 @@ Implemented:
 ## AI and Data Roadmap
 
 - Analyze recommendation impression/click exports
+- Backfill production `recipe_embeddings` for semantic recipe candidate search
+- Add a semantic recommendation API after the embedding migration and backfill are stable
 - Prototype ranking improvements from collected feature snapshots
 - Expand ingredient normalization examples
 - Improve OCR parser regression coverage
@@ -47,3 +49,4 @@ Implemented:
 - Automatic server writes for every ingredient CRUD action
 - Replacing review-before-save OCR with fully automatic imports
 - Treating experimental embedding or pgvector work as required for normal app usage
+- Treating embedding storage as model training

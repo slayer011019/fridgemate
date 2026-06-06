@@ -76,6 +76,14 @@ Recommendation events:
 - anonymous backend-mode events can still store session-level data
 - export scripts produce JSONL or CSV datasets for future ranking work
 
+Semantic recipe retrieval groundwork:
+
+- production recipe embeddings are stored separately in `recipe_embeddings`
+- the table references the existing production `recipes(id)` UUID instead of changing `recipes`
+- embedding generation builds deterministic text from production-shaped recipe and recipe ingredient rows
+- pgvector search is a candidate retrieval step, not the final recommendation ranker
+- rule-based reranking keeps ingredient ownership, expiration urgency, and missing ingredient penalties in control
+
 ## Security Boundaries
 
 - auth cookies are `httpOnly`

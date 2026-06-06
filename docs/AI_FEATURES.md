@@ -42,10 +42,22 @@ The export command creates future training data:
 npm run export:recommendation-training -- --format=jsonl --output=data/training/recommendation-training.jsonl
 ```
 
+### Recipe Embedding Groundwork
+
+Recipe embeddings convert stable recipe text into vectors for future semantic candidate search. This is storage and retrieval infrastructure, not model training.
+
+Current boundaries:
+
+- recipe vectors belong in the separate `recipe_embeddings` table
+- the existing production `recipes` table shape should not be changed for the first rollout
+- pgvector search should only choose candidates
+- final ordering should remain rule-based, using owned ingredient match, expiration urgency, missing ingredient count, and existing recommendation score
+- ranking model training should wait until recommendation events are plentiful enough for offline evaluation
+
 ## Experimental
 
 - OpenAI-compatible embeddings for OCR correction suggestions
-- recipe catalog embeddings and pgvector search
+- recipe catalog semantic retrieval from pgvector candidates
 - model-assisted recipe ingredient normalization
 - ranking experiments from recommendation event exports
 
