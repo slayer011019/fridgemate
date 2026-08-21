@@ -76,6 +76,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Simplified recipe, OCR import, and auth screen copy so the next step is clearer on mobile and desktop.
 
 ### Fixed
+- Cloudflare database requests now use a single connection per request, and recommendation events are queued in the browser to avoid exhausting the Supabase session pool.
+- Hybrid recipe recommendations now continue without alias expansion when the optional ingredient alias catalog is unavailable.
 - Server-side failures now record sanitized request and error metadata in private runtime logs while keeping generic 500 responses for clients.
 - Refresh requests without a session cookie now return `401` before opening a database query.
 - Manual ingredient sync now uses the authenticated API request path so a 401 can refresh the session and retry once.

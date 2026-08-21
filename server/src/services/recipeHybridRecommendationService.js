@@ -26,16 +26,22 @@ async function expandUserIngredientsWithAliases(userIngredients = [], prismaClie
     return userIngredients;
   }
 
-  const aliases = await prismaClient.ingredientAlias.findMany({
-    where: {
-      alias: {
-        in: normalizedNames
+  let aliases = [];
+
+  try {
+    aliases = await prismaClient.ingredientAlias.findMany({
+      where: {
+        alias: {
+          in: normalizedNames
+        }
+      },
+      include: {
+        ingredient: true
       }
-    },
-    include: {
-      ingredient: true
-    }
-  });
+    });
+  } catch (_error) {
+    return userIngredients;
+  }
   const aliasCanonicalNames = aliases.map((alias) => alias.ingredient?.name).filter(Boolean);
 
   return [

@@ -9,6 +9,14 @@ export class RecommendationEventsApiError extends ApiClientError {
   }
 }
 
+let eventRequestQueue = Promise.resolve();
+
+function enqueueEventRequest(request) {
+  const queuedRequest = eventRequestQueue.then(request, request);
+  eventRequestQueue = queuedRequest.catch(() => null);
+  return queuedRequest;
+}
+
 function getRecipeId(recipe = {}) {
   return String(recipe.recipeId || recipe.id || recipe.sourceRecipeId || recipe.title || recipe.name || '').trim();
 }
@@ -46,15 +54,17 @@ export function saveRecommendationEvent(recipe, eventType, options = {}) {
     return Promise.resolve(null);
   }
 
-  return requestJson(
-    '/recommendation-events',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+  return enqueueEventRequest(() =>
+    requestJson(
+      '/recommendation-events',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
       },
-      body: JSON.stringify(payload)
-    },
-    { authMode: 'auto', errorClass: RecommendationEventsApiError }
+      { authMode: 'auto', errorClass: RecommendationEventsApiError }
+    )
   );
 }

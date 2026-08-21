@@ -92,4 +92,39 @@ describe('recipeHybridRecommendationService', () => {
       missingIngredients: []
     });
   });
+
+  it('continues recommendation scoring when the optional alias table is unavailable', async () => {
+    const prismaClient = {
+      ingredientAlias: {
+        findMany: vi.fn(async () => {
+          throw new Error('relation ingredient_aliases does not exist');
+        })
+      },
+      recipe: {
+        findMany: vi.fn(async () => [
+          {
+            id: 'recipe-no-aliases',
+            name: '계란밥',
+            category: '한그릇',
+            cookingMethod: '비비기',
+            rawIngredientsText: '밥, 계란',
+            ingredients: [
+              { rawName: '밥', normalizedName: '밥', ingredientType: 'main', section: 'main' },
+              { rawName: '계란', normalizedName: '계란', ingredientType: 'main', section: 'main' }
+            ]
+          }
+        ])
+      }
+    };
+
+    const recommendations = await recommendRecipes([{ name: '밥' }, { name: '계란' }], {
+      prismaClient,
+      vectorSearch: async () => []
+    });
+
+    expect(recommendations[0]).toMatchObject({
+      recipeId: 'recipe-no-aliases',
+      canMakeNow: true
+    });
+  });
 });

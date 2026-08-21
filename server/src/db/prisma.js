@@ -7,7 +7,14 @@ const requestClients = new AsyncLocalStorage();
 
 function createPrismaClient() {
   const databaseUrl = serverConfig.databaseUrlProvider?.() || serverConfig.databaseUrl;
-  const adapter = databaseUrl ? new PrismaPg({ connectionString: databaseUrl }) : null;
+  const adapter = databaseUrl
+    ? new PrismaPg({
+        connectionString: databaseUrl,
+        max: serverConfig.runtime === 'cloudflare' ? 1 : 10,
+        connectionTimeoutMillis: 5000,
+        idleTimeoutMillis: 5000
+      })
+    : null;
   return adapter ? new PrismaClient({ adapter }) : new PrismaClient();
 }
 
