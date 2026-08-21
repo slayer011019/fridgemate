@@ -19,15 +19,6 @@ function adsenseHeadPlugin(mode) {
           tag: 'meta',
           attrs: { name: 'google-adsense-account', content: config.client },
           injectTo: 'head'
-        },
-        {
-          tag: 'script',
-          attrs: {
-            async: true,
-            crossorigin: 'anonymous',
-            src: `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${config.client}`
-          },
-          injectTo: 'head'
         }
       ];
     }

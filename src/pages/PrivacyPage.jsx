@@ -25,7 +25,7 @@ function PrivacyPage() {
         <div>
           <h2 className="text-base font-semibold text-slate-900">광고와 쿠키</h2>
           <p className="mt-1">
-            Google AdSense가 활성화되면 Google과 광고 파트너가 광고 제공, 빈도 조절, 성과 측정을 위해 쿠키 또는 유사 기술을 사용할 수 있습니다. 광고 기능이 비활성화된 동안에는 AdSense 스크립트를 불러오지 않습니다.
+            사이트 확인을 위해 Google AdSense 스크립트를 불러옵니다. 광고가 활성화되면 Google과 광고 파트너가 광고 제공, 빈도 조절, 성과 측정을 위해 쿠키 또는 유사 기술을 사용할 수 있습니다.
           </p>
         </div>
         <div>

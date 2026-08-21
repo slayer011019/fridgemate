@@ -44,6 +44,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Added the production AdSense publisher verification script to the document head while keeping ad units disabled by default.
 - Split account-page manual sync into explicit server backup and server pull actions with confirmation prompts.
 - Refactored the recipes page into a two-row layout: instant local seed recommendations first, lazy DB-backed AI recommendations second.
 - Home and recipe-page recommendation previews now use the DB-backed recommendation API first in authenticated backend mode, then fall back to local seed recipes for network or server failures.
