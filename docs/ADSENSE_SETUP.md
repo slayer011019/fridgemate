@@ -1,12 +1,12 @@
 # Google AdSense Readiness
 
-Ad units are disabled by default. The site-verification script for publisher `ca-pub-4133464450512249` is present in the document head, while ad units and `ads.txt` remain disabled until the enable flag and slot IDs are configured.
+The site-verification script and `ads.txt` declaration for publisher `ca-pub-4133464450512249` are enabled in production. Ad units remain hidden until valid slot IDs are configured.
 
 ## Before activation
 
 1. Complete the public site content and confirm that every main route is reachable without broken API calls.
 2. Replace the placeholder contact wording in `/privacy` with the real operator contact and finalized data-retention policy.
-3. Confirm that AdSense recognizes `오늘뭐먹지.com`, then obtain the ad-unit slot IDs.
+3. Confirm that AdSense recognizes `오늘뭐먹지.com` and its `ads.txt`, then obtain the ad-unit slot IDs.
 4. Select and configure a Google-certified consent management platform before serving ads where consent is required.
 5. Review ad placement on desktop and mobile so ads cannot be mistaken for recipe or navigation actions.
 
@@ -19,7 +19,7 @@ VITE_ADSENSE_HOME_SLOT=0000000000
 VITE_ADSENSE_RECIPES_SLOT=0000000000
 ```
 
-Use values issued by the actual AdSense account. The build fails when AdSense is enabled with a malformed publisher ID.
+The publisher settings are tracked in `.env.production` so production builds generate `ads.txt`. Configure slot IDs in the deployment environment after AdSense issues them. The build fails when AdSense is enabled with a malformed publisher ID.
 
 ## What the build does
 

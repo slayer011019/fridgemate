@@ -1,8 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { loadEnv } from 'vite';
 import { getAdSenseConfig, isValidAdSenseClient } from '../src/utils/adsenseConfig.js';
 
-const config = getAdSenseConfig(process.env);
+const productionEnv = loadEnv('production', process.cwd(), 'VITE_');
+const config = getAdSenseConfig({ ...productionEnv, ...process.env });
 
 if (config.requested && !isValidAdSenseClient(config.client)) {
   throw new Error('VITE_ADSENSE_CLIENT must use the ca-pub-XXXXXXXXXXXXXXXX format when AdSense is enabled.');
