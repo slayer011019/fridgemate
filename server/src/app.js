@@ -53,9 +53,19 @@ export function createApp() {
     });
   });
 
-  app.use((error, _request, response, _next) => {
+  app.use((error, request, response, _next) => {
     const status = error.status || 500;
     const message = status >= 500 ? 'Internal server error.' : error.message;
+
+    if (status >= 500) {
+      console.error('[server] request failed', {
+        method: request.method,
+        path: request.originalUrl,
+        errorName: error.name || 'Error',
+        errorCode: error.code || null,
+        errorMessage: error.message || 'Unknown server error'
+      });
+    }
 
     response.status(status).json({
       message

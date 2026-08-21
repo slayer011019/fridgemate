@@ -76,6 +76,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Simplified recipe, OCR import, and auth screen copy so the next step is clearer on mobile and desktop.
 
 ### Fixed
+- Server-side failures now record sanitized request and error metadata in private runtime logs while keeping generic 500 responses for clients.
+- Refresh requests without a session cookie now return `401` before opening a database query.
 - Manual ingredient sync now uses the authenticated API request path so a 401 can refresh the session and retry once.
 - Recipe recommendations no longer count recipes as "buy one more" when no core ingredients are currently owned.
 - Recommendation scoring now treats owned pantry staples as available ingredients.

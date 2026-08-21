@@ -119,6 +119,10 @@ export async function loginUser(input) {
 }
 
 export async function refreshUserSession(refreshToken) {
+  if (!refreshToken) {
+    throw createHttpError(401, 'The current session is no longer valid.');
+  }
+
   const refreshTokenHash = hashRefreshToken(refreshToken);
   const now = new Date();
   const session = await prisma.authSession.findUnique({

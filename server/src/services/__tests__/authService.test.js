@@ -113,4 +113,14 @@ describe('authService', () => {
       }
     });
   });
+
+  it('rejects a refresh request without a cookie before querying the database', async () => {
+    const { refreshUserSession } = await import('../authService.js');
+
+    await expect(refreshUserSession()).rejects.toMatchObject({
+      status: 401,
+      message: 'The current session is no longer valid.'
+    });
+    expect(prismaMock.authSession.findUnique).not.toHaveBeenCalled();
+  });
 });
