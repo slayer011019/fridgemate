@@ -20,7 +20,11 @@ function parseBooleanEnv(value, defaultValue = true) {
   return defaultValue;
 }
 
-const rawApiBaseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
+const rawApiBaseUrl =
+  import.meta.env.VITE_API_URL_OVERRIDE ||
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  '';
 
 export const apiBaseUrl = normalizeUrl(rawApiBaseUrl);
 export const ocrEnabled = parseBooleanEnv(import.meta.env.VITE_ENABLE_OCR, true);
