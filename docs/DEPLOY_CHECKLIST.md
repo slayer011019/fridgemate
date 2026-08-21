@@ -1,6 +1,6 @@
 # Deployment Checklist
 
-FridgeMate v1 deployment verification checklist for Vercel, Railway, Supabase, auth cookies, and manual sync.
+FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Supabase, auth cookies, and manual sync.
 
 ## Scope Gate
 
@@ -22,13 +22,15 @@ FridgeMate v1 deployment verification checklist for Vercel, Railway, Supabase, a
 - [ ] `VITE_API_URL=https://YOUR_API_DOMAIN/api`
 - [ ] `VITE_ENABLE_OCR=true`
 - [ ] Optional: `VITE_SENTRY_DSN`
+- [ ] Keep `VITE_ADSENSE_ENABLED=false` until the site is approved and publisher/slot IDs are configured.
 - [ ] Confirm SPA routes load after refresh: `/`, `/ingredients`, `/import`, `/recipes`, `/login`, `/account`.
 - [ ] Confirm the deployed frontend sends API requests with credentials.
 
-## Railway Backend
+## Cloudflare Workers API
 
-- [ ] `DATABASE_URL` points to the Supabase pooler/runtime URL.
-- [ ] `DIRECT_URL` points to the Supabase direct/session URL for Prisma migrations.
+- [ ] The `HYPERDRIVE` binding points to the Supabase PostgreSQL database.
+- [ ] The `AUTH_KV` binding exists for shared auth throttling and logout revocation state.
+- [ ] `DIRECT_URL` is available only in the trusted environment that applies Prisma migrations.
 - [ ] `JWT_SECRET` is at least 32 characters.
 - [ ] `JWT_EXPIRES_IN=15m` or another intentional short access-token value.
 - [ ] `REFRESH_TOKEN_EXPIRES_IN=30d` or another intentional refresh-window value.
@@ -36,15 +38,15 @@ FridgeMate v1 deployment verification checklist for Vercel, Railway, Supabase, a
 - [ ] `CLIENT_ORIGIN` matches the primary Vercel frontend origin.
 - [ ] `AUTH_COOKIE_SECURE=true`.
 - [ ] `AUTH_COOKIE_SAME_SITE=None` when frontend and backend are on different domains.
-- [ ] Optional: `REDIS_URL` for shared rate limit and logout revocation state.
+- [ ] `npm run worker:dry-run` completes before deployment.
 - [ ] Optional v2/lab only: AI and embedding keys.
 
 ## Supabase
 
-- [ ] Database exists and accepts connections from Railway.
+- [ ] Database exists and accepts connections through Cloudflare Hyperdrive.
 - [ ] Prisma migrations run successfully with `npm run prisma:deploy`.
-- [ ] `GET /health` returns `status: ok`.
-- [ ] `GET /health` reports a healthy database check.
+- [ ] `GET /api/health` returns `status: ok`.
+- [ ] `GET /api/health` reports a healthy database check.
 
 ## Authentication
 
