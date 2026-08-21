@@ -2,14 +2,26 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "fridgemate-api",
   "main": "server/src/worker.js",
-  "compatibility_date": "2026-08-22",
+  "compatibility_date": "2026-08-21",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "observability": { "enabled": true },
+  "kv_namespaces": [
+    {
+      "binding": "AUTH_KV",
+      "id": "3164069f15a04b56848f27d3f2153be0"
+    }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "d013cf39325246b1be8896415a3190c2"
+    }
+  ],
   "vars": {
     "NODE_ENV": "production",
-    "CLIENT_ORIGIN": "https://오늘뭐먹지.com",
-    "ALLOWED_ORIGINS": "https://오늘뭐먹지.com,https://www.오늘뭐먹지.com",
+    "CLIENT_ORIGIN": "https://xn--wh1bs8l5xa003adme.com",
+    "ALLOWED_ORIGINS": "https://xn--wh1bs8l5xa003adme.com,https://www.xn--wh1bs8l5xa003adme.com",
     "AUTH_COOKIE_SECURE": "true",
     "AUTH_COOKIE_SAME_SITE": "None",
     "JWT_EXPIRES_IN": "15m",

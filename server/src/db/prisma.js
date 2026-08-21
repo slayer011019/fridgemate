@@ -6,7 +6,8 @@ import { serverConfig } from '../config.js';
 const requestClients = new AsyncLocalStorage();
 
 function createPrismaClient() {
-  const adapter = serverConfig.databaseUrl ? new PrismaPg({ connectionString: serverConfig.databaseUrl }) : null;
+  const databaseUrl = serverConfig.databaseUrlProvider?.() || serverConfig.databaseUrl;
+  const adapter = databaseUrl ? new PrismaPg({ connectionString: databaseUrl }) : null;
   return adapter ? new PrismaClient({ adapter }) : new PrismaClient();
 }
 
@@ -53,7 +54,7 @@ export function prismaRequestScope(_request, response, next) {
 }
 
 export async function getDatabaseHealth() {
-  if (!serverConfig.databaseUrl) {
+  if (!serverConfig.databaseConfigured) {
     return 'disconnected';
   }
 

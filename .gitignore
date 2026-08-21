@@ -5,6 +5,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.production
 
 # Logs
 *.log
@@ -18,6 +19,7 @@ pnpm-debug.log*
 .vite/
 .wrangler-state/
 .wrangler/
+supabase/.temp/
 coverage/
 
 # OS and editor files

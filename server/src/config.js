@@ -34,17 +34,21 @@ function runtimeValue(runtimeEnv, name) {
 function createServerConfig(runtimeEnv = process.env) {
   const configuredAllowedOrigins = splitEnvList(runtimeValue(runtimeEnv, 'ALLOWED_ORIGINS'));
   const clientOrigin = runtimeValue(runtimeEnv, 'CLIENT_ORIGIN') || 'http://localhost:5173';
+  const hyperdrive = runtimeEnv?.HYPERDRIVE;
+  const databaseUrl = hyperdrive ? '' : runtimeValue(runtimeEnv, 'DATABASE_URL') || '';
   const allowedOrigins = configuredAllowedOrigins.length
     ? configuredAllowedOrigins
     : uniqueValues([clientOrigin, ...DEFAULT_ALLOWED_ORIGINS]);
 
   return {
-    runtime: runtimeEnv?.HYPERDRIVE ? 'cloudflare' : 'node',
+    runtime: hyperdrive ? 'cloudflare' : 'node',
     host: runtimeValue(runtimeEnv, 'HOST') || '0.0.0.0',
     port: Number(runtimeValue(runtimeEnv, 'PORT') || 4000),
     clientOrigin,
     allowedOrigins,
-    databaseUrl: runtimeEnv?.HYPERDRIVE?.connectionString || runtimeValue(runtimeEnv, 'DATABASE_URL') || '',
+    databaseUrl,
+    databaseUrlProvider: hyperdrive ? () => hyperdrive.connectionString : null,
+    databaseConfigured: Boolean(hyperdrive || databaseUrl),
     jwtSecret: runtimeValue(runtimeEnv, 'JWT_SECRET'),
     jwtExpiresIn: runtimeValue(runtimeEnv, 'JWT_EXPIRES_IN') || '15m',
     jwtIssuer: runtimeValue(runtimeEnv, 'JWT_ISSUER') || 'fridgemate-api',
@@ -77,7 +81,10 @@ export function configureServerRuntime(runtimeEnv) {
 }
 
 export function validateServerConfig({ exitOnError = true } = {}) {
-  const values = { JWT_SECRET: serverConfig.jwtSecret, DATABASE_URL: serverConfig.databaseUrl };
+  const values = {
+    JWT_SECRET: serverConfig.jwtSecret,
+    DATABASE_URL: serverConfig.databaseConfigured ? 'configured' : ''
+  };
   const missingEnvVars = REQUIRED_ENV_VARS.filter((name) => !String(values[name] || '').trim());
   const errors = missingEnvVars.map((name) => `${name} is required. Set it in your environment variables.`);
 
