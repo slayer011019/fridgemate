@@ -7,6 +7,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- Added a Cloudflare Workers Express entry point, Prisma PostgreSQL driver adapter support for Hyperdrive, and optional Workers KV auth security storage.
+- Added disabled-by-default AdSense head injection, responsive ad units, generated `ads.txt`, and a public privacy information page.
 - Added recommendation event persistence for impression and click feature snapshots, plus a training-data export script for future ML ranking experiments.
 - Added an account-page server pull action so authenticated users can replace the local device cache with their server ingredient list.
 - Added a shared horizontal recommendation row component and a lazy DB recommendation hook that waits for viewport entry before calling the recommendation API.

@@ -4,7 +4,7 @@ FridgeMate is an open-source AI-powered refrigerator management app that helps u
 
 It also serves as a practical reference project for students and junior developers building local-first, AI-assisted food management applications with React, Express, Prisma, PostgreSQL, OCR, and recommendation workflows.
 
-Live demo: https://fridgemate-ten.vercel.app/
+Live demo: https://오늘뭐먹지.com/
 
 ## Problem Statement
 
@@ -28,7 +28,7 @@ Implemented:
 - Rule-based recipe recommendation groups: ready now, buy one more, and use soon
 - OCR import with review-before-save and correction learning
 - JWT signup, login, logout, refresh-cookie session restore, and protected routes
-- Optional Express + Prisma + PostgreSQL backend
+- Optional Express API on Node or Cloudflare Workers with Prisma + PostgreSQL
 - Manual server backup and pull sync from the account page
 - API fallback behavior that keeps local IndexedDB usable during network or 5xx failures
 - Recommendation impression and click event persistence in backend-connected mode
@@ -99,7 +99,7 @@ Backend:
 - Prisma
 - PostgreSQL
 - JWT auth with `httpOnly` access and refresh cookies
-- Redis-backed auth throttling and logout token revocation with memory fallback
+- Redis-backed auth throttling for Node and Cloudflare KV-backed auth state for Workers, with memory fallback
 
 AI, OCR, and data:
 
@@ -204,6 +204,10 @@ VITE_API_URL=
 VITE_API_BASE_URL=
 VITE_ENABLE_OCR=true
 VITE_SENTRY_DSN=
+VITE_ADSENSE_ENABLED=false
+VITE_ADSENSE_CLIENT=
+VITE_ADSENSE_HOME_SLOT=
+VITE_ADSENSE_RECIPES_SLOT=
 ```
 
 Common backend variables:
@@ -231,6 +235,8 @@ Rules:
 - Do not expose private keys with a `VITE_` prefix.
 - Leave optional AI keys empty when testing the core app.
 - Keep `RECIPE_EMBEDDING_DIMENSIONS` aligned with the `recipe_embeddings.embedding` vector dimension.
+
+Cloudflare Workers deployment is documented in [docs/CLOUDFLARE_DEPLOYMENT.md](docs/CLOUDFLARE_DEPLOYMENT.md). AdSense activation and `ads.txt` generation are documented in [docs/ADSENSE_SETUP.md](docs/ADSENSE_SETUP.md).
 
 ## Database / Prisma Setup
 

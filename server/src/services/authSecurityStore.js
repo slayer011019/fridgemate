@@ -70,6 +70,51 @@ function createMemoryStore() {
   };
 }
 
+function createKvStore(kv) {
+  const prefix = serverConfig.authRedisPrefix;
+
+  return {
+    mode: 'kv',
+    async connect() {},
+    async disconnect() {},
+    async consumeRateLimit({ scope, key, limit, windowMs }) {
+      const storeKey = `${prefix}:ratelimit:${scope}:${key}`;
+      const now = Date.now();
+      const existingWindow = await kv.get(storeKey, 'json');
+      const windowState =
+        !existingWindow || existingWindow.resetTime <= now
+          ? { count: 0, resetTime: now + windowMs }
+          : existingWindow;
+
+      if (windowState.count >= limit) {
+        return {
+          allowed: false,
+          retryAfterSeconds: Math.max(1, Math.ceil((windowState.resetTime - now) / 1000))
+        };
+      }
+
+      windowState.count += 1;
+      await kv.put(storeKey, JSON.stringify(windowState), {
+        expirationTtl: Math.max(60, Math.ceil(windowMs / 1000))
+      });
+
+      return { allowed: true, retryAfterSeconds: 0 };
+    },
+    async revokeToken(jti, exp) {
+      const expiresAt = Number(exp);
+
+      if (!jti || !Number.isFinite(expiresAt)) return;
+
+      const ttlSeconds = Math.max(60, expiresAt - Math.floor(Date.now() / 1000));
+      await kv.put(`${prefix}:revoked:${jti}`, '1', { expirationTtl: ttlSeconds });
+    },
+    async isTokenRevoked(jti) {
+      if (!jti) return false;
+      return (await kv.get(`${prefix}:revoked:${jti}`)) === '1';
+    }
+  };
+}
+
 function createRedisStore() {
   const client = createClient({
     url: serverConfig.redisUrl
@@ -153,7 +198,7 @@ async function switchToMemoryStore(error) {
     return;
   }
 
-  console.error(`Redis auth store failed during runtime, falling back to memory: ${error.message}`);
+  console.error(`Persistent auth store failed during runtime, falling back to memory: ${error.message}`);
 
   try {
     await activeStore.disconnect();
@@ -170,7 +215,7 @@ async function runWithFallback(operation) {
   try {
     return await operation(activeStore);
   } catch (error) {
-    if (configuredMode !== 'redis') {
+    if (configuredMode === 'memory') {
       throw error;
     }
 
@@ -179,7 +224,14 @@ async function runWithFallback(operation) {
   }
 }
 
-export async function initializeAuthSecurityStore() {
+export async function initializeAuthSecurityStore({ kv } = {}) {
+  if (kv) {
+    activeStore = createKvStore(kv);
+    fallbackStore = createMemoryStore();
+    configuredMode = 'kv';
+    return configuredMode;
+  }
+
   if (!serverConfig.redisUrl) {
     return activeStore.mode;
   }
@@ -225,6 +277,10 @@ export function resetAuthSecurityStoreForTests() {
   if (typeof activeStore.clear === 'function') {
     activeStore.clear();
   }
+
+  activeStore = createMemoryStore();
+  fallbackStore = activeStore;
+  configuredMode = 'memory';
 }
 
 export function setAuthSecurityStoreForTests(store, mode = 'memory') {

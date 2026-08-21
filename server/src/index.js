@@ -1,10 +1,11 @@
 import { createApp } from './app.js';
 import { prisma } from './db/prisma.js';
-import { serverConfig } from './config.js';
+import { serverConfig, validateServerConfig } from './config.js';
 import { getAuthSecurityStoreMode, initializeAuthSecurityStore, shutdownAuthSecurityStore } from './services/authSecurityStore.js';
 
 const app = createApp();
 
+validateServerConfig();
 await initializeAuthSecurityStore();
 
 const server = app.listen(serverConfig.port, serverConfig.host, () => {

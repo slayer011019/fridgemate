@@ -22,6 +22,7 @@ export default [
     ignores: [
       'coverage/**',
       'dist/**',
+      '.wrangler/**',
       'node_modules/**',
       'server/dist/**',
       'server/node_modules/**',

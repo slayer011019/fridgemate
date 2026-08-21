@@ -1,5 +1,6 @@
 import Header from './Header';
 import ConnectionStatusToast from './ConnectionStatusToast';
+import SiteFooter from './SiteFooter';
 
 function AppShell({ children }) {
   return (
@@ -9,6 +10,7 @@ function AppShell({ children }) {
       <main className="app-frame">
         {children}
       </main>
+      <SiteFooter />
     </div>
   );
 }

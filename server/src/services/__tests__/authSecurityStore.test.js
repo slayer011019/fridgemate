@@ -15,6 +15,31 @@ describe('authSecurityStore', () => {
     authSecurityStore.resetAuthSecurityStoreForTests();
   });
 
+  it('uses a Cloudflare KV binding for rate limits and token revocation', async () => {
+    const values = new Map();
+    const kv = {
+      async get(key, type) {
+        const value = values.get(key) ?? null;
+        return type === 'json' && value ? JSON.parse(value) : value;
+      },
+      async put(key, value) {
+        values.set(key, value);
+      }
+    };
+    const authSecurityStore = await import('../authSecurityStore.js');
+
+    await expect(authSecurityStore.initializeAuthSecurityStore({ kv })).resolves.toBe('kv');
+    await expect(
+      authSecurityStore.consumeAuthRateLimit({ scope: 'login', key: 'client', limit: 1, windowMs: 60_000 })
+    ).resolves.toEqual({ allowed: true, retryAfterSeconds: 0 });
+    await expect(
+      authSecurityStore.consumeAuthRateLimit({ scope: 'login', key: 'client', limit: 1, windowMs: 60_000 })
+    ).resolves.toMatchObject({ allowed: false });
+
+    await authSecurityStore.revokeAuthToken('token-1', Math.floor(Date.now() / 1000) + 3600);
+    await expect(authSecurityStore.checkRevokedToken('token-1')).resolves.toBe(true);
+  });
+
   it('falls back to memory when the active redis rate limit operation fails', async () => {
     const authSecurityStore = await import('../authSecurityStore.js');
     const failingStore = {

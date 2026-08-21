@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
+import AdSenseSlot from '../components/ads/AdSenseSlot';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useHomePageModel } from '../hooks/useHomePageModel';
 import { isOcrEnabled } from '../utils/backendConfig';
@@ -176,6 +177,7 @@ function HomePage() {
           </div>
         </div>
       </section>
+      <AdSenseSlot placement="home" />
     </div>
   );
 }

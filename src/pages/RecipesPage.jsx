@@ -3,6 +3,7 @@ import PageHeader from '../components/PageHeader';
 import PantryStaplesPanel from '../components/PantryStaplesPanel';
 import RecommendationRow from '../components/RecommendationRow';
 import StatCard from '../components/StatCard';
+import AdSenseSlot from '../components/ads/AdSenseSlot';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useDBRecommendations } from '../hooks/useDBRecommendations';
 import { useRecipesPageModel } from '../hooks/useRecipesPageModel';
@@ -193,6 +194,7 @@ function RecipesPage() {
         emptyActionLabel={'재료 등록하러 가기'}
         emptyActionTo="/ingredients/new"
       />
+      <AdSenseSlot placement="recipes" />
     </div>
   );
 }

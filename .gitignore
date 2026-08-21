@@ -16,6 +16,8 @@ pnpm-debug.log*
 # Build and cache artifacts
 .cache/
 .vite/
+.wrangler-state/
+.wrangler/
 coverage/
 
 # OS and editor files

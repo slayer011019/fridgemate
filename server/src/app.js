@@ -7,6 +7,7 @@ import { recommendationEventRoutes } from './routes/recommendationEventRoutes.js
 import { recipeRoutes } from './routes/recipeRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { isAllowedOrigin } from './config.js';
+import { prismaRequestScope } from './db/prisma.js';
 import { optionalAuth } from './middleware/optionalAuth.js';
 import { requireAuth } from './middleware/requireAuth.js';
 
@@ -29,6 +30,7 @@ export function createApp() {
     })
   );
   app.use(express.json({ limit: '16kb' }));
+  app.use(prismaRequestScope);
 
   app.get('/', (_request, response) => {
     response.json({
