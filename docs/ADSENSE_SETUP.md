@@ -5,7 +5,7 @@ The site-verification script and `ads.txt` declaration for publisher `ca-pub-413
 ## Before activation
 
 1. Complete the public site content and confirm that every main route is reachable without broken API calls.
-2. Replace the placeholder contact wording in `/privacy` with the real operator contact and finalized data-retention policy.
+2. Confirm that the public operator contact (`ibaekgom@gmail.com`) and data-retention wording in `/privacy` remain current.
 3. Confirm that AdSense recognizes `오늘뭐먹지.com` and its `ads.txt`, then obtain the ad-unit slot IDs.
 4. Select and configure a Google-certified consent management platform before serving ads where consent is required.
 5. Review ad placement on desktop and mobile so ads cannot be mistaken for recipe or navigation actions.
@@ -28,12 +28,18 @@ The publisher settings are tracked in `.env.production` so production builds gen
 - Home and recipe pages render reserved, responsive ad units only when their slot IDs are valid.
 - `postbuild` creates `dist/ads.txt` from the configured publisher ID.
 - `/privacy` explains browser storage, service analytics, advertising, and cookies.
+- `/about` and `/contact` provide public service and operator contact information.
+- `robots.txt` points crawlers to the public `sitemap.xml`.
 
 After deployment, verify:
 
 ```text
 https://오늘뭐먹지.com/ads.txt
 https://오늘뭐먹지.com/privacy
+https://오늘뭐먹지.com/about
+https://오늘뭐먹지.com/contact
+https://오늘뭐먹지.com/robots.txt
+https://오늘뭐먹지.com/sitemap.xml
 ```
 
 Also inspect the generated page source for the `google-adsense-account` meta tag. Do not click live ads during testing.

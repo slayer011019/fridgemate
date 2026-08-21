@@ -31,7 +31,14 @@ function PrivacyPage() {
         <div>
           <h2 className="text-base font-semibold text-slate-900">선택과 문의</h2>
           <p className="mt-1">
-            브라우저 설정에서 쿠키와 로컬 데이터를 삭제하거나 차단할 수 있습니다. 계정 데이터 삭제와 개인정보 관련 문의 창구는 운영 정책 확정 후 이 페이지에 고지합니다.
+            브라우저 설정에서 쿠키와 로컬 데이터를 삭제하거나 차단할 수 있습니다. 브라우저에 저장된 정보는 사용자가 직접 삭제할 때까지 보관되며, 계정과 서버에 저장된 정보는 계정 삭제를 요청하면 관계 법령상 보관 의무가 있는 경우를 제외하고 삭제합니다.
+          </p>
+          <p className="mt-2">
+            계정 데이터 삭제와 개인정보 관련 문의는{' '}
+            <a className="font-medium text-brand-700 underline underline-offset-2" href="mailto:ibaekgom@gmail.com">
+              ibaekgom@gmail.com
+            </a>
+            으로 보내주세요.
           </p>
         </div>
         <p className="border-t border-slate-200 pt-4 text-xs text-slate-500">시행일: 2026년 8월 22일</p>
