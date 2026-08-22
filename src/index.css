@@ -4,12 +4,12 @@
 
 @layer base {
   :root {
-    --fm-bg: #f6f2e8;
-    --fm-bg-soft: #fbf8f2;
-    --fm-card: rgba(255, 255, 255, 0.86);
-    --fm-line: rgba(143, 157, 143, 0.2);
+    --fm-bg: #f3f6f3;
+    --fm-bg-soft: #f8faf8;
+    --fm-card: rgba(255, 255, 255, 0.96);
+    --fm-line: rgba(100, 116, 104, 0.24);
     --fm-text: #243428;
-    --fm-text-soft: #657065;
+    --fm-text-soft: #566258;
     --fm-brand: #7ea382;
     --fm-brand-deep: #5f8364;
     --fm-brand-soft: #e5efe2;
@@ -27,10 +27,7 @@
   }
 
   body {
-    background:
-      radial-gradient(circle at top left, rgba(126, 163, 130, 0.18), transparent 28rem),
-      radial-gradient(circle at top right, rgba(255, 231, 195, 0.38), transparent 24rem),
-      linear-gradient(180deg, #fbf8f2 0%, #f6f2e8 100%);
+    background: var(--fm-bg);
     color: var(--fm-text);
     font-family: "Avenir Next", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
     overflow-x: hidden;
@@ -67,10 +64,10 @@
 
 @layer components {
   .glass-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 252, 247, 0.82));
-    border-color: rgba(126, 163, 130, 0.16);
+    background: var(--fm-card);
+    border-color: var(--fm-line);
     box-shadow: var(--fm-shadow-soft);
-    @apply rounded-[22px] border backdrop-blur-sm;
+    @apply rounded-lg border;
   }
 
   .card {
@@ -78,13 +75,13 @@
   }
 
   .soft-panel {
-    @apply rounded-[18px] border p-3.5;
-    border-color: rgba(126, 163, 130, 0.16);
-    background: rgba(250, 247, 241, 0.82);
+    @apply rounded-md border p-3.5;
+    border-color: var(--fm-line);
+    background: #f8faf8;
   }
 
   .btn-primary {
-    @apply inline-flex min-h-[2.5rem] items-center justify-center rounded-full bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm;
+    @apply inline-flex min-h-[2.5rem] items-center justify-center rounded-md bg-green-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm;
   }
 
   .btn-primary:hover {
@@ -96,7 +93,7 @@
     border-color: rgba(126, 163, 130, 0.18);
     background: rgba(255, 255, 255, 0.82);
     color: var(--fm-text);
-    @apply inline-flex min-h-[2.5rem] items-center justify-center rounded-full border px-4 py-2.5 text-sm font-semibold;
+    @apply inline-flex min-h-[2.5rem] items-center justify-center rounded-md border px-4 py-2.5 text-sm font-semibold;
   }
 
   .btn-secondary:hover {
@@ -104,16 +101,16 @@
   }
 
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-[0.02em];
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold;
   }
 
   .kicker {
     color: var(--fm-brand-deep);
-    @apply text-[11px] font-semibold uppercase tracking-[0.22em];
+    @apply text-xs font-bold;
   }
 
   .section-title {
-    @apply text-[1.55rem] font-semibold leading-tight text-slate-900 sm:text-[1.75rem];
+    @apply text-[1.55rem] font-bold leading-tight text-slate-950 sm:text-[1.85rem];
   }
 
   .muted {
@@ -129,8 +126,8 @@
   }
 
   .app-footer {
-    @apply border-t border-white/70 py-6 text-xs text-slate-500;
-    background: rgba(255, 255, 255, 0.52);
+    @apply border-t border-slate-200 py-6 text-xs text-slate-600;
+    background: rgba(255, 255, 255, 0.88);
   }
 
   .ad-slot {
@@ -150,8 +147,7 @@
   }
 
   .section-shell {
-    background: rgba(255, 255, 255, 0.18);
-    @apply rounded-[28px] border border-white/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] sm:p-4;
+    @apply px-3 sm:px-4;
   }
 
   .stats-grid {
@@ -171,8 +167,8 @@
   }
 
   .summary-chip {
-    @apply inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold;
-    border-color: rgba(126, 163, 130, 0.16);
+    @apply inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-semibold;
+    border-color: var(--fm-line);
     background: rgba(255, 255, 255, 0.84);
     color: var(--fm-text);
   }
@@ -201,17 +197,12 @@
 @media (max-width: 640px) {
   @layer components {
     .section-shell {
-      border-radius: 20px;
-      padding: 0.5rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
     }
 
     .card {
-      border-radius: 18px;
       padding: 0.875rem;
-    }
-
-    .glass-card {
-      border-radius: 18px;
     }
 
     .primary-nav {

@@ -79,7 +79,7 @@ function HomePage() {
 
       <section className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {summaryItems.map((item) => (
-          <div key={item.label} className={`rounded-[22px] border px-4 py-4 text-center shadow-sm ${item.className}`}>
+          <div key={item.label} className={`rounded-lg border px-4 py-4 text-center shadow-sm ${item.className}`}>
             <p className="text-2xl font-semibold leading-none text-stone-800">{item.value}</p>
             <p className="mt-1.5 text-[11px] font-semibold text-stone-500">{item.label}</p>
           </div>

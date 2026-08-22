@@ -39,7 +39,7 @@ function AccountPage() {
       />
 
       <section className="card space-y-4">
-        {error ? <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</div> : null}
+        {error ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</div> : null}
 
         <div className="soft-panel">
           <p className="kicker">{'\uB85C\uADF8\uC778 \uC815\uBCF4'}</p>
@@ -90,13 +90,13 @@ function AccountPage() {
         </div>
 
         {syncStatus === 'synced' ? (
-          <div className="rounded-[18px] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
             현재 로컬 재료 목록을 서버에 저장했습니다.
           </div>
         ) : null}
 
         {syncError ? (
-          <div className="rounded-[18px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{syncError}</div>
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{syncError}</div>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">

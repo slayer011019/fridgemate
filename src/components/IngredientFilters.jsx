@@ -48,8 +48,23 @@ function IngredientFilters({ filters, categories, storageTypes, onChange }) {
         </div>
       </div>
 
-      <div className="rounded-[18px] border border-brand-100/70 bg-white/58 p-2">
-        <div className="touch-pan-x flex gap-1.5 overflow-x-auto">
+      <label className="space-y-1.5 text-sm font-medium text-slate-700 sm:hidden">
+        {'카테고리'}
+        <select
+          className="min-h-[2.7rem]"
+          value={filters.category}
+          onChange={(event) => onChange('category', event.target.value)}
+        >
+          {categoryOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="hidden rounded-md border border-brand-100/70 bg-white/70 p-2 sm:block">
+        <div className="flex flex-wrap gap-1.5">
           {categoryOptions.map((option) => {
             const isActive = filters.category === option.value;
 
@@ -59,7 +74,7 @@ function IngredientFilters({ filters, categories, storageTypes, onChange }) {
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => onChange('category', option.value)}
-                className={`shrink-0 rounded-full px-3 py-2 text-sm font-semibold ${
+                className={`rounded-full px-3 py-2 text-sm font-semibold ${
                   isActive
                     ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/20'
                     : 'bg-white/78 text-slate-600 hover:bg-brand-50 hover:text-slate-900'

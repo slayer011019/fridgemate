@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 function EmptyState({ title, description, compact = false, actionLabel = '', actionTo = '', icon = '🥕', className = '' }) {
   return (
     <div
-      className={`rounded-3xl border border-dashed border-stone-100 bg-white/70 p-5 text-center shadow-sm ${
+      className={`rounded-lg border border-dashed border-slate-300 bg-white p-5 text-center shadow-sm ${
         compact ? 'py-4' : 'py-7'
       } ${className}`}
     >
@@ -17,7 +17,7 @@ function EmptyState({ title, description, compact = false, actionLabel = '', act
       {actionLabel && actionTo ? (
         <Link
           to={actionTo}
-          className="mt-4 inline-flex min-h-[2.5rem] items-center justify-center rounded-full bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700"
+          className="mt-4 inline-flex min-h-[2.5rem] items-center justify-center rounded-md bg-green-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-800"
         >
           {actionLabel}
         </Link>

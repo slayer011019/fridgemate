@@ -19,14 +19,14 @@ function RecommendationSection({
     <section className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">{title}</h3>
+          <h2 className="text-lg font-bold text-slate-950 sm:text-xl">{title}</h2>
           <p className="mt-1 text-sm leading-6 muted">{description}</p>
         </div>
         {recipes.length ? <span className="badge bg-white text-slate-500">{`\uB808\uC2DC\uD53C ${recipes.length}\uAC1C`}</span> : null}
       </div>
 
       {!recipes.length ? (
-        <div className="rounded-[20px] border border-dashed border-slate-200 bg-white/70 p-4">
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-1.5">
               <p className="text-base font-semibold text-slate-900">{emptyTitle}</p>

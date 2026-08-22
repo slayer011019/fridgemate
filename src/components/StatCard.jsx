@@ -17,7 +17,7 @@ function StatCard({ label, value, tone = 'default', helper = '', emptyMessage = 
         {emptyMessage ? (
           <p className="max-w-[11rem] text-sm font-semibold leading-5 text-stone-600">{emptyMessage}</p>
         ) : (
-          <p className="text-[1.85rem] font-semibold tracking-tight text-stone-800">{value}</p>
+          <p className="text-[1.85rem] font-semibold text-stone-800">{value}</p>
         )}
       </div>
     </div>

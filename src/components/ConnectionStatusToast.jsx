@@ -72,7 +72,7 @@ function ConnectionStatusToast() {
       {notices.map((notice) => (
         <section
           key={notice.id}
-          className={`pointer-events-auto rounded-[18px] border px-4 py-3 shadow-lg backdrop-blur ${TOAST_STYLES[notice.tone]}`}
+          className={`pointer-events-auto rounded-lg border px-4 py-3 shadow-lg backdrop-blur ${TOAST_STYLES[notice.tone]}`}
         >
           <p className="text-sm font-semibold">{notice.title}</p>
           <p className="mt-1 text-sm leading-6">{notice.description}</p>

@@ -80,7 +80,7 @@ const ShoppingListItemCard = memo(function ShoppingListItemCard({
   onRestore
 }) {
   return (
-    <div className="rounded-[18px] border border-white/80 bg-white/75 p-3.5">
+    <div className="rounded-lg border border-slate-200 bg-white p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -329,7 +329,7 @@ function ShoppingListPanel({ items, onDelete, onRestore, onRestoreAll, onSaveDet
   }
 
   return (
-    <section className="card bg-gradient-to-br from-amber-50/70 via-white/70 to-brand-50/50">
+    <section className="card border-l-4 border-l-amber-400 bg-white">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-1.5">
           <p className="kicker">{'\uC7AC\uAD6C\uB9E4 \uD6C4\uBCF4'}</p>

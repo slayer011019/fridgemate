@@ -18,7 +18,7 @@ function UploadBox({ imagePreviewUrl, fileName, disabled, onChange, onRunOcr }) 
             <span className="summary-chip">{'4. \uAC00\uC838\uC624\uAE30'}</span>
           </div>
 
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-[18px] border border-dashed border-brand-100 bg-brand-50/40 px-4 py-6 text-center hover:border-brand-500 hover:bg-brand-50/70">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-brand-100 bg-brand-50/40 px-4 py-6 text-center hover:border-brand-500 hover:bg-brand-50/70">
             <span className="text-sm font-semibold text-slate-800">{'\uC0AC\uC9C4 \uACE0\uB974\uAE30'}</span>
             <span className="mt-1 text-xs muted">{'PNG, JPG, WEBP \uC8FC\uBB38 \uD654\uBA74 \u6216 \uC601\uC218\uC99D'}</span>
             <input type="file" accept="image/*" className="hidden" onChange={onChange} />
@@ -38,7 +38,7 @@ function UploadBox({ imagePreviewUrl, fileName, disabled, onChange, onRunOcr }) 
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-[18px] border border-white/70 bg-white/70">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           {imagePreviewUrl ? (
             <img
               src={imagePreviewUrl}

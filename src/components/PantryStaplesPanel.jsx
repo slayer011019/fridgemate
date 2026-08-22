@@ -29,7 +29,7 @@ function PantryStapleButton({ item, status, onCycle }) {
 function PantryCategoryGroup({ title, items, pantryOwnership, onCycle }) {
   return (
     <section className="space-y-2">
-      <h5 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</h5>
+      <h3 className="text-xs font-bold text-slate-700">{title}</h3>
       <div className="flex flex-wrap gap-2">
         {items.map((item) => {
           const status = pantryOwnership[item.id] || PANTRY_STATUS.UNKNOWN;
@@ -43,7 +43,7 @@ function PantryCategoryGroup({ title, items, pantryOwnership, onCycle }) {
 
 function PantryStaplesPanel({ pantryOwnership, pantrySummary, onCycle }) {
   return (
-    <div className="rounded-[20px] border border-white/70 bg-white/78 p-4">
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-1.5">
           <p className="kicker">{'기본 조미료 / 팬트리'}</p>

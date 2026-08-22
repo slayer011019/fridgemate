@@ -7,6 +7,8 @@ function RecipeCard({ recipe, onSelect }) {
   const matchedIngredients = recipe.matchedIngredients || recipe.matchedCore || [];
   const missingIngredients = recipe.missingIngredients || recipe.missingCore || [];
   const missingSeasonings = recipe.missingSeasonings || [];
+  const coreIngredients = recipe.coreIngredients || recipe.ingredients || [];
+  const hasMissingItems = missingIngredients.length > 0 || missingSeasonings.length > 0 || recipe.missingGroups?.length > 0;
   const isInteractive = typeof onSelect === 'function';
 
   const handleKeyDown = (event) => {
@@ -22,75 +24,68 @@ function RecipeCard({ recipe, onSelect }) {
 
   return (
     <article
-      className={`card overflow-hidden ${isInteractive ? 'cursor-pointer' : ''}`}
+      className={`card overflow-hidden border-l-4 border-l-brand-500 ${isInteractive ? 'cursor-pointer hover:border-brand-500 hover:shadow-md' : ''}`}
       onClick={isInteractive ? () => onSelect(recipe) : undefined}
       onKeyDown={handleKeyDown}
       role={isInteractive ? 'button' : undefined}
       tabIndex={isInteractive ? 0 : undefined}
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3.5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               {recipe.category ? <p className="kicker">{recipe.category}</p> : null}
-              {recipe.useSoon ? <span className="badge border border-rose-100 bg-rose-50 text-rose-700">빨리 써야 할 재료 중심</span> : null}
-              {recipe.canMakeNow ? <span className="badge border border-green-100 bg-green-50 text-green-700">지금 만들 수 있어요</span> : null}
+              {recipe.useSoon ? <span className="badge border border-amber-200 bg-amber-50 text-amber-800">먼저 쓸 재료</span> : null}
+              {recipe.canMakeNow ? <span className="badge border border-emerald-200 bg-emerald-50 text-emerald-800">바로 가능</span> : null}
             </div>
             <h3 className="text-lg font-semibold text-slate-900">{recipeName}</h3>
             {recipe.reason ? (
-              <div className="rounded-[16px] border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm text-brand-900">
+              <p className="border-l-2 border-brand-500 pl-3 text-sm font-medium leading-6 text-brand-900">
                 {recipe.reason}
-              </div>
+              </p>
             ) : null}
-            {recipe.description ? <p className="text-sm leading-6 muted">{recipe.description}</p> : null}
+            {recipe.description ? <p className="line-clamp-2 text-sm leading-6 muted">{recipe.description}</p> : null}
           </div>
 
-          <div className="flex flex-wrap gap-1.5 lg:justify-end">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             {recipe.cookingMethod ? <span className="badge bg-white text-slate-600">{recipe.cookingMethod}</span> : null}
-            <span className="badge bg-slate-900 text-white">{recipe.matchRateLabel || `${Math.round((recipe.matchRate || 0) * 100)}%`}</span>
+            <div className="flex items-baseline gap-1 rounded-md bg-slate-900 px-3 py-2 text-white">
+              <span className="text-lg font-bold leading-none">{recipe.matchRateLabel || `${Math.round((recipe.matchRate || 0) * 100)}%`}</span>
+              <span className="text-[11px] text-slate-300">매칭</span>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-3">
-          <div className="soft-panel border-brand-100/70 bg-brand-50/60">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700">매칭률</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">
-              {recipe.matchRateLabel || `${Math.round((recipe.matchRate || 0) * 100)}%`}
-            </p>
-            <p className="mt-1 text-xs muted">
-              핵심 재료 {recipe.matchedCount ?? matchedIngredients.length}/{recipe.totalRequiredIngredients ?? 0}
-            </p>
-          </div>
-          <div className="soft-panel">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">보유한 재료</p>
-            <p className="mt-2 text-sm leading-6 text-slate-900">{joinIngredientLabels(matchedIngredients) || '아직 없어요'}</p>
-          </div>
-          <div className="soft-panel border-rose-100/80 bg-rose-50/70">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-700">부족한 재료</p>
-            <p className="mt-2 text-sm leading-6 text-slate-900">{joinIngredientLabels(missingIngredients) || '없음'}</p>
-          </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-700">
+          <span className="font-semibold text-slate-900">보유 재료</span>
+          <span>{joinIngredientLabels(matchedIngredients) || '아직 없어요'}</span>
+          <span className="text-xs text-slate-500">
+            {`${recipe.matchedCount ?? matchedIngredients.length}/${recipe.totalRequiredIngredients ?? coreIngredients.length}개 일치`}
+          </span>
         </div>
 
-        <div className="grid gap-2 lg:grid-cols-2">
-          <div className="soft-panel">
-            <p className="text-sm font-semibold text-slate-900">부족한 양념</p>
-            <p className="mt-1.5 text-sm leading-6 muted">{joinIngredientLabels(missingSeasonings) || '없음'}</p>
-          </div>
-
-          <div className="soft-panel">
-            <p className="text-sm font-semibold text-slate-900">핵심 재료</p>
-            <p className="mt-1.5 text-sm leading-6 muted">{joinIngredientLabels(recipe.coreIngredients || recipe.ingredients || [])}</p>
+        {hasMissingItems ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+            <p className="font-semibold">추가로 필요한 재료</p>
+            {missingIngredients.length ? <p className="mt-1 leading-6">{joinIngredientLabels(missingIngredients)}</p> : null}
+            {missingSeasonings.length ? <p className="mt-1 text-xs leading-5 text-amber-800">{`양념: ${joinIngredientLabels(missingSeasonings)}`}</p> : null}
             {recipe.missingGroups?.length ? (
-              <p className="mt-2 text-xs text-rose-700">{`${recipe.missingGroups.join(', ')} 조건은 아직 부족해요`}</p>
+              <p className="mt-1 text-xs leading-5 text-amber-800">{`${recipe.missingGroups.join(', ')} 조건이 더 필요해요`}</p>
             ) : null}
           </div>
-        </div>
+        ) : null}
 
         {recipe.expiringMatchedIngredients?.length ? (
-          <div className="rounded-[18px] border border-amber-200/70 bg-amber-50/80 px-3.5 py-3">
-            <p className="text-sm font-semibold text-amber-800">곧 써야 하는 재료</p>
-            <p className="mt-1.5 text-sm leading-6 text-amber-900">{joinIngredientLabels(recipe.expiringMatchedIngredients)}</p>
+          <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5">
+            <p className="text-sm font-semibold text-rose-800">{`먼저 사용: ${joinIngredientLabels(recipe.expiringMatchedIngredients)}`}</p>
           </div>
+        ) : null}
+
+        {coreIngredients.length ? (
+          <details className="text-sm text-slate-600">
+            <summary className="cursor-pointer font-medium text-slate-700">주요 재료 보기</summary>
+            <p className="mt-2 leading-6">{joinIngredientLabels(coreIngredients)}</p>
+          </details>
         ) : null}
 
         <RecipeExternalLinks recipeName={recipeName} searchLinks={recipe.searchLinks} />

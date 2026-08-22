@@ -30,7 +30,7 @@ const IMPORT_PAGE_COPY = {
 
 function ImportEmptyPanel({ title, description }) {
   return (
-    <section className="rounded-[22px] border border-dashed border-brand-100/80 bg-white/60 px-5 py-8 text-center shadow-sm">
+    <section className="rounded-lg border border-dashed border-brand-100 bg-white px-5 py-8 text-center shadow-sm">
       <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg text-brand-700">◎</div>
       <h3 className="mt-3 text-xl font-semibold text-slate-900">{title}</h3>
       <p className="mx-auto mt-1.5 max-w-2xl text-sm leading-6 muted">{description}</p>
@@ -302,7 +302,7 @@ function ImportPage() {
           </div>
 
           {parseResult.warnings?.length ? (
-            <div className="rounded-[20px] border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <p className="font-semibold">{'\uD655\uC778\uD558\uBA74 \uC88B\uC740 \uD56D\uBAA9'}</p>
               <ul className="mt-2 space-y-1.5 text-sm leading-6">
                 {parseResult.warnings.map((warning, index) => (

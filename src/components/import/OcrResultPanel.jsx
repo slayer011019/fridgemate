@@ -41,19 +41,19 @@ function OcrResultPanel({ status, progress, error, rawText, showRawText, onToggl
       ) : null}
 
       {status === 'error' ? (
-        <div className="rounded-[18px] border border-rose-200 bg-rose-50/80 p-3 text-sm text-rose-700">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           {`\uC0AC\uC9C4\uC744 \uC77D\uB294 \uB370 \uC2E4\uD328\uD588\uC5B4\uC694. ${error || '\uB354 \uC120\uBA85\uD55C \uC0AC\uC9C4\uC73C\uB85C \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uBCF4\uC138\uC694.'}`}
         </div>
       ) : null}
 
       {status === 'success' && !rawText ? (
-        <div className="rounded-[18px] border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-800">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           {'\uC0AC\uC9C4\uC744 \uC77D\uAE30\uB294 \uD588\uC9C0\uB9CC \uC7AC\uB8CC\uB85C \uBCF4\uC774\uB294 \uB0B4\uC6A9\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694.'}
         </div>
       ) : null}
 
       {showRawText && rawText ? (
-        <pre className="max-h-56 overflow-auto rounded-[18px] bg-slate-950 p-3 text-xs text-slate-100">{rawText}</pre>
+        <pre className="max-h-56 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">{rawText}</pre>
       ) : null}
     </section>
   );

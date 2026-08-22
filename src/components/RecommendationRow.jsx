@@ -9,16 +9,12 @@ function getRecipeKey(recipe = {}) {
 
 function SkeletonCard() {
   return (
-    <div className="card min-h-[280px] min-w-[300px] flex-[0_0_300px] animate-pulse sm:min-w-[360px] sm:flex-[0_0_360px]">
+    <div className="card min-h-[230px] min-w-[300px] flex-[0_0_300px] animate-pulse sm:min-w-[360px] sm:flex-[0_0_360px]">
       <div className="space-y-4">
         <div className="h-4 w-20 rounded-full bg-slate-200" />
         <div className="h-6 w-2/3 rounded-full bg-slate-200" />
-        <div className="h-16 rounded-[16px] bg-slate-100" />
-        <div className="grid grid-cols-3 gap-2">
-          <div className="h-20 rounded-[16px] bg-slate-100" />
-          <div className="h-20 rounded-[16px] bg-slate-100" />
-          <div className="h-20 rounded-[16px] bg-slate-100" />
-        </div>
+        <div className="h-12 rounded-md bg-slate-100" />
+        <div className="h-10 rounded-md bg-slate-100" />
       </div>
     </div>
   );
@@ -90,15 +86,15 @@ function RecommendationRow({
   return (
     <section ref={observeRef} className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h3 className="text-xl font-semibold text-slate-900 sm:text-2xl">{title}</h3>
+        <div className={`border-l-4 pl-3 ${source === 'hybrid' ? 'border-l-cyan-500' : 'border-l-brand-500'}`}>
+          <h2 className="text-lg font-bold text-slate-950 sm:text-xl">{title}</h2>
           {description ? <p className="mt-1 text-sm leading-6 muted">{description}</p> : null}
         </div>
       {rankedRecipes.length ? <span className="badge bg-white text-slate-500">{`레시피 ${rankedRecipes.length}개`}</span> : null}
       </div>
 
       {needsLogin ? (
-        <div className="rounded-[16px] border border-dashed border-slate-200 bg-white/80 p-4">
+        <div className="rounded-md border border-dashed border-slate-300 bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-medium text-slate-800">로그인하면 AI 추천을 볼 수 있어요</p>
             <Link to={loginCtaTo} className="btn-primary">
@@ -108,7 +104,7 @@ function RecommendationRow({
         </div>
       ) : null}
 
-      {error ? <div className="rounded-[16px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
+      {error ? <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div> : null}
 
       {!needsLogin && !error && loading ? (
         <div className="flex gap-3 overflow-x-auto pb-3">
@@ -129,7 +125,7 @@ function RecommendationRow({
       ) : null}
 
       {!needsLogin && !error && !loading && !rankedRecipes.length ? (
-        <div className="rounded-3xl border border-dashed border-stone-100 bg-white/70 p-5 shadow-sm">
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-3">
               <div className="text-4xl leading-none" aria-hidden="true">

@@ -23,13 +23,13 @@ function Header() {
   const visibleNavItems = ocrEnabled ? navItems : navItems.filter((item) => item.to !== '/import');
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/60 bg-[#fbf8f2]/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
       <div className="py-3">
         <div className="app-header-frame mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 flex-1">
               <p className="kicker">오늘뭐먹지</p>
-              <p className="mt-1 text-lg font-semibold tracking-tight text-slate-900 sm:text-[1.25rem]">
+              <p className="mt-1 text-lg font-semibold text-slate-900 sm:text-[1.25rem]">
                 {'\uB0C9\uC7A5\uACE0 \uC815\uB9AC\uB97C \uBE60\uB974\uAC8C, \uC694\uB9AC \uC120\uD0DD\uC740 \uB354 \uC26C\uAC8C'}
               </p>
               <p className="max-w-2xl text-sm leading-5.5 muted">
@@ -37,7 +37,7 @@ function Header() {
               </p>
             </div>
 
-            <div className="flex w-full flex-wrap items-center justify-end gap-2 rounded-full border border-white/75 bg-white/72 px-2 py-2 shadow-sm lg:w-auto">
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 shadow-sm lg:w-auto">
               {isAuthenticated ? (
                 <>
                   <span className="max-w-full truncate rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600 sm:max-w-[18rem]">

@@ -109,7 +109,7 @@ function RecipesPage() {
         />
       </section>
 
-      <section className="card bg-gradient-to-br from-brand-50/80 via-white/55 to-amber-50/65">
+      <section className="card border-l-4 border-l-brand-500 bg-white">
         <div className="adaptive-split">
           <div className="space-y-3">
             <div>
@@ -130,17 +130,17 @@ function RecipesPage() {
 
           <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-1">
             <div className="soft-panel">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{'\uD604\uC7AC \uB4F1\uB85D \uC7AC\uB8CC'}</p>
+              <p className="text-xs font-bold text-slate-700">{'\uD604\uC7AC \uB4F1\uB85D \uC7AC\uB8CC'}</p>
               <p className="mt-2 text-xl font-semibold text-slate-900">{loading ? '...' : activeIngredientCount}</p>
               <p className="mt-1 text-xs muted">{'\uBCF4\uC720 \uC911\uC778 \uC7AC\uB8CC \uAE30\uC900'}</p>
             </div>
             <div className="soft-panel border-amber-100/70 bg-amber-50/70">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">{'\uC720\uD1B5\uAE30\uD55C \uC784\uBC15'}</p>
+              <p className="text-xs font-bold text-amber-800">{'\uC720\uD1B5\uAE30\uD55C \uC784\uBC15'}</p>
               <p className="mt-2 text-xl font-semibold text-slate-900">{loading ? '...' : summary.expiringSoon}</p>
               <p className="mt-1 text-xs muted">{'\uC6B0\uC120 \uC18C\uBE44\uD558\uBA74 \uC88B\uC740 \uC7AC\uB8CC'}</p>
             </div>
             <div className="soft-panel border-brand-100/70 bg-white/80">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700">{'\uCD94\uCC9C \uD3ED \uB113\uD788\uAE30'}</p>
+              <p className="text-xs font-bold text-brand-700">{'\uCD94\uCC9C \uD3ED \uB113\uD788\uAE30'}</p>
               <p className="mt-2 text-sm font-medium leading-6 text-slate-900">
                 {missingBasicIngredients.length
                   ? `${missingBasicIngredients.slice(0, 3).join(', ')}\uC744 \uCC44\uC6B0\uBA74 \uCD94\uCC9C\uC774 \uB354 \uB2E4\uC591\uD574\uC838\uC694.`
