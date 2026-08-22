@@ -28,10 +28,10 @@ function Header() {
         <div className="app-header-frame mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 flex-1">
-              <p className="kicker">FridgeMate</p>
-              <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900 sm:text-[1.25rem]">
+              <p className="kicker">오늘뭐먹지</p>
+              <p className="mt-1 text-lg font-semibold tracking-tight text-slate-900 sm:text-[1.25rem]">
                 {'\uB0C9\uC7A5\uACE0 \uC815\uB9AC\uB97C \uBE60\uB974\uAC8C, \uC694\uB9AC \uC120\uD0DD\uC740 \uB354 \uC26C\uAC8C'}
-              </h1>
+              </p>
               <p className="max-w-2xl text-sm leading-5.5 muted">
                 {'\uC7AC\uB8CC \uD604\uD669, \uC720\uD1B5\uAE30\uD55C, \uC7A5\uBCF4\uAE30 \uD544\uC694\uD55C \uD56D\uBAA9\uC744 \uD55C \uACF3\uC5D0\uC11C \uBCF4\uC138\uC694.'}
               </p>

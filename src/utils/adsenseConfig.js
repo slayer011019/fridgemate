@@ -7,11 +7,17 @@ function parseBoolean(value) {
 
 export function getAdSenseConfig(env = import.meta.env) {
   const client = String(env.VITE_ADSENSE_CLIENT || '').trim();
-  const requested = parseBoolean(env.VITE_ADSENSE_ENABLED);
+  const verificationRequested = parseBoolean(
+    env.VITE_ADSENSE_VERIFICATION_ENABLED ?? env.VITE_ADSENSE_ENABLED
+  );
+  const servingRequested = parseBoolean(env.VITE_ADSENSE_SERVING_ENABLED);
+  const verificationEnabled = verificationRequested && ADSENSE_CLIENT_PATTERN.test(client);
 
   return {
-    enabled: requested && ADSENSE_CLIENT_PATTERN.test(client),
-    requested,
+    enabled: verificationEnabled && servingRequested,
+    requested: verificationRequested,
+    servingRequested,
+    verificationEnabled,
     client,
     slots: {
       home: String(env.VITE_ADSENSE_HOME_SLOT || '').trim(),

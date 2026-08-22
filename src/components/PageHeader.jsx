@@ -6,7 +6,7 @@ function PageHeader({ eyebrow, title, description, action }) {
         <div className="max-w-2xl space-y-2">
           {eyebrow ? <p className="kicker">{eyebrow}</p> : null}
           <div className="space-y-1">
-            <h2 className="section-title">{title}</h2>
+            <h1 className="section-title">{title}</h1>
             {description ? <p className="max-w-2xl text-sm leading-5.5 muted sm:text-[0.95rem]">{description}</p> : null}
           </div>
         </div>

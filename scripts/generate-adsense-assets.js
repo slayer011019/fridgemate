@@ -7,10 +7,12 @@ const productionEnv = loadEnv('production', process.cwd(), 'VITE_');
 const config = getAdSenseConfig({ ...productionEnv, ...process.env });
 
 if (config.requested && !isValidAdSenseClient(config.client)) {
-  throw new Error('VITE_ADSENSE_CLIENT must use the ca-pub-XXXXXXXXXXXXXXXX format when AdSense is enabled.');
+  throw new Error(
+    'VITE_ADSENSE_CLIENT must use the ca-pub-XXXXXXXXXXXXXXXX format when AdSense verification is enabled.'
+  );
 }
 
-if (config.enabled) {
+if (config.verificationEnabled) {
   const outputDirectory = resolve(process.cwd(), 'dist');
   const publisherId = config.client.replace(/^ca-/, '');
   const content = `google.com, ${publisherId}, DIRECT, f08c47fec0942fa0\n`;
@@ -19,5 +21,5 @@ if (config.enabled) {
   await writeFile(resolve(outputDirectory, 'ads.txt'), content, 'utf8');
   console.log('Generated dist/ads.txt for the configured AdSense publisher.');
 } else {
-  console.log('AdSense is disabled; dist/ads.txt was not generated.');
+  console.log('AdSense site verification is disabled; dist/ads.txt was not generated.');
 }

@@ -6,13 +6,15 @@ function adsenseHeadPlugin(mode) {
   const config = getAdSenseConfig(loadEnv(mode, process.cwd(), ''));
 
   if (config.requested && !isValidAdSenseClient(config.client)) {
-    throw new Error('VITE_ADSENSE_CLIENT must use the ca-pub-XXXXXXXXXXXXXXXX format when AdSense is enabled.');
+    throw new Error(
+      'VITE_ADSENSE_CLIENT must use the ca-pub-XXXXXXXXXXXXXXXX format when AdSense verification is enabled.'
+    );
   }
 
   return {
     name: 'fridgemate-adsense-head',
     transformIndexHtml() {
-      if (!config.enabled) return [];
+      if (!config.verificationEnabled) return [];
 
       return [
         {

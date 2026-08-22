@@ -22,7 +22,8 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] `VITE_API_URL=https://YOUR_API_DOMAIN/api`
 - [ ] `VITE_ENABLE_OCR=true`
 - [ ] Optional: `VITE_SENTRY_DSN`
-- [ ] Keep `VITE_ADSENSE_ENABLED=false` until the site is approved and publisher/slot IDs are configured.
+- [ ] Keep `VITE_ADSENSE_SERVING_ENABLED=false` until the site is approved and publisher/slot IDs are configured.
+- [ ] Keep AdSense Auto ads disabled so functional, empty, and error routes never receive Google-served ads.
 - [ ] Confirm SPA routes load after refresh: `/`, `/ingredients`, `/import`, `/recipes`, `/login`, `/account`.
 - [ ] Confirm the deployed frontend sends API requests with credentials.
 

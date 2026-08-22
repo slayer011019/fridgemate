@@ -7,6 +7,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 ### Added
+- Added route-specific titles, descriptions, canonical URLs, search-index controls, and a Not Found page with production 404 routing.
 - Added a Cloudflare Workers Express entry point, Prisma PostgreSQL driver adapter support for Hyperdrive, and optional Workers KV auth security storage.
 - Added disabled-by-default AdSense head injection, responsive ad units, generated `ads.txt`, and a public privacy information page.
 - Added public service and contact pages, finalized the privacy contact, and published `robots.txt` and `sitemap.xml` for search crawlers.
@@ -45,6 +46,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Separated AdSense ownership verification from ad serving, disabled Google-served ads during policy review, and removed the global Auto ads loader from non-content routes.
 - Added the production AdSense publisher verification script to the document head while keeping ad units disabled by default.
 - Split account-page manual sync into explicit server backup and server pull actions with confirmation prompts.
 - Refactored the recipes page into a two-row layout: instant local seed recommendations first, lazy DB-backed AI recommendations second.

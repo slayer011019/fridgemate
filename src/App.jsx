@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppShell from './components/AppShell';
+import RouteMetadata from './components/RouteMetadata';
 import HomePage from './pages/HomePage';
 import IngredientsPage from './pages/IngredientsPage';
 import IngredientFormPage from './pages/IngredientFormPage';
@@ -12,6 +13,7 @@ import AccountPage from './pages/AccountPage';
 import PrivacyPage from './pages/PrivacyPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
+import NotFoundPage from './pages/NotFoundPage';
 import { isOcrEnabled } from './utils/backendConfig';
 
 function App() {
@@ -19,6 +21,7 @@ function App() {
 
   return (
     <AppShell>
+      <RouteMetadata />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/ingredients" element={<IngredientsPage />} />
@@ -39,6 +42,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>
   );
