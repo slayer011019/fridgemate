@@ -35,7 +35,7 @@ export async function withDatabaseScope(
         set_config('app.current_user_id', ${normalizedUserId}, true) AS "userId",
         set_config('app.current_auth_email', ${normalizedAuthEmail}, true) AS "authEmail",
         set_config('app.current_refresh_token_hash', ${normalizedRefreshTokenHash}, true) AS "refreshTokenHash",
-        current_user AS "currentUser",
+        current_user::text AS "currentUser",
         COALESCE((SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user), true) AS "bypassRls",
         pg_has_role(current_user, 'fridgemate_app', 'member') AS "isAppRoleMember",
         EXISTS (
