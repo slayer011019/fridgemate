@@ -30,7 +30,8 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 ## Cloudflare Workers API
 
 - [ ] The `HYPERDRIVE` binding points to the Supabase PostgreSQL database.
-- [ ] The `AUTH_KV` binding exists for shared auth throttling and logout revocation state.
+- [ ] The `AUTH_KV` binding exists for logout revocation state.
+- [ ] The `AUTH_RATE_LIMITER` Durable Object binding and `AuthRateLimiter` SQLite export are present.
 - [ ] `DIRECT_URL` is available only in the trusted environment that applies Prisma migrations.
 - [ ] `JWT_SECRET` is at least 32 characters.
 - [ ] `JWT_EXPIRES_IN=15m` or another intentional short access-token value.

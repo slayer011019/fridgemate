@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createClient } from 'redis';
 import { serverConfig } from '../config.js';
 
@@ -70,35 +71,22 @@ function createMemoryStore() {
   };
 }
 
-function createKvStore(kv) {
+function buildRateLimiterName(scope, key) {
+  return createHash('sha256')
+    .update(`${serverConfig.authRedisPrefix}:ratelimit:${scope}:${key}`)
+    .digest('hex');
+}
+
+function createCloudflareStore({ kv, rateLimiter }) {
   const prefix = serverConfig.authRedisPrefix;
 
   return {
-    mode: 'kv',
+    mode: 'cloudflare',
     async connect() {},
     async disconnect() {},
     async consumeRateLimit({ scope, key, limit, windowMs }) {
-      const storeKey = `${prefix}:ratelimit:${scope}:${key}`;
-      const now = Date.now();
-      const existingWindow = await kv.get(storeKey, 'json');
-      const windowState =
-        !existingWindow || existingWindow.resetTime <= now
-          ? { count: 0, resetTime: now + windowMs }
-          : existingWindow;
-
-      if (windowState.count >= limit) {
-        return {
-          allowed: false,
-          retryAfterSeconds: Math.max(1, Math.ceil((windowState.resetTime - now) / 1000))
-        };
-      }
-
-      windowState.count += 1;
-      await kv.put(storeKey, JSON.stringify(windowState), {
-        expirationTtl: Math.max(60, Math.ceil(windowMs / 1000))
-      });
-
-      return { allowed: true, retryAfterSeconds: 0 };
+      const stub = rateLimiter.getByName(buildRateLimiterName(scope, key));
+      return stub.consumeRateLimit({ limit, windowMs });
     },
     async revokeToken(jti, exp) {
       const expiresAt = Number(exp);
@@ -191,44 +179,15 @@ function createRedisStore() {
 
 let activeStore = createMemoryStore();
 let configuredMode = 'memory';
-let fallbackStore = activeStore;
 
-async function switchToMemoryStore(error) {
-  if (configuredMode === 'memory') {
-    return;
-  }
-
-  console.error(`Persistent auth store failed during runtime, falling back to memory: ${error.message}`);
-
-  try {
-    await activeStore.disconnect();
-  } catch (disconnectError) {
-    console.error(`Redis auth store disconnect failed: ${disconnectError.message}`);
-  }
-
-  fallbackStore = createMemoryStore();
-  activeStore = fallbackStore;
-  configuredMode = 'memory';
-}
-
-async function runWithFallback(operation) {
-  try {
-    return await operation(activeStore);
-  } catch (error) {
-    if (configuredMode === 'memory') {
-      throw error;
+export async function initializeAuthSecurityStore({ kv, rateLimiter } = {}) {
+  if (kv || rateLimiter) {
+    if (!kv || !rateLimiter) {
+      throw new Error('Cloudflare auth security requires both AUTH_KV and AUTH_RATE_LIMITER bindings.');
     }
 
-    await switchToMemoryStore(error);
-    return operation(activeStore);
-  }
-}
-
-export async function initializeAuthSecurityStore({ kv } = {}) {
-  if (kv) {
-    activeStore = createKvStore(kv);
-    fallbackStore = createMemoryStore();
-    configuredMode = 'kv';
+    activeStore = createCloudflareStore({ kv, rateLimiter });
+    configuredMode = 'cloudflare';
     return configuredMode;
   }
 
@@ -238,19 +197,10 @@ export async function initializeAuthSecurityStore({ kv } = {}) {
 
   const redisStore = createRedisStore();
 
-  try {
-    await redisStore.connect();
-    activeStore = redisStore;
-    fallbackStore = createMemoryStore();
-    configuredMode = 'redis';
-    return configuredMode;
-  } catch (error) {
-    console.error(`Redis auth store unavailable, falling back to memory: ${error.message}`);
-    activeStore = createMemoryStore();
-    fallbackStore = activeStore;
-    configuredMode = 'memory';
-    return configuredMode;
-  }
+  await redisStore.connect();
+  activeStore = redisStore;
+  configuredMode = 'redis';
+  return configuredMode;
 }
 
 export async function shutdownAuthSecurityStore() {
@@ -258,15 +208,15 @@ export async function shutdownAuthSecurityStore() {
 }
 
 export async function consumeAuthRateLimit(options) {
-  return runWithFallback((store) => store.consumeRateLimit(options));
+  return activeStore.consumeRateLimit(options);
 }
 
 export async function revokeAuthToken(jti, exp) {
-  return runWithFallback((store) => store.revokeToken(jti, exp));
+  return activeStore.revokeToken(jti, exp);
 }
 
 export async function checkRevokedToken(jti) {
-  return runWithFallback((store) => store.isTokenRevoked(jti));
+  return activeStore.isTokenRevoked(jti);
 }
 
 export function getAuthSecurityStoreMode() {
@@ -279,7 +229,6 @@ export function resetAuthSecurityStoreForTests() {
   }
 
   activeStore = createMemoryStore();
-  fallbackStore = activeStore;
   configuredMode = 'memory';
 }
 

@@ -100,7 +100,7 @@ Backend:
 - Prisma
 - PostgreSQL
 - JWT auth with `httpOnly` access and refresh cookies
-- Redis-backed auth throttling for Node and Cloudflare KV-backed auth state for Workers, with memory fallback
+- Atomic Redis-backed auth throttling for production Node and SQLite Durable Object throttling for Workers; KV stores Worker token revocations
 
 AI, OCR, and data:
 

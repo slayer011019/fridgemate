@@ -42,6 +42,7 @@ function createServerConfig(runtimeEnv = process.env) {
 
   return {
     runtime: hyperdrive ? 'cloudflare' : 'node',
+    nodeEnv: runtimeValue(runtimeEnv, 'NODE_ENV') || 'development',
     host: runtimeValue(runtimeEnv, 'HOST') || '0.0.0.0',
     port: Number(runtimeValue(runtimeEnv, 'PORT') || 4000),
     clientOrigin,
@@ -90,6 +91,10 @@ export function validateServerConfig({ exitOnError = true } = {}) {
 
   if (String(serverConfig.jwtSecret || '').trim().length < 32 && !missingEnvVars.includes('JWT_SECRET')) {
     errors.push('JWT_SECRET must be at least 32 characters long.');
+  }
+
+  if (serverConfig.runtime === 'node' && serverConfig.nodeEnv === 'production' && !serverConfig.redisUrl) {
+    errors.push('REDIS_URL is required for a production Node server.');
   }
 
   if (errors.length && exitOnError) {

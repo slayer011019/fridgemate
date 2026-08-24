@@ -84,6 +84,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Simplified recipe, OCR import, and auth screen copy so the next step is clearer on mobile and desktop.
 
 ### Fixed
+- Login and signup throttling now uses per-key SQLite Durable Objects on Cloudflare, keeps Redis atomic counters on production Node, and fails closed instead of falling back to per-instance memory when persistent auth storage fails.
 - Cloudflare database requests now use a single connection per request, and recommendation events are queued in the browser to avoid exhausting the Supabase session pool.
 - Hybrid recipe recommendations now continue without alias expansion when the optional ingredient alias catalog is unavailable.
 - Server-side failures now record sanitized request and error metadata in private runtime logs while keeping generic 500 responses for clients.

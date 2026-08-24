@@ -31,18 +31,25 @@ FridgeMate keeps the React frontend on Vercel and the PostgreSQL database on Sup
 1. Authenticate Wrangler with `npx wrangler login`.
 2. Create a Hyperdrive configuration in the Cloudflare dashboard using the Supabase direct PostgreSQL connection. Do not commit or paste the connection string into `wrangler.jsonc`.
 3. Add the generated Hyperdrive binding to `wrangler.jsonc` with the binding name `HYPERDRIVE`.
-4. Create a Workers KV namespace and add its binding as `AUTH_KV`.
-5. Store `JWT_SECRET` with `npx wrangler secret put JWT_SECRET`.
-6. Store optional `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` as Wrangler secrets only when those features are enabled.
-7. Run `npm run worker:dry-run`, then `npm run dev:worker` for a local smoke check.
-8. Deploy with `npm run worker:deploy` after the health and auth checks pass.
+4. Create a Workers KV namespace and add its binding as `AUTH_KV` for access-token revocation.
+5. Keep the `AUTH_RATE_LIMITER` Durable Object binding and `AuthRateLimiter` SQLite export from `wrangler.jsonc`; Wrangler provisions it on deploy.
+6. Store `JWT_SECRET` with `npx wrangler secret put JWT_SECRET`.
+7. Store optional `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` as Wrangler secrets only when those features are enabled.
+8. Run `npm run worker:dry-run`, then `npm run dev:worker` for a local smoke check.
+9. Deploy with `npm run worker:deploy` after the health and auth checks pass.
 
 Example binding shape to add after Cloudflare creates the resources:
 
 ```jsonc
 {
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<cloudflare-hyperdrive-id>" }],
-  "kv_namespaces": [{ "binding": "AUTH_KV", "id": "<cloudflare-kv-id>" }]
+  "kv_namespaces": [{ "binding": "AUTH_KV", "id": "<cloudflare-kv-id>" }],
+  "durable_objects": {
+    "bindings": [{ "name": "AUTH_RATE_LIMITER", "class_name": "AuthRateLimiter" }]
+  },
+  "exports": {
+    "AuthRateLimiter": { "type": "durable-object", "storage": "sqlite" }
+  }
 }
 ```
 
@@ -66,7 +73,8 @@ Redeploy the frontend and verify login, session restore, ingredient backup/pull,
 
 - Hyperdrive is preferred over a plain `DATABASE_URL` because it pools and routes PostgreSQL connections for Workers.
 - Prisma migrations continue to run from a trusted local or CI environment with `DIRECT_URL`; Workers do not run migrations at startup.
-- `AUTH_KV` persists logout revocations across Worker isolates. KV rate limiting is approximate because KV writes are not strongly consistent; use Cloudflare Rate Limiting or a Durable Object if abuse volume grows.
+- `AUTH_KV` persists logout revocations across Worker isolates. `AUTH_RATE_LIMITER` serializes each hashed email/IP rate-limit key in a SQLite Durable Object so concurrent login attempts cannot bypass the counter.
+- Persistent auth-store failures are fail-closed. Production Node deployments require `REDIS_URL`; Cloudflare deployments require both auth bindings.
 - `wrangler.jsonc` contains non-secret defaults only. Never add database URLs, API keys, or service role keys to it.
 
 References: [Express on Workers](https://developers.cloudflare.com/workers/tutorials/deploy-an-express-app/), [Supabase with Hyperdrive](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-database-providers/supabase/), [Prisma with Hyperdrive](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-drivers-and-libraries/prisma-orm/).

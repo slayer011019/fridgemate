@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "fridgemate-api",
   "main": "server/src/worker.js",
-  "compatibility_date": "2026-08-21",
+  "compatibility_date": "2026-08-25",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "routes": [
@@ -18,6 +18,20 @@
       "id": "3164069f15a04b56848f27d3f2153be0"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTH_RATE_LIMITER",
+        "class_name": "AuthRateLimiter"
+      }
+    ]
+  },
+  "exports": {
+    "AuthRateLimiter": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",

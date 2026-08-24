@@ -2,6 +2,8 @@ import { httpServerHandler } from 'cloudflare:node';
 import { env } from 'cloudflare:workers';
 import { configureServerRuntime, validateServerConfig } from './config.js';
 
+export { AuthRateLimiter } from './durableObjects/authRateLimiter.js';
+
 configureServerRuntime(env);
 
 const errors = validateServerConfig({ exitOnError: false });
@@ -15,7 +17,10 @@ const [{ createApp }, { initializeAuthSecurityStore }] = await Promise.all([
   import('./services/authSecurityStore.js')
 ]);
 
-await initializeAuthSecurityStore({ kv: env.AUTH_KV });
+await initializeAuthSecurityStore({
+  kv: env.AUTH_KV,
+  rateLimiter: env.AUTH_RATE_LIMITER
+});
 createApp().listen(3000);
 
 export default httpServerHandler({ port: 3000 });

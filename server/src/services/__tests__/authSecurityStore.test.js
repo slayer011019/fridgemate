@@ -15,8 +15,10 @@ describe('authSecurityStore', () => {
     authSecurityStore.resetAuthSecurityStoreForTests();
   });
 
-  it('uses a Cloudflare KV binding for rate limits and token revocation', async () => {
+  it('uses a Durable Object for rate limits and KV for token revocation', async () => {
     const values = new Map();
+    const rateLimitCounts = new Map();
+    const objectNames = [];
     const kv = {
       async get(key, type) {
         const value = values.get(key) ?? null;
@@ -26,9 +28,24 @@ describe('authSecurityStore', () => {
         values.set(key, value);
       }
     };
+    const rateLimiter = {
+      getByName(name) {
+        objectNames.push(name);
+        return {
+          async consumeRateLimit({ limit }) {
+            const nextCount = (rateLimitCounts.get(name) || 0) + 1;
+            rateLimitCounts.set(name, nextCount);
+            return {
+              allowed: nextCount <= limit,
+              retryAfterSeconds: nextCount <= limit ? 0 : 60
+            };
+          }
+        };
+      }
+    };
     const authSecurityStore = await import('../authSecurityStore.js');
 
-    await expect(authSecurityStore.initializeAuthSecurityStore({ kv })).resolves.toBe('kv');
+    await expect(authSecurityStore.initializeAuthSecurityStore({ kv, rateLimiter })).resolves.toBe('cloudflare');
     await expect(
       authSecurityStore.consumeAuthRateLimit({ scope: 'login', key: 'client', limit: 1, windowMs: 60_000 })
     ).resolves.toEqual({ allowed: true, retryAfterSeconds: 0 });
@@ -38,9 +55,20 @@ describe('authSecurityStore', () => {
 
     await authSecurityStore.revokeAuthToken('token-1', Math.floor(Date.now() / 1000) + 3600);
     await expect(authSecurityStore.checkRevokedToken('token-1')).resolves.toBe(true);
+    expect(objectNames).toHaveLength(2);
+    expect(objectNames[0]).toBe(objectNames[1]);
+    expect(objectNames[0]).toMatch(/^[a-f0-9]{64}$/);
+  }, 15_000);
+
+  it('requires both Cloudflare auth bindings', async () => {
+    const authSecurityStore = await import('../authSecurityStore.js');
+
+    await expect(authSecurityStore.initializeAuthSecurityStore({ kv: {} })).rejects.toThrow(
+      'AUTH_KV and AUTH_RATE_LIMITER'
+    );
   });
 
-  it('falls back to memory when the active redis rate limit operation fails', async () => {
+  it('fails closed when the persistent rate limit operation fails', async () => {
     const authSecurityStore = await import('../authSecurityStore.js');
     const failingStore = {
       async consumeRateLimit() {
@@ -63,15 +91,12 @@ describe('authSecurityStore', () => {
         limit: 2,
         windowMs: 60_000
       })
-    ).resolves.toEqual({
-      allowed: true,
-      retryAfterSeconds: 0
-    });
+    ).rejects.toThrow('redis down');
 
-    expect(authSecurityStore.getAuthSecurityStoreMode()).toBe('memory');
+    expect(authSecurityStore.getAuthSecurityStoreMode()).toBe('redis');
   });
 
-  it('falls back to memory when token revocation checks fail', async () => {
+  it('fails closed when token revocation checks fail', async () => {
     const authSecurityStore = await import('../authSecurityStore.js');
     const failingStore = {
       async consumeRateLimit() {
@@ -89,10 +114,10 @@ describe('authSecurityStore', () => {
 
     authSecurityStore.setAuthSecurityStoreForTests(failingStore, 'redis');
 
-    await expect(authSecurityStore.revokeAuthToken('token-1', Math.floor(Date.now() / 1000) + 3600)).resolves.toBe(
-      undefined
-    );
-    await expect(authSecurityStore.checkRevokedToken('token-1')).resolves.toBe(true);
-    expect(authSecurityStore.getAuthSecurityStoreMode()).toBe('memory');
+    await expect(
+      authSecurityStore.revokeAuthToken('token-1', Math.floor(Date.now() / 1000) + 3600)
+    ).rejects.toThrow('redis down');
+    await expect(authSecurityStore.checkRevokedToken('token-1')).rejects.toThrow('redis down');
+    expect(authSecurityStore.getAuthSecurityStoreMode()).toBe('redis');
   });
 });
