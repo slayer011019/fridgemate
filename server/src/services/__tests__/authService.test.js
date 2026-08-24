@@ -15,6 +15,13 @@ const prismaMock = {
   }
 };
 
+prismaMock.$queryRaw = vi.fn().mockResolvedValue([
+  {
+    isAppRoleMember: true,
+    bypassRls: false,
+    ownsTenantTables: false
+  }
+]);
 prismaMock.$transaction = vi.fn(async (callback) => callback(prismaMock));
 
 vi.mock('../../db/prisma.js', () => ({

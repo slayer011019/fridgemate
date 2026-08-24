@@ -1,4 +1,4 @@
-import { prisma } from '../db/prisma.js';
+import { withDatabaseScope, withUserDatabaseScope } from '../db/tenantScope.js';
 import { createHttpError } from '../lib/httpError.js';
 
 const VALID_EVENT_TYPES = new Set(['impression', 'click']);
@@ -153,17 +153,23 @@ export function normalizeRecommendationEventPayload(body = {}) {
 export async function createRecommendationEvent({ userId = null, body = {} } = {}) {
   const data = normalizeRecommendationEventPayload(body);
   const normalizedUserId = typeof userId === 'string' && userId.trim() ? userId.trim() : null;
-  const user = normalizedUserId
-    ? await prisma.user.findUnique({
-        where: { id: normalizedUserId },
-        select: { id: true }
-      })
-    : null;
+  const operation = async (database) => {
+    const user = normalizedUserId
+      ? await database.user.findUnique({
+          where: { id: normalizedUserId },
+          select: { id: true }
+        })
+      : null;
 
-  return prisma.recommendationEvent.create({
-    data: {
-      ...data,
-      userId: user?.id || null
-    }
-  });
+    return database.recommendationEvent.create({
+      data: {
+        ...data,
+        userId: user?.id || null
+      }
+    });
+  };
+
+  return normalizedUserId
+    ? withUserDatabaseScope(normalizedUserId, operation)
+    : withDatabaseScope({}, operation);
 }

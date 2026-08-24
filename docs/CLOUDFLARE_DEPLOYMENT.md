@@ -42,7 +42,7 @@ Recipe catalog imports are intentionally not exposed over HTTP. Run the trusted 
 
 ## Database runtime role and RLS
 
-The tenant RLS migration creates a non-login, non-bypass role named `fridgemate_app` and forces user-scoped policies on `Ingredient` and `ImportCorrection`. Create a separate login role directly in Supabase using a generated password, grant it membership, and configure Hyperdrive to connect as that login role:
+The tenant RLS migrations create a non-login, non-bypass role named `fridgemate_app`. They force user-scoped policies on `Ingredient` and `ImportCorrection`, bind account lookup to the submitted normalized email, bind refresh-session lookup to the presented token hash, and keep recipe access read-only. Create a separate login role directly in Supabase using a generated password, grant it membership, and configure Hyperdrive to connect as that login role:
 
 ```sql
 CREATE ROLE fridgemate_runtime
@@ -60,7 +60,7 @@ Do not put the generated password in this repository or `wrangler.jsonc`. Update
 
 Apply the migration and create/update the runtime role before deploying the Worker code. Production tenant queries fail closed when the connected database role owns either protected table, has `BYPASSRLS`, or is not a member of `fridgemate_app`.
 
-The API sets `app.current_user_id` with transaction-local `set_config(..., true)` before accessing either protected table. A missing user scope therefore receives the RLS default-deny behavior, and the setting is discarded at transaction end instead of leaking through the connection pool.
+The API sets `app.current_user_id`, `app.current_auth_email`, and `app.current_refresh_token_hash` with transaction-local `set_config(..., true)` before the corresponding database operation. Missing or mismatched context therefore receives the RLS default-deny behavior, and every setting is discarded at transaction end instead of leaking through the connection pool.
 
 Example binding shape to add after Cloudflare creates the resources:
 

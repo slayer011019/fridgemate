@@ -1,4 +1,3 @@
-import { prisma } from '../db/prisma.js';
 import { serverConfig } from '../config.js';
 import { normalizeAuthInput, assertValidLoginInput, assertValidSignupInput } from '../lib/authValidation.js';
 import { createHttpError } from '../lib/httpError.js';
@@ -6,6 +5,7 @@ import { hashPassword, verifyPassword } from '../lib/password.js';
 import { createAccessToken, parseExpirySeconds } from '../lib/token.js';
 import { createRefreshToken, hashRefreshToken } from '../lib/refreshToken.js';
 import { randomUUID } from 'node:crypto';
+import { setTransactionUserId, withDatabaseScope, withUserDatabaseScope } from '../db/tenantScope.js';
 
 const SIGNUP_CONFLICT_MESSAGE = 'Unable to create account with the provided credentials.';
 
@@ -39,18 +39,20 @@ function buildRefreshExpiryDate() {
 }
 
 async function revokeActiveRefreshSessions(userId, revokedAt = new Date()) {
-  await prisma.authSession.updateMany({
-    where: {
-      userId,
-      revokedAt: null
-    },
-    data: {
-      revokedAt
-    }
-  });
+  await withUserDatabaseScope(userId, (database) =>
+    database.authSession.updateMany({
+      where: {
+        userId,
+        revokedAt: null
+      },
+      data: {
+        revokedAt
+      }
+    })
+  );
 }
 
-async function createSessionPayload(user, prismaClient = prisma) {
+async function createSessionPayload(user, prismaClient) {
   const refreshToken = createRefreshToken();
 
   await prismaClient.authSession.create({
@@ -71,26 +73,29 @@ async function createSessionPayload(user, prismaClient = prisma) {
 export async function signupUser(input) {
   const credentials = normalizeAuthInput(input);
   assertValidSignupInput(credentials);
-
-  const existingUser = await prisma.user.findUnique({
-    where: { emailNormalized: credentials.email }
-  });
-
-  if (existingUser) {
-    await hashPassword(credentials.password);
-    throw createHttpError(409, SIGNUP_CONFLICT_MESSAGE);
-  }
+  const passwordHash = await hashPassword(credentials.password);
 
   try {
-    const user = await prisma.user.create({
-      data: {
-        email: credentials.email,
-        emailNormalized: credentials.email,
-        passwordHash: await hashPassword(credentials.password)
-      }
-    });
+    return await withDatabaseScope({ authEmail: credentials.email }, async (database) => {
+      const existingUser = await database.user.findUnique({
+        where: { emailNormalized: credentials.email }
+      });
 
-    return createSessionPayload(user);
+      if (existingUser) {
+        throw createHttpError(409, SIGNUP_CONFLICT_MESSAGE);
+      }
+
+      const user = await database.user.create({
+        data: {
+          email: credentials.email,
+          emailNormalized: credentials.email,
+          passwordHash
+        }
+      });
+
+      await setTransactionUserId(database, user.id);
+      return createSessionPayload(user, database);
+    });
   } catch (error) {
     if (error?.code === 'P2002') {
       throw createHttpError(409, SIGNUP_CONFLICT_MESSAGE);
@@ -103,10 +108,11 @@ export async function signupUser(input) {
 export async function loginUser(input) {
   const credentials = normalizeAuthInput(input);
   assertValidLoginInput(credentials);
-
-  const user = await prisma.user.findUnique({
-    where: { emailNormalized: credentials.email }
-  });
+  const user = await withDatabaseScope({ authEmail: credentials.email }, (database) =>
+    database.user.findUnique({
+      where: { emailNormalized: credentials.email }
+    })
+  );
 
   if (!user) {
     throw createHttpError(401, 'Invalid email or password.');
@@ -118,16 +124,21 @@ export async function loginUser(input) {
     throw createHttpError(401, 'Invalid email or password.');
   }
 
-  if (passwordCheck.needsRehash) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash: await hashPassword(credentials.password)
+  return withDatabaseScope(
+    { userId: user.id, authEmail: credentials.email },
+    async (database) => {
+      if (passwordCheck.needsRehash) {
+        await database.user.update({
+          where: { id: user.id },
+          data: {
+            passwordHash: await hashPassword(credentials.password)
+          }
+        });
       }
-    });
-  }
 
-  return createSessionPayload(user);
+      return createSessionPayload(user, database);
+    }
+  );
 }
 
 export async function refreshUserSession(refreshToken) {
@@ -137,10 +148,12 @@ export async function refreshUserSession(refreshToken) {
 
   const refreshTokenHash = hashRefreshToken(refreshToken);
   const now = new Date();
-  const session = await prisma.authSession.findUnique({
-    where: { tokenHash: refreshTokenHash },
-    include: { user: true }
-  });
+  const session = await withDatabaseScope({ refreshTokenHash }, (database) =>
+    database.authSession.findUnique({
+      where: { tokenHash: refreshTokenHash },
+      include: { user: true }
+    })
+  );
 
   if (!session) {
     throw createHttpError(401, 'The current session is no longer valid.');
@@ -153,7 +166,10 @@ export async function refreshUserSession(refreshToken) {
 
   const refreshTokenValue = createRefreshToken();
 
-  const payload = await prisma.$transaction(async (transaction) => {
+  const payload = await withDatabaseScope({
+    userId: session.userId,
+    refreshTokenHash
+  }, async (transaction) => {
     const consumedSession = await transaction.authSession.updateMany({
       where: {
         id: session.id,
@@ -207,26 +223,33 @@ export async function logoutUser(refreshToken) {
     return;
   }
 
-  const session = await prisma.authSession.findUnique({
-    where: { tokenHash: hashRefreshToken(refreshToken) }
-  });
+  const refreshTokenHash = hashRefreshToken(refreshToken);
+  const session = await withDatabaseScope({ refreshTokenHash }, (database) =>
+    database.authSession.findUnique({
+      where: { tokenHash: refreshTokenHash }
+    })
+  );
 
   if (!session || session.revokedAt) {
     return;
   }
 
-  await prisma.authSession.update({
-    where: { id: session.id },
-    data: {
-      revokedAt: new Date()
-    }
-  });
+  await withDatabaseScope({ userId: session.userId, refreshTokenHash }, (database) =>
+    database.authSession.update({
+      where: { id: session.id },
+      data: {
+        revokedAt: new Date()
+      }
+    })
+  );
 }
 
 export async function getCurrentUser(userId) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId }
-  });
+  const user = await withUserDatabaseScope(userId, (database) =>
+    database.user.findUnique({
+      where: { id: userId }
+    })
+  );
 
   if (!user) {
     throw createHttpError(401, 'The current session is no longer valid.');
