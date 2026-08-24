@@ -17,10 +17,17 @@ const [{ createApp }, { initializeAuthSecurityStore }] = await Promise.all([
   import('./services/authSecurityStore.js')
 ]);
 
-await initializeAuthSecurityStore({
-  kv: env.AUTH_KV,
-  rateLimiter: env.AUTH_RATE_LIMITER
-});
 createApp().listen(3000);
 
-export default httpServerHandler({ port: 3000 });
+const handler = httpServerHandler({ port: 3000 });
+
+export default {
+  async fetch(request, runtimeEnv, context) {
+    await initializeAuthSecurityStore({
+      kv: runtimeEnv.AUTH_KV,
+      rateLimiter: runtimeEnv.AUTH_RATE_LIMITER
+    });
+
+    return handler.fetch(request, runtimeEnv, context);
+  }
+};
