@@ -103,6 +103,7 @@ Backend:
 - JWT auth with `httpOnly` access cookies, atomic single-use refresh-token rotation, and server-side CSRF origin verification
 - Atomic Redis-backed auth throttling for production Node and SQLite Durable Object throttling for Workers; KV stores Worker token revocations
 - Tenant-scoped ingredient reads, updates, and deletes always include the authenticated user ID in database conditions
+- PostgreSQL RLS forces transaction-local user isolation for ingredient and OCR correction rows when the API uses the dedicated non-bypass database role
 
 AI, OCR, and data:
 

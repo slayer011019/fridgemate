@@ -40,6 +40,28 @@ Recipe catalog imports are intentionally not exposed over HTTP. Run the trusted 
 8. Run `npm run worker:dry-run`, then `npm run dev:worker` for a local smoke check.
 9. Deploy with `npm run worker:deploy` after the health and auth checks pass.
 
+## Database runtime role and RLS
+
+The tenant RLS migration creates a non-login, non-bypass role named `fridgemate_app` and forces user-scoped policies on `Ingredient` and `ImportCorrection`. Create a separate login role directly in Supabase using a generated password, grant it membership, and configure Hyperdrive to connect as that login role:
+
+```sql
+CREATE ROLE fridgemate_runtime
+  LOGIN
+  PASSWORD '<generated-secret>'
+  NOSUPERUSER
+  NOCREATEDB
+  NOCREATEROLE
+  NOREPLICATION
+  NOBYPASSRLS;
+GRANT fridgemate_app TO fridgemate_runtime;
+```
+
+Do not put the generated password in this repository or `wrangler.jsonc`. Update the Hyperdrive origin credentials through Cloudflare, then confirm the runtime role is neither the table owner nor a member of a role with `BYPASSRLS`. `DIRECT_URL` remains an admin/migration credential and must not be used by the deployed API.
+
+Apply the migration and create/update the runtime role before deploying the Worker code. Production tenant queries fail closed when the connected database role owns either protected table, has `BYPASSRLS`, or is not a member of `fridgemate_app`.
+
+The API sets `app.current_user_id` with transaction-local `set_config(..., true)` before accessing either protected table. A missing user scope therefore receives the RLS default-deny behavior, and the setting is discarded at transaction end instead of leaking through the connection pool.
+
 Example binding shape to add after Cloudflare creates the resources:
 
 ```jsonc
@@ -77,6 +99,7 @@ Redeploy the frontend and verify login, session restore, ingredient backup/pull,
 - Prisma migrations continue to run from a trusted local or CI environment with `DIRECT_URL`; Workers do not run migrations at startup.
 - `AUTH_KV` persists logout revocations across Worker isolates. `AUTH_RATE_LIMITER` serializes each hashed email/IP/client rate-limit key in its own SQLite Durable Object so concurrent auth attempts and recommendation-event floods cannot bypass counters.
 - Persistent auth-store failures are fail-closed. Production Node deployments require `REDIS_URL`; Cloudflare deployments require both auth bindings.
+- Production database traffic must use the dedicated `fridgemate_runtime` login role; using the Supabase `postgres` or service role bypasses the RLS boundary.
 - `ALLOWED_ORIGINS` is both the credentialed CORS allowlist and the CSRF source-origin allowlist; keep production entries exact and do not use `*`.
 - `wrangler.jsonc` contains non-secret defaults only. Never add database URLs, API keys, or service role keys to it.
 

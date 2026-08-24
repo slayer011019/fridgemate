@@ -1,4 +1,4 @@
-import { prisma } from '../db/prisma.js';
+import { withUserDatabaseScope } from '../db/tenantScope.js';
 import { serverConfig } from '../config.js';
 import { seedRecipes } from '../../../src/data/seedRecipes.js';
 import { buildRecipeRecommendations } from '../../../src/utils/recommendations.js';
@@ -58,10 +58,12 @@ function parseClaudeJson(text) {
 }
 
 async function getStoredIngredients(userId) {
-  const ingredients = await prisma.ingredient.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' }
-  });
+  const ingredients = await withUserDatabaseScope(userId, (database) =>
+    database.ingredient.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    })
+  );
 
   return ingredients.map((ingredient) => ({
     name: ingredient.name,

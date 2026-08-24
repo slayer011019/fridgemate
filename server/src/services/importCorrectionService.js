@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { serverConfig } from '../config.js';
-import { prisma } from '../db/prisma.js';
+import { withUserDatabaseScope } from '../db/tenantScope.js';
 import { createHttpError } from '../lib/httpError.js';
 import { createEmbedding, isEmbeddingEnabled, toVectorLiteral } from './embeddingService.js';
 
@@ -83,21 +83,24 @@ export async function getImportCorrectionSuggestions(userId, items = []) {
     }
 
     const vectorLiteral = toVectorLiteral(embedding);
-    const rows = await prisma.$queryRaw`
-      SELECT
-        "id",
-        "sourceText",
-        "correctedName",
-        "category",
-        "storageType",
-        "lastUsedAt",
-        1 - ("embedding" <=> ${vectorLiteral}::vector) AS "similarity"
-      FROM "ImportCorrection"
-      WHERE "userId" = ${userId}
-        AND "embedding" IS NOT NULL
-      ORDER BY "embedding" <=> ${vectorLiteral}::vector
-      LIMIT ${MAX_SUGGESTIONS_PER_ITEM}
-    `;
+    const rows = await withUserDatabaseScope(
+      userId,
+      (database) => database.$queryRaw`
+        SELECT
+          "id",
+          "sourceText",
+          "correctedName",
+          "category",
+          "storageType",
+          "lastUsedAt",
+          1 - ("embedding" <=> ${vectorLiteral}::vector) AS "similarity"
+        FROM "ImportCorrection"
+        WHERE "userId" = ${userId}
+          AND "embedding" IS NOT NULL
+        ORDER BY "embedding" <=> ${vectorLiteral}::vector
+        LIMIT ${MAX_SUGGESTIONS_PER_ITEM}
+      `
+    );
 
     const suggestions = rows
       .map((row) => ({
@@ -139,90 +142,95 @@ export async function saveImportCorrectionsForUser(userId, items = []) {
     if (embedding?.length) {
       const vectorLiteral = toVectorLiteral(embedding);
 
-      await prisma.$executeRaw`
-        INSERT INTO "ImportCorrection" (
-          "id",
-          "userId",
-          "sourceKey",
-          "sourceText",
-          "correctedName",
-          "category",
-          "storageType",
-          "usageCount",
-          "lastUsedAt",
-          "embeddingText",
-          "embeddingModel",
-          "embeddingDimensions",
-          "embedding",
-          "createdAt",
-          "updatedAt"
-        )
-        VALUES (
-          ${randomUUID()},
-          ${userId},
-          ${item.sourceKey},
-          ${item.sourceText},
-          ${item.correctedName},
-          ${item.category},
-          ${item.storageType},
-          1,
-          now(),
-          ${item.embeddingText},
-          ${serverConfig.embeddingModel},
-          ${serverConfig.embeddingDimensions},
-          ${vectorLiteral}::vector,
-          now(),
-          now()
-        )
-        ON CONFLICT ("userId", "sourceKey")
-        DO UPDATE SET
-          "sourceText" = EXCLUDED."sourceText",
-          "correctedName" = EXCLUDED."correctedName",
-          "category" = EXCLUDED."category",
-          "storageType" = EXCLUDED."storageType",
-          "usageCount" = "ImportCorrection"."usageCount" + 1,
-          "lastUsedAt" = now(),
-          "embeddingText" = EXCLUDED."embeddingText",
-          "embeddingModel" = EXCLUDED."embeddingModel",
-          "embeddingDimensions" = EXCLUDED."embeddingDimensions",
-          "embedding" = EXCLUDED."embedding",
-          "updatedAt" = now()
-      `;
+      await withUserDatabaseScope(
+        userId,
+        (database) => database.$executeRaw`
+          INSERT INTO "ImportCorrection" (
+            "id",
+            "userId",
+            "sourceKey",
+            "sourceText",
+            "correctedName",
+            "category",
+            "storageType",
+            "usageCount",
+            "lastUsedAt",
+            "embeddingText",
+            "embeddingModel",
+            "embeddingDimensions",
+            "embedding",
+            "createdAt",
+            "updatedAt"
+          )
+          VALUES (
+            ${randomUUID()},
+            ${userId},
+            ${item.sourceKey},
+            ${item.sourceText},
+            ${item.correctedName},
+            ${item.category},
+            ${item.storageType},
+            1,
+            now(),
+            ${item.embeddingText},
+            ${serverConfig.embeddingModel},
+            ${serverConfig.embeddingDimensions},
+            ${vectorLiteral}::vector,
+            now(),
+            now()
+          )
+          ON CONFLICT ("userId", "sourceKey")
+          DO UPDATE SET
+            "sourceText" = EXCLUDED."sourceText",
+            "correctedName" = EXCLUDED."correctedName",
+            "category" = EXCLUDED."category",
+            "storageType" = EXCLUDED."storageType",
+            "usageCount" = "ImportCorrection"."usageCount" + 1,
+            "lastUsedAt" = now(),
+            "embeddingText" = EXCLUDED."embeddingText",
+            "embeddingModel" = EXCLUDED."embeddingModel",
+            "embeddingDimensions" = EXCLUDED."embeddingDimensions",
+            "embedding" = EXCLUDED."embedding",
+            "updatedAt" = now()
+        `
+      );
       continue;
     }
 
-    await prisma.importCorrection.upsert({
-      where: {
-        userId_sourceKey: {
-          userId,
-          sourceKey: item.sourceKey
-        }
-      },
-      create: {
-        userId,
-        sourceKey: item.sourceKey,
-        sourceText: item.sourceText,
-        correctedName: item.correctedName,
-        category: item.category,
-        storageType: item.storageType,
-        embeddingText: item.embeddingText,
-        embeddingModel: serverConfig.embeddingModel,
-        embeddingDimensions: serverConfig.embeddingDimensions
-      },
-      update: {
-        sourceText: item.sourceText,
-        correctedName: item.correctedName,
-        category: item.category,
-        storageType: item.storageType,
-        usageCount: {
-          increment: 1
+    await withUserDatabaseScope(userId, (database) =>
+      database.importCorrection.upsert({
+        where: {
+          userId_sourceKey: {
+            userId,
+            sourceKey: item.sourceKey
+          }
         },
-        lastUsedAt: new Date(),
-        embeddingText: item.embeddingText,
-        embeddingModel: serverConfig.embeddingModel,
-        embeddingDimensions: serverConfig.embeddingDimensions
-      }
-    });
+        create: {
+          userId,
+          sourceKey: item.sourceKey,
+          sourceText: item.sourceText,
+          correctedName: item.correctedName,
+          category: item.category,
+          storageType: item.storageType,
+          embeddingText: item.embeddingText,
+          embeddingModel: serverConfig.embeddingModel,
+          embeddingDimensions: serverConfig.embeddingDimensions
+        },
+        update: {
+          sourceText: item.sourceText,
+          correctedName: item.correctedName,
+          category: item.category,
+          storageType: item.storageType,
+          usageCount: {
+            increment: 1
+          },
+          lastUsedAt: new Date(),
+          embeddingText: item.embeddingText,
+          embeddingModel: serverConfig.embeddingModel,
+          embeddingDimensions: serverConfig.embeddingDimensions
+        }
+      })
+    );
   }
 
   return { savedCount: normalizedItems.length };

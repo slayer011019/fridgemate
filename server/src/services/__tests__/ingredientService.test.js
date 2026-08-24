@@ -2,13 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMock = {
   ingredient: {
+    create: vi.fn(),
     deleteMany: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
     updateMany: vi.fn(),
     upsert: vi.fn()
   },
-  $transaction: vi.fn()
+  $queryRaw: vi.fn(),
+  $transaction: vi.fn(async (operation) => operation(prismaMock))
 };
 
 vi.mock('../../db/prisma.js', () => ({
@@ -34,10 +36,10 @@ function createIngredient(id, overrides = {}) {
 describe('ingredientService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prismaMock.ingredient.deleteMany.mockReturnValue({ operation: 'deleteMany' });
-    prismaMock.ingredient.upsert.mockReturnValue({ operation: 'upsert' });
+    prismaMock.$queryRaw.mockResolvedValue([{ set_config: 'user-1' }]);
+    prismaMock.ingredient.deleteMany.mockResolvedValue({ count: 1 });
+    prismaMock.ingredient.upsert.mockResolvedValue({});
     prismaMock.ingredient.findMany.mockResolvedValue([]);
-    prismaMock.$transaction.mockResolvedValue([]);
   });
 
   it('syncs ingredients by upserting with userId and clientId', async () => {
@@ -71,7 +73,8 @@ describe('ingredientService', () => {
         })
       })
     );
-    expect(prismaMock.$transaction).toHaveBeenCalledWith([{ operation: 'deleteMany' }, { operation: 'upsert' }]);
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(prismaMock.$queryRaw).toHaveBeenCalledOnce();
   });
 
   it('uses id as clientId for older local payloads', async () => {

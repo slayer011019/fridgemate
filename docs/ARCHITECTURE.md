@@ -87,6 +87,7 @@ Semantic recipe retrieval groundwork:
 ## Security Boundaries
 
 - auth cookies are `httpOnly`
+- tenant-sensitive ingredient and OCR correction queries run inside a transaction-local PostgreSQL user scope, backed by forced RLS policies and a non-bypass runtime role
 - frontend code does not store access or refresh tokens in localStorage
 - API keys stay in server/local environment files
 - Supabase service role keys must never use a `VITE_` prefix

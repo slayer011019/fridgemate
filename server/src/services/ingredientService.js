@@ -1,4 +1,4 @@
-import { prisma } from '../db/prisma.js';
+import { withUserDatabaseScope } from '../db/tenantScope.js';
 import { createHttpError } from '../lib/httpError.js';
 import { assertValidIngredient, normalizeIngredientInput } from '../lib/ingredientValidation.js';
 
@@ -8,8 +8,8 @@ function normalizeAndValidateIngredient(input) {
   return ingredient;
 }
 
-async function findIngredientOrThrow(userId, id) {
-  const ingredient = await prisma.ingredient.findFirst({
+async function findIngredientOrThrow(database, userId, id) {
+  const ingredient = await database.ingredient.findFirst({
     where: { id, userId }
   });
 
@@ -21,25 +21,29 @@ async function findIngredientOrThrow(userId, id) {
 }
 
 export async function listIngredients(userId) {
-  return prisma.ingredient.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' }
-  });
+  return withUserDatabaseScope(userId, (database) =>
+    database.ingredient.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    })
+  );
 }
 
 export async function getIngredientById(userId, id) {
-  return findIngredientOrThrow(userId, id);
+  return withUserDatabaseScope(userId, (database) => findIngredientOrThrow(database, userId, id));
 }
 
 export async function createIngredient(userId, input) {
   const ingredient = normalizeAndValidateIngredient(input);
 
-  return prisma.ingredient.create({
-    data: {
-      ...ingredient,
-      userId
-    }
-  });
+  return withUserDatabaseScope(userId, (database) =>
+    database.ingredient.create({
+      data: {
+        ...ingredient,
+        userId
+      }
+    })
+  );
 }
 
 export async function createIngredientsBulk(userId, items = []) {
@@ -49,26 +53,30 @@ export async function createIngredientsBulk(userId, items = []) {
 
   const normalizedItems = items.map((item) => normalizeAndValidateIngredient(item));
 
-  return prisma.$transaction(
-    normalizedItems.map((ingredient) =>
-      prisma.ingredient.create({
-        data: {
-          ...ingredient,
-          userId
-        }
-      })
-    )
-  );
+  return withUserDatabaseScope(userId, async (database) => {
+    const ingredients = [];
+
+    for (const ingredient of normalizedItems) {
+      ingredients.push(
+        await database.ingredient.create({
+          data: {
+            ...ingredient,
+            userId
+          }
+        })
+      );
+    }
+
+    return ingredients;
+  });
 }
 
 export async function replaceIngredientsForUser(userId, items = []) {
   const normalizedItems = items.map((item) => normalizeAndValidateIngredient(item));
   const syncedClientIds = normalizedItems.map((ingredient) => ingredient.clientId);
 
-  // MVP manual sync is local-first: the current local snapshot wins.
-  // Rows are upserted by clientId so repeated syncs do not create duplicates.
-  const operations = [
-    prisma.ingredient.deleteMany({
+  return withUserDatabaseScope(userId, async (database) => {
+    await database.ingredient.deleteMany({
       where: {
         userId,
         ...(syncedClientIds.length
@@ -79,9 +87,10 @@ export async function replaceIngredientsForUser(userId, items = []) {
             }
           : {})
       }
-    }),
-    ...normalizedItems.map((ingredient) =>
-      prisma.ingredient.upsert({
+    });
+
+    for (const ingredient of normalizedItems) {
+      await database.ingredient.upsert({
         where: {
           userId_clientId: {
             userId,
@@ -96,47 +105,52 @@ export async function replaceIngredientsForUser(userId, items = []) {
           ...ingredient,
           userId
         }
-      })
-    )
-  ];
+      });
+    }
 
-  await prisma.$transaction(operations);
-
-  return listIngredients(userId);
+    return database.ingredient.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+  });
 }
 
 export async function updateIngredientById(userId, id, input) {
-  const existingIngredient = await findIngredientOrThrow(userId, id);
-  const ingredient = normalizeAndValidateIngredient({
-    ...existingIngredient,
-    ...input,
-    id
-  });
-  const { id: _id, ...ingredientData } = ingredient;
-  const result = await prisma.ingredient.updateMany({
-    where: {
-      id,
-      userId
-    },
-    data: ingredientData
-  });
+  return withUserDatabaseScope(userId, async (database) => {
+    const existingIngredient = await findIngredientOrThrow(database, userId, id);
+    const ingredient = normalizeAndValidateIngredient({
+      ...existingIngredient,
+      ...input,
+      id
+    });
+    const { id: _id, ...ingredientData } = ingredient;
+    const result = await database.ingredient.updateMany({
+      where: {
+        id,
+        userId
+      },
+      data: ingredientData
+    });
 
-  if (result.count !== 1) {
-    throw createHttpError(404, 'Ingredient not found.');
-  }
+    if (result.count !== 1) {
+      throw createHttpError(404, 'Ingredient not found.');
+    }
 
-  return findIngredientOrThrow(userId, id);
+    return findIngredientOrThrow(database, userId, id);
+  });
 }
 
 export async function deleteIngredientById(userId, id) {
-  const result = await prisma.ingredient.deleteMany({
-    where: {
-      id,
-      userId
+  return withUserDatabaseScope(userId, async (database) => {
+    const result = await database.ingredient.deleteMany({
+      where: {
+        id,
+        userId
+      }
+    });
+
+    if (result.count !== 1) {
+      throw createHttpError(404, 'Ingredient not found.');
     }
   });
-
-  if (result.count !== 1) {
-    throw createHttpError(404, 'Ingredient not found.');
-  }
 }

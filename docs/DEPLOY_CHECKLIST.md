@@ -51,6 +51,9 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 
 - [ ] Database exists and accepts connections through Cloudflare Hyperdrive.
 - [ ] Prisma migrations run successfully with `npm run prisma:deploy`.
+- [ ] Hyperdrive connects as a dedicated login role that is a member of `fridgemate_app`, is not a table owner, and has `NOBYPASSRLS`.
+- [ ] The deployed API does not use `postgres`, `service_role`, or `DIRECT_URL` credentials.
+- [ ] With `app.current_user_id` unset, direct runtime-role reads of `Ingredient` and `ImportCorrection` return no rows; with user A set locally in a transaction, user B rows remain inaccessible.
 - [ ] `GET /api/health` returns only `{ "status": "ok" }` and does not expose database state.
 - [ ] Verify database connectivity through authenticated functional smoke tests and private platform telemetry.
 - [ ] Update any external uptime or Cloudflare Health Check assertion that previously parsed `db` or `timestamp`; the public contract is now only `status: ok`.
