@@ -24,7 +24,7 @@ FridgeMate keeps the React frontend on Vercel and the PostgreSQL database on Sup
 | `/api/ingredients/*` | Authenticated | Ingredient list and manual sync |
 | `/api/import/*` | Authenticated | Import correction lookup and learning |
 | `/api/recipes/*` | Authenticated | Recipe recommendations |
-| `/api/recommendation-events/*` | Optional auth | Recommendation event collection |
+| `/api/recommendation-events/*` | Optional auth, rate-limited | Bounded recommendation event collection |
 
 Recipe catalog imports are intentionally not exposed over HTTP. Run the trusted `seed:recipes` workflow from a local or CI environment that holds the required server-side credentials.
 
@@ -75,7 +75,7 @@ Redeploy the frontend and verify login, session restore, ingredient backup/pull,
 
 - Hyperdrive is preferred over a plain `DATABASE_URL` because it pools and routes PostgreSQL connections for Workers.
 - Prisma migrations continue to run from a trusted local or CI environment with `DIRECT_URL`; Workers do not run migrations at startup.
-- `AUTH_KV` persists logout revocations across Worker isolates. `AUTH_RATE_LIMITER` serializes each hashed email/IP rate-limit key in a SQLite Durable Object so concurrent login attempts cannot bypass the counter.
+- `AUTH_KV` persists logout revocations across Worker isolates. `AUTH_RATE_LIMITER` serializes each hashed email/IP/client rate-limit key in its own SQLite Durable Object so concurrent auth attempts and recommendation-event floods cannot bypass counters.
 - Persistent auth-store failures are fail-closed. Production Node deployments require `REDIS_URL`; Cloudflare deployments require both auth bindings.
 - `ALLOWED_ORIGINS` is both the credentialed CORS allowlist and the CSRF source-origin allowlist; keep production entries exact and do not use `*`.
 - `wrangler.jsonc` contains non-secret defaults only. Never add database URLs, API keys, or service role keys to it.

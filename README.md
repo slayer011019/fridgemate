@@ -32,7 +32,7 @@ Implemented:
 - Recipe catalog imports are restricted to trusted local/CI seeding scripts and are not exposed as user-facing API routes
 - Manual server backup and pull sync from the account page
 - API fallback behavior that keeps local IndexedDB usable during network or 5xx failures
-- Recommendation impression and click event persistence in backend-connected mode
+- Bounded, rate-limited recommendation impression and click event persistence in backend-connected mode
 - Public service, contact, privacy, crawler, and sitemap pages for production site transparency
 - Recommendation training-data export script for future ranking experiments
 - Vitest, React Testing Library, Playwright, ESLint, and GitHub Actions CI

@@ -43,6 +43,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] `AUTH_COOKIE_SAME_SITE=Lax` for the same-site production frontend and API.
 - [ ] Production cookie names use `__Host-` prefixes and users are notified that the cutover requires one sign-in.
 - [ ] Cookie-authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests with a missing or untrusted `Origin`/`Referer` return `403`.
+- [ ] `/api/recommendation-events` rejects unknown/oversized fields and returns `429` after 120 requests per user/client address in one minute.
 - [ ] `npm run worker:dry-run` completes before deployment.
 - [ ] Optional v2/lab only: AI and embedding keys.
 
