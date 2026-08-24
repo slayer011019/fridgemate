@@ -10,6 +10,7 @@ import { isAllowedOrigin } from './config.js';
 import { prismaRequestScope } from './db/prisma.js';
 import { optionalAuth } from './middleware/optionalAuth.js';
 import { requireAuth } from './middleware/requireAuth.js';
+import { csrfProtection } from './middleware/csrfProtection.js';
 
 export function createApp() {
   const app = express();
@@ -29,6 +30,7 @@ export function createApp() {
       }
     })
   );
+  app.use(csrfProtection);
   app.use(express.json({ limit: '16kb' }));
   app.use(prismaRequestScope);
 

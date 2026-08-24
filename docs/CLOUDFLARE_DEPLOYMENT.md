@@ -61,7 +61,7 @@ The IDs are deployment identifiers, while database credentials and signing keys 
 
 Start with the generated `workers.dev` URL. After smoke testing, map `api.오늘뭐먹지.com` as a Worker custom domain. If the domain DNS is not managed by Cloudflare, move DNS management carefully while preserving the Vercel frontend records.
 
-The Worker defaults to secure `SameSite=None` cookies so the temporary `workers.dev` origin can participate in frontend smoke tests. Once the API uses the same-site `api.오늘뭐먹지.com` domain, `Lax` can be used if cross-site clients are no longer needed.
+Production uses secure `SameSite=Lax` cookies with `__Host-` names on the same-site `api.오늘뭐먹지.com` domain. Cookie-authenticated state changes must also carry an exact allowed `Origin`, or an allowed `Referer` when `Origin` is unavailable. The cookie-name cutover invalidates existing browser sessions, so users must sign in once after deployment. Cross-site `workers.dev` authentication smoke tests require a separate, deliberate cookie configuration and are not the production default.
 
 Set Vercel production environment variables to:
 
@@ -77,6 +77,7 @@ Redeploy the frontend and verify login, session restore, ingredient backup/pull,
 - Prisma migrations continue to run from a trusted local or CI environment with `DIRECT_URL`; Workers do not run migrations at startup.
 - `AUTH_KV` persists logout revocations across Worker isolates. `AUTH_RATE_LIMITER` serializes each hashed email/IP rate-limit key in a SQLite Durable Object so concurrent login attempts cannot bypass the counter.
 - Persistent auth-store failures are fail-closed. Production Node deployments require `REDIS_URL`; Cloudflare deployments require both auth bindings.
+- `ALLOWED_ORIGINS` is both the credentialed CORS allowlist and the CSRF source-origin allowlist; keep production entries exact and do not use `*`.
 - `wrangler.jsonc` contains non-secret defaults only. Never add database URLs, API keys, or service role keys to it.
 
 References: [Express on Workers](https://developers.cloudflare.com/workers/tutorials/deploy-an-express-app/), [Supabase with Hyperdrive](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-database-providers/supabase/), [Prisma with Hyperdrive](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-drivers-and-libraries/prisma-orm/).

@@ -7,6 +7,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+### Fixed
+
+- Hardened production auth cookies with `SameSite=Lax` and `__Host-` names, and reject cookie-authenticated state changes whose `Origin` or fallback `Referer` is missing or untrusted.
+
 ### Added
 
 - Added a mobile category select to the ingredient filters while keeping wrapped category buttons on larger screens.

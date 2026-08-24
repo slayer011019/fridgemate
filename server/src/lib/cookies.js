@@ -38,7 +38,13 @@ export function parseCookieHeader(headerValue) {
       }
 
       const name = entry.slice(0, separatorIndex).trim();
-      const value = decodeURIComponent(entry.slice(separatorIndex + 1).trim());
+      let value = '';
+
+      try {
+        value = decodeURIComponent(entry.slice(separatorIndex + 1).trim());
+      } catch {
+        return cookies;
+      }
 
       if (name) {
         cookies[name] = value;

@@ -58,8 +58,8 @@ This checklist is the release gate for the deployable v1 MVP. Recipe source seed
 
 - Vercel `VITE_API_URL` points to the production API `/api` base URL.
 - Railway `ALLOWED_ORIGINS` and `CLIENT_ORIGIN` include the exact frontend origin.
-- Production cookies use `AUTH_COOKIE_SECURE=true`.
-- Use `AUTH_COOKIE_SAME_SITE=None` when frontend and backend are on different domains.
+- Production cookies use `AUTH_COOKIE_SECURE=true`, `AUTH_COOKIE_SAME_SITE=Lax`, and `__Host-` names on the same-site frontend/API domain.
+- Cookie-authenticated state changes reject missing or untrusted `Origin`/`Referer` values.
 - `GET /health` succeeds against the deployed backend.
 - Signup, login, reload session restore, account sync, logout, and relogin work on the custom domain.
 

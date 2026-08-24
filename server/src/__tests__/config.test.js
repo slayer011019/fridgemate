@@ -41,4 +41,36 @@ describe('server config security requirements', () => {
       'REDIS_URL is required for a production Node server.'
     );
   });
+
+  it('rejects unsupported SameSite values', async () => {
+    process.env.REDIS_URL = 'redis://localhost:6379';
+    process.env.AUTH_COOKIE_SAME_SITE = 'invalid';
+    const { validateServerConfig } = await import('../config.js');
+
+    expect(validateServerConfig({ exitOnError: false })).toContain(
+      'AUTH_COOKIE_SAME_SITE must be Lax, Strict, or None.'
+    );
+  });
+
+  it('requires Secure for SameSite=None cookies', async () => {
+    process.env.REDIS_URL = 'redis://localhost:6379';
+    process.env.AUTH_COOKIE_SAME_SITE = 'None';
+    process.env.AUTH_COOKIE_SECURE = 'false';
+    const { validateServerConfig } = await import('../config.js');
+
+    expect(validateServerConfig({ exitOnError: false })).toContain(
+      'AUTH_COOKIE_SECURE must be true when AUTH_COOKIE_SAME_SITE is None.'
+    );
+  });
+
+  it('requires Secure for __Host- cookie names', async () => {
+    process.env.REDIS_URL = 'redis://localhost:6379';
+    process.env.ACCESS_TOKEN_COOKIE_NAME = '__Host-fridgemate_access';
+    process.env.AUTH_COOKIE_SECURE = 'false';
+    const { validateServerConfig } = await import('../config.js');
+
+    expect(validateServerConfig({ exitOnError: false })).toContain(
+      'AUTH_COOKIE_SECURE must be true for __Host- cookie names.'
+    );
+  });
 });

@@ -31,6 +31,15 @@ function runtimeValue(runtimeEnv, name) {
   return runtimeEnv?.[name] ?? process.env[name];
 }
 
+function normalizeSameSite(value) {
+  const configuredValue = String(value || 'Lax').trim();
+  const supportedValue = ['Lax', 'Strict', 'None'].find(
+    (candidate) => candidate.toLowerCase() === configuredValue.toLowerCase()
+  );
+
+  return supportedValue || configuredValue;
+}
+
 function createServerConfig(runtimeEnv = process.env) {
   const configuredAllowedOrigins = splitEnvList(runtimeValue(runtimeEnv, 'ALLOWED_ORIGINS'));
   const clientOrigin = runtimeValue(runtimeEnv, 'CLIENT_ORIGIN') || 'http://localhost:5173';
@@ -59,7 +68,7 @@ function createServerConfig(runtimeEnv = process.env) {
     refreshTokenCookieName: runtimeValue(runtimeEnv, 'REFRESH_TOKEN_COOKIE_NAME') || 'fridgemate_refresh',
     authCookieSecure:
       String(runtimeValue(runtimeEnv, 'AUTH_COOKIE_SECURE') || runtimeValue(runtimeEnv, 'NODE_ENV') === 'production').toLowerCase() === 'true',
-    authCookieSameSite: runtimeValue(runtimeEnv, 'AUTH_COOKIE_SAME_SITE') || 'Lax',
+    authCookieSameSite: normalizeSameSite(runtimeValue(runtimeEnv, 'AUTH_COOKIE_SAME_SITE')),
     redisUrl: runtimeValue(runtimeEnv, 'REDIS_URL') || '',
     authRedisPrefix: runtimeValue(runtimeEnv, 'AUTH_REDIS_PREFIX') || 'fridgemate:auth',
     anthropicApiKey: runtimeValue(runtimeEnv, 'ANTHROPIC_API_KEY') || '',
@@ -95,6 +104,23 @@ export function validateServerConfig({ exitOnError = true } = {}) {
 
   if (serverConfig.runtime === 'node' && serverConfig.nodeEnv === 'production' && !serverConfig.redisUrl) {
     errors.push('REDIS_URL is required for a production Node server.');
+  }
+
+  if (!['Lax', 'Strict', 'None'].includes(serverConfig.authCookieSameSite)) {
+    errors.push('AUTH_COOKIE_SAME_SITE must be Lax, Strict, or None.');
+  }
+
+  if (serverConfig.authCookieSameSite === 'None' && !serverConfig.authCookieSecure) {
+    errors.push('AUTH_COOKIE_SECURE must be true when AUTH_COOKIE_SAME_SITE is None.');
+  }
+
+  const hostCookieNames = [
+    serverConfig.accessTokenCookieName,
+    serverConfig.refreshTokenCookieName
+  ].filter((name) => name.startsWith('__Host-'));
+
+  if (hostCookieNames.length && !serverConfig.authCookieSecure) {
+    errors.push('AUTH_COOKIE_SECURE must be true for __Host- cookie names.');
   }
 
   if (errors.length && exitOnError) {

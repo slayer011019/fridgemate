@@ -40,7 +40,9 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] `ALLOWED_ORIGINS` includes the exact Vercel frontend origin.
 - [ ] `CLIENT_ORIGIN` matches the primary Vercel frontend origin.
 - [ ] `AUTH_COOKIE_SECURE=true`.
-- [ ] `AUTH_COOKIE_SAME_SITE=None` when frontend and backend are on different domains.
+- [ ] `AUTH_COOKIE_SAME_SITE=Lax` for the same-site production frontend and API.
+- [ ] Production cookie names use `__Host-` prefixes and users are notified that the cutover requires one sign-in.
+- [ ] Cookie-authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests with a missing or untrusted `Origin`/`Referer` return `403`.
 - [ ] `npm run worker:dry-run` completes before deployment.
 - [ ] Optional v2/lab only: AI and embedding keys.
 
