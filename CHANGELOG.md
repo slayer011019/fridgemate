@@ -84,6 +84,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Simplified recipe, OCR import, and auth screen copy so the next step is clearer on mobile and desktop.
 
 ### Fixed
+- Ingredient updates and deletes now apply `id` and authenticated `userId` together in the database mutation, preventing unscoped writes and returning the same `404` for missing or foreign records.
 - Removed the authenticated-but-unprivileged recipe catalog import HTTP route; global recipe imports now remain restricted to trusted local or CI seeding workflows.
 - Refresh-token rotation now atomically consumes the previous database session before issuing a replacement, rejects concurrent reuse, and revokes the user's remaining refresh sessions when reuse is detected.
 - Login and signup throttling now uses per-key SQLite Durable Objects on Cloudflare, keeps Redis atomic counters on production Node, and fails closed instead of falling back to per-instance memory when persistent auth storage fails.

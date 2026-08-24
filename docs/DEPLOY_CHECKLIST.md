@@ -78,6 +78,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Account-page sync sends `POST /api/ingredients/sync`.
 - [ ] Reload after sync and confirm data remains available.
 - [ ] Delete locally, sync, reload, and confirm deleted item remains deleted.
+- [ ] Direct API update/delete requests return the same `404` for missing ingredient IDs and IDs owned by another user.
 - [ ] Record v2 follow-up for `updatedAt` merge plus `deletedAt`/tombstone conflict handling.
 
 ## Core Smoke Path

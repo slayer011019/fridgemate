@@ -102,6 +102,7 @@ Backend:
 - PostgreSQL
 - JWT auth with `httpOnly` access cookies and atomic single-use refresh-token rotation
 - Atomic Redis-backed auth throttling for production Node and SQLite Durable Object throttling for Workers; KV stores Worker token revocations
+- Tenant-scoped ingredient reads, updates, and deletes always include the authenticated user ID in database conditions
 
 AI, OCR, and data:
 

@@ -112,28 +112,31 @@ export async function updateIngredientById(userId, id, input) {
     ...input,
     id
   });
-
-  return prisma.ingredient.update({
-    where: { id },
-    data: {
-      ...ingredient,
+  const { id: _id, ...ingredientData } = ingredient;
+  const result = await prisma.ingredient.updateMany({
+    where: {
+      id,
       userId
-    }
+    },
+    data: ingredientData
   });
+
+  if (result.count !== 1) {
+    throw createHttpError(404, 'Ingredient not found.');
+  }
+
+  return findIngredientOrThrow(userId, id);
 }
 
 export async function deleteIngredientById(userId, id) {
-  await findIngredientOrThrow(userId, id);
-
-  try {
-    await prisma.ingredient.delete({
-      where: { id }
-    });
-  } catch (error) {
-    if (error.code === 'P2025') {
-      throw createHttpError(404, 'Ingredient not found.');
+  const result = await prisma.ingredient.deleteMany({
+    where: {
+      id,
+      userId
     }
+  });
 
-    throw error;
+  if (result.count !== 1) {
+    throw createHttpError(404, 'Ingredient not found.');
   }
 }
