@@ -1,6 +1,9 @@
 import { parseExpirySeconds } from './token.js';
 import { serverConfig } from '../config.js';
 
+const LEGACY_ACCESS_TOKEN_COOKIE_NAME = 'fridgemate_access';
+const LEGACY_REFRESH_TOKEN_COOKIE_NAME = 'fridgemate_refresh';
+
 function serializeCookie(name, value, options = {}) {
   const parts = [`${name}=${encodeURIComponent(value)}`];
 
@@ -84,24 +87,34 @@ export function setAuthCookies(response, accessToken, refreshToken) {
     })
   ];
 
+  if (serverConfig.accessTokenCookieName !== LEGACY_ACCESS_TOKEN_COOKIE_NAME) {
+    cookies.push(serializeExpiredAuthCookie(LEGACY_ACCESS_TOKEN_COOKIE_NAME));
+  }
+
+  if (serverConfig.refreshTokenCookieName !== LEGACY_REFRESH_TOKEN_COOKIE_NAME) {
+    cookies.push(serializeExpiredAuthCookie(LEGACY_REFRESH_TOKEN_COOKIE_NAME));
+  }
+
   response.setHeader('Set-Cookie', cookies);
 }
 
+function serializeExpiredAuthCookie(name) {
+  return serializeCookie(name, '', {
+    httpOnly: true,
+    secure: serverConfig.authCookieSecure,
+    sameSite: serverConfig.authCookieSameSite,
+    path: '/',
+    maxAge: 0
+  });
+}
+
 export function clearAuthCookies(response) {
-  response.setHeader('Set-Cookie', [
-    serializeCookie(serverConfig.accessTokenCookieName, '', {
-      httpOnly: true,
-      secure: serverConfig.authCookieSecure,
-      sameSite: serverConfig.authCookieSameSite,
-      path: '/',
-      maxAge: 0
-    }),
-    serializeCookie(serverConfig.refreshTokenCookieName, '', {
-      httpOnly: true,
-      secure: serverConfig.authCookieSecure,
-      sameSite: serverConfig.authCookieSameSite,
-      path: '/',
-      maxAge: 0
-    })
+  const cookieNames = new Set([
+    serverConfig.accessTokenCookieName,
+    serverConfig.refreshTokenCookieName,
+    LEGACY_ACCESS_TOKEN_COOKIE_NAME,
+    LEGACY_REFRESH_TOKEN_COOKIE_NAME
   ]);
+
+  response.setHeader('Set-Cookie', [...cookieNames].map(serializeExpiredAuthCookie));
 }

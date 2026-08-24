@@ -12,6 +12,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Hardened production auth cookies with `SameSite=Lax` and `__Host-` names, and reject cookie-authenticated state changes whose `Origin` or fallback `Referer` is missing or untrusted.
 - Rate-limited recommendation event ingestion by authenticated user/client address and replaced arbitrary analytics metadata with a bounded allowlisted schema.
 - Reduced public health responses to a static liveness signal so database connectivity and runtime timestamps are not exposed to unauthenticated callers.
+- Expire legacy auth-cookie names during the `__Host-` cookie cutover, and key recommendation-event limits by user ID for authenticated traffic or client address for anonymous traffic.
 
 ### Added
 
