@@ -150,8 +150,7 @@ export async function refreshUserSession(refreshToken) {
   const now = new Date();
   const session = await withDatabaseScope({ refreshTokenHash }, (database) =>
     database.authSession.findUnique({
-      where: { tokenHash: refreshTokenHash },
-      include: { user: true }
+      where: { tokenHash: refreshTokenHash }
     })
   );
 
@@ -160,6 +159,17 @@ export async function refreshUserSession(refreshToken) {
   }
 
   if (session.revokedAt || session.expiresAt <= now) {
+    await revokeActiveRefreshSessions(session.userId, now);
+    throw createHttpError(401, 'The current session is no longer valid.');
+  }
+
+  const user = await withUserDatabaseScope(session.userId, (database) =>
+    database.user.findUnique({
+      where: { id: session.userId }
+    })
+  );
+
+  if (!user) {
     await revokeActiveRefreshSessions(session.userId, now);
     throw createHttpError(401, 'The current session is no longer valid.');
   }
@@ -204,9 +214,9 @@ export async function refreshUserSession(refreshToken) {
     });
 
     return {
-      accessToken: buildAccessToken(session.user),
+      accessToken: buildAccessToken(user),
       refreshToken: refreshTokenValue,
-      user: serializeUser(session.user)
+      user: serializeUser(user)
     };
   });
 

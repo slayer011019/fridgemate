@@ -146,6 +146,7 @@ describe('authService', () => {
       }
     };
     prismaMock.authSession.findUnique.mockResolvedValue(session);
+    prismaMock.user.findUnique.mockResolvedValue(session.user);
     prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.authSession.create.mockResolvedValue({ id: 'session-2' });
     prismaMock.authSession.update.mockResolvedValue(null);
@@ -190,7 +191,7 @@ describe('authService', () => {
   });
 
   it('rejects refresh-token reuse and revokes the user refresh sessions', async () => {
-    prismaMock.authSession.findUnique.mockResolvedValue({
+    const session = {
       id: 'session-1',
       userId: 'user-1',
       revokedAt: null,
@@ -202,7 +203,9 @@ describe('authService', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
-    });
+    };
+    prismaMock.authSession.findUnique.mockResolvedValue(session);
+    prismaMock.user.findUnique.mockResolvedValue(session.user);
     prismaMock.authSession.updateMany
       .mockResolvedValueOnce({ count: 0 })
       .mockResolvedValueOnce({ count: 1 });
