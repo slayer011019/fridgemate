@@ -38,6 +38,18 @@ function buildRefreshExpiryDate() {
   return new Date(Date.now() + parseExpirySeconds(serverConfig.refreshTokenExpiresIn) * 1000);
 }
 
+async function revokeActiveRefreshSessions(userId, revokedAt = new Date()) {
+  await prisma.authSession.updateMany({
+    where: {
+      userId,
+      revokedAt: null
+    },
+    data: {
+      revokedAt
+    }
+  });
+}
+
 async function createSessionPayload(user, prismaClient = prisma) {
   const refreshToken = createRefreshToken();
 
@@ -135,21 +147,31 @@ export async function refreshUserSession(refreshToken) {
   }
 
   if (session.revokedAt || session.expiresAt <= now) {
-    await prisma.authSession.updateMany({
-      where: {
-        userId: session.userId,
-        revokedAt: null
-      },
-      data: {
-        revokedAt: now
-      }
-    });
+    await revokeActiveRefreshSessions(session.userId, now);
     throw createHttpError(401, 'The current session is no longer valid.');
   }
 
   const refreshTokenValue = createRefreshToken();
 
   const payload = await prisma.$transaction(async (transaction) => {
+    const consumedSession = await transaction.authSession.updateMany({
+      where: {
+        id: session.id,
+        revokedAt: null,
+        replacedBySessionId: null,
+        expiresAt: {
+          gt: now
+        }
+      },
+      data: {
+        revokedAt: now
+      }
+    });
+
+    if (consumedSession.count !== 1) {
+      return null;
+    }
+
     const nextSession = await transaction.authSession.create({
       data: {
         tokenHash: hashRefreshToken(refreshTokenValue),
@@ -161,7 +183,6 @@ export async function refreshUserSession(refreshToken) {
     await transaction.authSession.update({
       where: { id: session.id },
       data: {
-        revokedAt: now,
         replacedBySessionId: nextSession.id
       }
     });
@@ -172,6 +193,11 @@ export async function refreshUserSession(refreshToken) {
       user: serializeUser(session.user)
     };
   });
+
+  if (!payload) {
+    await revokeActiveRefreshSessions(session.userId, now);
+    throw createHttpError(401, 'The current session is no longer valid.');
+  }
 
   return payload;
 }

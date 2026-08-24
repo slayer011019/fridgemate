@@ -99,7 +99,7 @@ Backend:
 - Express
 - Prisma
 - PostgreSQL
-- JWT auth with `httpOnly` access and refresh cookies
+- JWT auth with `httpOnly` access cookies and atomic single-use refresh-token rotation
 - Atomic Redis-backed auth throttling for production Node and SQLite Durable Object throttling for Workers; KV stores Worker token revocations
 
 AI, OCR, and data:

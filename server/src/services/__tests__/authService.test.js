@@ -123,4 +123,98 @@ describe('authService', () => {
     });
     expect(prismaMock.authSession.findUnique).not.toHaveBeenCalled();
   });
+
+  it('atomically consumes a refresh session before issuing its replacement', async () => {
+    const session = {
+      id: 'session-1',
+      userId: 'user-1',
+      revokedAt: null,
+      replacedBySessionId: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    };
+    prismaMock.authSession.findUnique.mockResolvedValue(session);
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.authSession.create.mockResolvedValue({ id: 'session-2' });
+    prismaMock.authSession.update.mockResolvedValue(null);
+    const { refreshUserSession } = await import('../authService.js');
+
+    const result = await refreshUserSession('valid-refresh-token');
+
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'session-1',
+        revokedAt: null,
+        replacedBySessionId: null,
+        expiresAt: {
+          gt: expect.any(Date)
+        }
+      },
+      data: {
+        revokedAt: expect.any(Date)
+      }
+    });
+    expect(prismaMock.authSession.create).toHaveBeenCalledWith({
+      data: {
+        tokenHash: expect.any(String),
+        expiresAt: expect.any(Date),
+        userId: 'user-1'
+      }
+    });
+    expect(prismaMock.authSession.update).toHaveBeenCalledWith({
+      where: { id: 'session-1' },
+      data: {
+        replacedBySessionId: 'session-2'
+      }
+    });
+    expect(result).toMatchObject({
+      accessToken: expect.any(String),
+      refreshToken: expect.any(String),
+      user: {
+        id: 'user-1',
+        email: 'user@example.com'
+      }
+    });
+  });
+
+  it('rejects refresh-token reuse and revokes the user refresh sessions', async () => {
+    prismaMock.authSession.findUnique.mockResolvedValue({
+      id: 'session-1',
+      userId: 'user-1',
+      revokedAt: null,
+      replacedBySessionId: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    });
+    prismaMock.authSession.updateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+    const { refreshUserSession } = await import('../authService.js');
+
+    await expect(refreshUserSession('reused-refresh-token')).rejects.toMatchObject({
+      status: 401,
+      message: 'The current session is no longer valid.'
+    });
+
+    expect(prismaMock.authSession.create).not.toHaveBeenCalled();
+    expect(prismaMock.authSession.updateMany).toHaveBeenLastCalledWith({
+      where: {
+        userId: 'user-1',
+        revokedAt: null
+      },
+      data: {
+        revokedAt: expect.any(Date)
+      }
+    });
+  });
 });

@@ -56,6 +56,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Login succeeds and redirects back to the originally requested protected route.
 - [ ] Logout revokes the refresh session and clears the local user snapshot.
 - [ ] Refresh session restores a user after page reload.
+- [ ] Reusing the same refresh cookie concurrently yields at most one replacement session; detected reuse revokes remaining refresh sessions.
 - [ ] 401/403 from refresh clears auth and returns to login.
 - [ ] Network or 5xx refresh failure keeps the local session snapshot and surfaces a recoverable message.
 
