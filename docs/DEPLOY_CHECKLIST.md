@@ -36,6 +36,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] `JWT_SECRET` is at least 32 characters.
 - [ ] `JWT_EXPIRES_IN=15m` or another intentional short access-token value.
 - [ ] `REFRESH_TOKEN_EXPIRES_IN=30d` or another intentional refresh-window value.
+- [ ] `/api/recipes/import/food-safety` returns `404`; recipe imports run only through the trusted seeding workflow.
 - [ ] `ALLOWED_ORIGINS` includes the exact Vercel frontend origin.
 - [ ] `CLIENT_ORIGIN` matches the primary Vercel frontend origin.
 - [ ] `AUTH_COOKIE_SECURE=true`.

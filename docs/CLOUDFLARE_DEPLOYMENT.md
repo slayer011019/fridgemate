@@ -26,6 +26,8 @@ FridgeMate keeps the React frontend on Vercel and the PostgreSQL database on Sup
 | `/api/recipes/*` | Authenticated | Recipe recommendations |
 | `/api/recommendation-events/*` | Optional auth | Recommendation event collection |
 
+Recipe catalog imports are intentionally not exposed over HTTP. Run the trusted `seed:recipes` workflow from a local or CI environment that holds the required server-side credentials.
+
 ## One-time Cloudflare setup
 
 1. Authenticate Wrangler with `npx wrangler login`.

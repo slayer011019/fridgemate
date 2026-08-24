@@ -29,6 +29,7 @@ Implemented:
 - OCR import with review-before-save and correction learning
 - JWT signup, login, logout, refresh-cookie session restore, and protected routes
 - Optional Express API on Node or Cloudflare Workers with Prisma + PostgreSQL
+- Recipe catalog imports are restricted to trusted local/CI seeding scripts and are not exposed as user-facing API routes
 - Manual server backup and pull sync from the account page
 - API fallback behavior that keeps local IndexedDB usable during network or 5xx failures
 - Recommendation impression and click event persistence in backend-connected mode
