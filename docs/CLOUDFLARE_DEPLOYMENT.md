@@ -19,7 +19,7 @@ FridgeMate keeps the React frontend on Vercel and the PostgreSQL database on Sup
 
 | Path | Access | Purpose |
 | --- | --- | --- |
-| `GET /api/health` | Public | API and database health |
+| `GET /api/health` | Public | Minimal API liveness signal |
 | `/api/auth/*` | Public/session | Signup, login, refresh, logout, session |
 | `/api/ingredients/*` | Authenticated | Ingredient list and manual sync |
 | `/api/import/*` | Authenticated | Import correction lookup and learning |

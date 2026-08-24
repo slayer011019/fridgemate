@@ -51,8 +51,8 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 
 - [ ] Database exists and accepts connections through Cloudflare Hyperdrive.
 - [ ] Prisma migrations run successfully with `npm run prisma:deploy`.
-- [ ] `GET /api/health` returns `status: ok`.
-- [ ] `GET /api/health` reports a healthy database check.
+- [ ] `GET /api/health` returns only `{ "status": "ok" }` and does not expose database state.
+- [ ] Verify database connectivity through authenticated functional smoke tests and private platform telemetry.
 
 ## Authentication
 

@@ -60,7 +60,7 @@ This checklist is the release gate for the deployable v1 MVP. Recipe source seed
 - Railway `ALLOWED_ORIGINS` and `CLIENT_ORIGIN` include the exact frontend origin.
 - Production cookies use `AUTH_COOKIE_SECURE=true`, `AUTH_COOKIE_SAME_SITE=Lax`, and `__Host-` names on the same-site frontend/API domain.
 - Cookie-authenticated state changes reject missing or untrusted `Origin`/`Referer` values.
-- `GET /health` succeeds against the deployed backend.
+- `GET /health` returns only the public liveness response without database details.
 - Signup, login, reload session restore, account sync, logout, and relogin work on the custom domain.
 
 ## Core QA Scenario
