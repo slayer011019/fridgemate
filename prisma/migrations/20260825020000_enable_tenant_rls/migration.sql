@@ -12,13 +12,26 @@ BEGIN
 END
 $$;
 
-ALTER ROLE fridgemate_app
-  NOLOGIN
-  NOSUPERUSER
-  NOCREATEDB
-  NOCREATEROLE
-  NOREPLICATION
-  NOBYPASSRLS;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_roles
+    WHERE rolname = 'fridgemate_app'
+      AND (
+        rolcanlogin
+        OR rolsuper
+        OR rolcreatedb
+        OR rolcreaterole
+        OR rolreplication
+        OR rolbypassrls
+      )
+  ) THEN
+    RAISE EXCEPTION
+      'fridgemate_app must be a NOLOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOREPLICATION, NOBYPASSRLS role';
+  END IF;
+END
+$$;
 
 REVOKE ALL ON TABLE "Ingredient", "ImportCorrection" FROM PUBLIC;
 
