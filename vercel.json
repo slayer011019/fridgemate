@@ -1,18 +1,43 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/ingredients",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
+    },
+    {
+      "source": "/ingredients/:path*",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
+    },
+    {
+      "source": "/import",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
+    },
+    {
+      "source": "/login",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
+    },
+    {
+      "source": "/signup",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
+    },
+    {
+      "source": "/account",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
+    }
+  ],
   "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/recipes", "destination": "/index.html" },
-    { "source": "/about", "destination": "/index.html" },
-    { "source": "/contact", "destination": "/index.html" },
-    { "source": "/privacy", "destination": "/index.html" },
-    { "source": "/ingredients", "destination": "/index.html" },
-    { "source": "/ingredients/new", "destination": "/index.html" },
-    { "source": "/ingredients/:ingredientId/edit", "destination": "/index.html" },
-    { "source": "/import", "destination": "/index.html" },
-    { "source": "/login", "destination": "/index.html" },
-    { "source": "/signup", "destination": "/index.html" },
-    { "source": "/account", "destination": "/index.html" }
+    { "source": "/recipes", "destination": "/_seo/recipes.html" },
+    { "source": "/about", "destination": "/_seo/about.html" },
+    { "source": "/contact", "destination": "/_seo/contact.html" },
+    { "source": "/privacy", "destination": "/_seo/privacy.html" },
+    { "source": "/ingredients", "destination": "/_seo/app.html" },
+    { "source": "/ingredients/new", "destination": "/_seo/app.html" },
+    { "source": "/ingredients/:ingredientId/edit", "destination": "/_seo/app.html" },
+    { "source": "/import", "destination": "/_seo/app.html" },
+    { "source": "/login", "destination": "/_seo/app.html" },
+    { "source": "/signup", "destination": "/_seo/app.html" },
+    { "source": "/account", "destination": "/_seo/app.html" }
   ]
 }

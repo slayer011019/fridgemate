@@ -1,4 +1,9 @@
 User-agent: *
 Allow: /
+Disallow: /account
+Disallow: /import
+Disallow: /ingredients
+Disallow: /login
+Disallow: /signup
 
 Sitemap: https://xn--wh1bs8l5xa003adme.com/sitemap.xml

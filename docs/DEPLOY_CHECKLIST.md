@@ -26,6 +26,11 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Keep AdSense Auto ads disabled so functional, empty, and error routes never receive Google-served ads.
 - [ ] Confirm SPA routes load after refresh: `/`, `/ingredients`, `/import`, `/recipes`, `/login`, `/account`.
 - [ ] Confirm the deployed frontend sends API requests with credentials.
+- [ ] `curl` for `/`, `/recipes`, `/about`, `/contact`, and `/privacy` contains a visible `h1`, route-specific title, canonical URL, and JSON-LD without executing JavaScript.
+- [ ] `/ingredients`, `/ingredients/*`, `/import`, `/login`, `/signup`, and `/account` return `X-Robots-Tag: noindex, nofollow, noarchive`.
+- [ ] `/robots.txt`, `/sitemap.xml`, and `/llms.txt` return `200`; the sitemap contains only public routes.
+- [ ] Review Cloudflare managed crawler/content-signal rules separately because they can be prepended to the repository's `robots.txt` response.
+- [ ] Record Search Console and Naver Search Advisor baselines after deployment and compare impressions, clicks, indexed pages, and citations after 14 days.
 
 ## Cloudflare Workers API
 

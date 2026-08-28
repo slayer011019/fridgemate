@@ -12,6 +12,14 @@ import { useAuth } from './useAuth';
 
 const IngredientsContext = createContext(null);
 
+function getStoredLastSyncedAt() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.localStorage.getItem('fridgemate-last-synced-at');
+}
+
 export function IngredientsProvider({ children }) {
   const { isAuthenticated, storageScope } = useAuth();
   const backendSyncAvailable = isBackendEnabled() && isAuthenticated;
@@ -23,7 +31,7 @@ export function IngredientsProvider({ children }) {
   const [dataSource, setDataSource] = useState('indexeddb');
   const [syncSummary, setSyncSummary] = useState(() => initialScopeState.syncSummary || createEmptySyncSummary());
   const [syncStatus, setSyncStatus] = useState('idle');
-  const [lastSyncedAt, setLastSyncedAt] = useState(() => window.localStorage.getItem('fridgemate-last-synced-at'));
+  const [lastSyncedAt, setLastSyncedAt] = useState(getStoredLastSyncedAt);
   const [syncError, setSyncError] = useState(null);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
   const isSyncing = syncStatus === 'syncing';
@@ -69,7 +77,7 @@ export function IngredientsProvider({ children }) {
     setSyncStatus('idle');
     setSyncError(null);
     setHasUnsyncedChanges(false);
-    setLastSyncedAt(window.localStorage.getItem('fridgemate-last-synced-at'));
+    setLastSyncedAt(getStoredLastSyncedAt());
   }, [storageScope]);
 
   useEffect(() => {

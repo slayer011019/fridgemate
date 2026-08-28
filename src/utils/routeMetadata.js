@@ -23,6 +23,8 @@ const PUBLIC_PAGE_METADATA = {
   }
 };
 
+export const PUBLIC_ROUTES = Object.freeze(Object.keys(PUBLIC_PAGE_METADATA));
+
 const FUNCTIONAL_PATH_PATTERNS = [
   /^\/ingredients(?:\/.*)?$/,
   /^\/import$/,

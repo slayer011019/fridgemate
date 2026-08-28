@@ -66,6 +66,14 @@
 - Vitest, React Testing Library, Playwright, ESLint, GitHub Actions CI
 - 공개 서비스·연락처·개인정보처리방침·사이트맵·`ads.txt`
 
+### 검색 노출 경계
+
+- 홈, 메뉴 추천, 서비스 소개, 문의, 개인정보 처리 안내는 빌드 시 본문과 경로별 메타·JSON-LD를 HTML로 프리렌더합니다.
+- 재료, OCR 가져오기, 로그인, 회원가입, 계정 화면은 Vercel `X-Robots-Tag`와 `robots.txt`에서 색인을 차단합니다.
+- `npm run build`의 postbuild 단계는 공개 HTML의 `h1`, canonical, structured data와 기능 화면의 빈 `noindex` 앱 셸을 자동 검증합니다.
+- `llms.txt`는 공개 정보와 사용자별 비공개 영역의 경계를 설명하며, 개인정보나 개인화 추천 데이터는 인용 대상으로 제공하지 않습니다.
+- 공개 레시피 상세 페이지와 `Recipe` JSON-LD는 조리 단계·대표 이미지·출처가 준비되기 전까지 생성하지 않습니다.
+
 아직 운영 단계가 아닙니다.
 
 - 자동 백그라운드 및 실시간 동기화

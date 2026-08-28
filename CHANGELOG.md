@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Prerendered public pages with route-specific crawler-visible HTML and forced functional, account, ingredient, and import routes out of search indexes at the response-header level.
 - Added an explicit `--max-writes` cap to recipe embedding backfills so a full catalog scan can still guarantee a limited number of production upserts.
 - Raised the fixed semantic recipe retrieval fixture from 6/10 to 9/10 Hit@5 by placing normalized ingredient sections before menu metadata in candidate embedding text, without changing the embedding model, vector dimensions, candidate pool, or fixture ground truth.
 - Added target similarity and query-versus-candidate ingredient classification evidence to the read-only recipe search quality report.
@@ -28,6 +29,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added truthful page-level JSON-LD, `llms.txt`, private-route crawler exclusions, and a post-build SEO output verification gate.
 - Added a fixed ten-recipe semantic retrieval fixture, an all-catalog read-only evaluation command, Hit@1/Hit@5/MRR metrics, and a vector-free JSON quality report.
 - Added first-pass conflict-aware manual ingredient sync with stable `clientId` matching, persisted pending create/update/delete states, and server deletion tombstones.
 - Added a record-level ingredient sync API and complete sync-state pull endpoint while preserving authenticated user scoping and PostgreSQL RLS boundaries.

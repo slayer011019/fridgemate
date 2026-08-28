@@ -11,7 +11,7 @@
     "dev:worker": "wrangler dev",
     "lint": "eslint .",
     "build": "vite build",
-    "postbuild": "node scripts/generate-adsense-assets.js",
+    "postbuild": "node scripts/generate-adsense-assets.js && node scripts/generate-seo-pages.js && node scripts/verify-seo-output.js",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
