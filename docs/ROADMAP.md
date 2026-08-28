@@ -23,6 +23,7 @@ Implemented:
 
 - Deploy frontend and backend to stable public environments
 - Keep lint, tests, build, and core E2E green in CI
+- Recover and reconcile the three production-only Prisma migrations before applying the pending ingredient tombstone migration
 - Harden auth recovery when sessions expire
 - Polish guest import and manual sync messaging
 - Improve documentation for first-time contributors

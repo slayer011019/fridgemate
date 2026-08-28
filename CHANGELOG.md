@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Added an explicit `--max-writes` cap to recipe embedding backfills so a full catalog scan can still guarantee a limited number of production upserts.
 - Raised the fixed semantic recipe retrieval fixture from 6/10 to 9/10 Hit@5 by placing normalized ingredient sections before menu metadata in candidate embedding text, without changing the embedding model, vector dimensions, candidate pool, or fixture ground truth.
 - Added target similarity and query-versus-candidate ingredient classification evidence to the read-only recipe search quality report.
 - Added deterministic runtime ingredient classification so empty production categories no longer make every seasoning, liquid, garnish, optional item, or uncertain item a core requirement.

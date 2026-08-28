@@ -245,6 +245,8 @@ npm run prisma:deploy
 npm run recipes:embed -- --dry-run --limit=10
 ```
 
+제한적 운영 backfill은 조회 범위와 실제 쓰기 상한을 분리합니다. 예를 들어 전체 카탈로그에서 missing 항목을 찾되 최대 10개만 쓰려면 `--limit=1146 --max-writes=10`을 함께 사용합니다.
+
 고정 fixture를 이용한 읽기 전용 품질 평가:
 
 ```bash

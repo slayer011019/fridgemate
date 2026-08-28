@@ -21,7 +21,8 @@ export function parseArgs(argv = process.argv.slice(2)) {
     resumeFrom: '',
     output: '',
     limit: 25,
-    batchSize: 25
+    batchSize: 25,
+    maxWrites: Number.POSITIVE_INFINITY
   };
 
   argv.forEach((arg) => {
@@ -31,6 +32,10 @@ export function parseArgs(argv = process.argv.slice(2)) {
 
     if (arg.startsWith('--batch-size=')) {
       options.batchSize = Math.max(1, Number.parseInt(arg.split('=')[1], 10) || options.batchSize);
+    }
+
+    if (arg.startsWith('--max-writes=')) {
+      options.maxWrites = Math.max(1, Number.parseInt(arg.split('=')[1], 10) || 1);
     }
 
     if (arg.startsWith('--resume-from=')) options.resumeFrom = arg.slice('--resume-from='.length).trim();
@@ -186,6 +191,11 @@ async function upsertEmbedding(prisma, { recipeId, embeddingText, embedding, mod
 
 export async function embedRecipes(options = parseArgs()) {
   const prisma = options.prismaClient || new PrismaClient();
+  const createEmbeddingForRecipe = options.createEmbedding || createEmbedding;
+  const upsertEmbeddingForRecipe = options.upsertEmbedding || upsertEmbedding;
+  const maxWrites = Number.isFinite(options.maxWrites)
+    ? Math.max(1, Math.floor(options.maxWrites))
+    : Number.POSITIVE_INFINITY;
   const config = {
     ...getEmbeddingConfig(),
     ...options.embeddingConfig
@@ -198,6 +208,7 @@ export async function embedRecipes(options = parseArgs()) {
     current: 0,
     missing: 0,
     stale: 0,
+    writeLimitReached: false,
     lastProcessedRecipeId: null
   };
 
@@ -225,6 +236,11 @@ export async function embedRecipes(options = parseArgs()) {
       });
 
       for (const recipe of recipes) {
+        if (!options.dryRun && summary.generated >= maxWrites) {
+          summary.writeLimitReached = true;
+          break;
+        }
+
         const ingredients = ingredientsByRecipeId.get(String(recipe.id)) || [];
         const embeddingText = buildProductionRecipeEmbeddingText(recipe, ingredients);
         const contentHash = contentHashFor(embeddingText);
@@ -253,8 +269,8 @@ export async function embedRecipes(options = parseArgs()) {
             continue;
           }
 
-          const embedding = await createEmbedding(embeddingText, config);
-          await upsertEmbedding(prisma, {
+          const embedding = await createEmbeddingForRecipe(embeddingText, config);
+          await upsertEmbeddingForRecipe(prisma, {
             recipeId: recipe.id,
             embeddingText,
             embedding,
@@ -263,15 +279,22 @@ export async function embedRecipes(options = parseArgs()) {
             contentHash
           });
           summary.generated += 1;
+          if (summary.generated >= maxWrites) {
+            summary.writeLimitReached = true;
+          }
         } catch (error) {
           summary.failed += 1;
           console.error(`[failed] ${recipe.id} ${error.message}`);
         }
       }
+
+      if (summary.writeLimitReached) {
+        break;
+      }
     }
 
     console.log(
-      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'}`
+      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} writeLimitReached=${summary.writeLimitReached} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'}`
     );
     return summary;
   } finally {

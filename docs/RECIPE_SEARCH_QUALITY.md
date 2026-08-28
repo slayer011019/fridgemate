@@ -70,9 +70,9 @@ The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 
 
 1. Take a Supabase checkpoint and export `recipe_embeddings` IDs, model, dimensions, content hashes, and vectors to protected storage for rollback.
 2. Run `npm run recipes:embed -- --dry-run --limit=1146 --batch-size=100 --quiet`. The current new-builder state is `missing=153`, `stale=993`, `current=0`.
-3. Backfill missing rows first in batches of 25 with `--backfill-missing --limit=1146 --batch-size=25`. Resume after interruption with the reported `--resume-from=<lastProcessedRecipeId>` cursor.
+3. Backfill at most ten missing rows first with `--backfill-missing --limit=1146 --batch-size=25 --max-writes=10`. Verify the reported `writeLimitReached=true`, then resume later with the reported `--resume-from=<lastProcessedRecipeId>` cursor.
 4. Verify model/dimension counts, duplicate composite keys, orphans, failures, and a limited production query smoke test.
-5. Replace stale rows with `--backfill-stale --limit=1146 --batch-size=25`; retry only failed batches with the last safe cursor. API 429 and 5xx errors retain the old row and remain retryable.
+5. Replace at most ten stale rows with `--backfill-stale --limit=1146 --batch-size=25 --max-writes=10`; retry only failed batches with the last safe cursor. API 429 and 5xx errors retain the old row and remain retryable. Remove or raise the write cap only after the limited stored-vector smoke test passes.
 6. During stale replacement, old and new content hashes coexist temporarily under the same model/dimension filter. Run during a controlled window, monitor search quality, and pause on regression.
 7. Re-run the fixed quality report against stored vectors, then verify total count 1,146, dimensions 1,536, duplicate keys 0, and orphans 0.
 8. Roll back by restoring the protected `recipe_embeddings` snapshot if stored-vector quality differs from the approved in-memory report.
