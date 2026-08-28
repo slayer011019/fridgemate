@@ -8,17 +8,30 @@ This check evaluates semantic recipe candidate retrieval without writing product
 
 | Metric | Old production vectors | Classification-aware in-memory vectors |
 | --- | ---: | ---: |
-| Hit@1 | not recorded | 5/10 |
-| Hit@5 | historical 2/10; fixed fixture replay 3/10 | 6/10 |
-| MRR@5 | not recorded | 0.55 |
-| Average original rank | not recorded | 69.7 |
+| Hit@1 | not recorded | 9/10 |
+| Hit@5 | historical 2/10; fixed fixture replay 3/10 | 9/10 |
+| MRR@5 | not recorded | 0.9 |
+| Average original rank | not recorded | 30.4 |
 | Classification rate | 0% from the empty DB category column | 79.35% |
 | Unknown rate | not represented | 20.65% |
-| Median core missing count in evaluated Top 5 | observed range about 9-14 | 5 |
-| Median missing seasoning count in evaluated Top 5 | not recorded | 1.5 |
+| Median core missing count in evaluated Top 5 | observed range about 9-14 | 3.5 |
+| Median missing seasoning count in evaluated Top 5 | not recorded | 1 |
 | Existing embedding missing rate | 13.35% | 13.35% |
 
-The agreed release gate is Hit@5 at least 7/10. The current result is **No-Go** for production backfill.
+The agreed release gate is Hit@5 at least 7/10. The current result is **Go** for a separately reviewed, limited production backfill. No production vectors were written by this evaluation.
+
+## Failure Diagnosis and Minimal Fix
+
+The 6/10 baseline had four misses. Every target existed in the 1,146-recipe candidate pool and had zero missing ingredients against its own fixture query, while the returned Top 5 recipes were missing multiple ingredients. Candidate-pool size, similarity threshold, missing catalog rows, stale-hash detection, and fixture IDs were therefore ruled out for these cases.
+
+| Fixture | Baseline rank / similarity | Current rank / similarity | Finding |
+| --- | ---: | ---: | --- |
+| 포니언 스프 | 85 / 0.583549 | 1 / 0.894177 | Ingredient text was placed after menu metadata, weakening alignment with the ingredient-only query. |
+| 떡갈비콩나물밥 | 58 / 0.603366 | 1 / 0.845062 | The same ordering issue was amplified by a long core-ingredient list and a minced-garlic classification mismatch. |
+| 호박잎 삼계탕 | 25 / 0.667513 | 1 / 0.878200 | The query and candidate shared the core ingredients, but candidate metadata preceded the matching sections. |
+| 케이준 스타일 닭고기 요리 | 524 / 0.538547 | 295 / 0.730204 | Dried-herb names and optional sugar remain inconsistently classified; this is the only remaining miss. |
+
+The accepted change only reorders the existing deterministic candidate sections so normalized search ingredients, core ingredients, and seasonings precede menu/category/cooking metadata. It does not change the model, dimensions, candidate pool, threshold, fixture ground truth, or classification dictionaries.
 
 ## Classification Rules
 
@@ -35,7 +48,7 @@ Only `main` blocks `canMakeNow`. Seasonings remain separate, optional/garnish/li
 
 ## Embedding Text Contract
 
-The builder emits deterministic Korean sections: menu, category, cooking method, normalized search ingredients, core ingredients, bounded seasonings, liquid, optional/garnish, and tags. It removes HTML, quantity suffixes, section prefixes, duplicate names, raw ingredient repetition, and cooking-step noise. Output is capped at 1,200 characters and SHA-256 hashes are calculated from the exact final text.
+The builder emits deterministic Korean sections with ingredient-bearing sections first: normalized search ingredients, core ingredients, bounded seasonings, liquid, optional/garnish, then menu, category, cooking method, and tags. It removes HTML, quantity suffixes, section prefixes, duplicate names, raw ingredient repetition, and cooking-step noise. Output is capped at 1,200 characters and SHA-256 hashes are calculated from the exact final text.
 
 ## Reproduce
 
@@ -64,11 +77,11 @@ The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 
 7. Re-run the fixed quality report against stored vectors, then verify total count 1,146, dimensions 1,536, duplicate keys 0, and orphans 0.
 8. Roll back by restoring the protected `recipe_embeddings` snapshot if stored-vector quality differs from the approved in-memory report.
 
-Do not run either backfill mode until Hit@5 reaches 7/10 and the report is reviewed.
+The in-memory gate is now satisfied. Run the backup, dry-run, limited backfill, integrity checks, and stored-vector smoke test as a separate reviewed operation before any full replacement or semantic API release.
 
 ## Next Improvement Candidates
 
 - Fix parser artifacts still visible in names such as `버터 1½작은술` and merged section text.
-- Add broader canonical aliases for meat cuts, dried herbs, and section-prefixed names.
+- Add broader canonical aliases for meat cuts, dried herbs such as `바질마른것`/`오레가노마른것`/`타임 마른것`, and section-prefixed names.
 - Replace UUID-order smoke coverage with a reviewed category-balanced Korean home-meal set while preserving the original fixture for regression comparison.
 - Evaluate candidate retrieval plus the existing structured reranker separately; several vector misses had much worse ingredient overlap than the target recipe.

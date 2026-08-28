@@ -266,8 +266,28 @@ export async function evaluateRecipeSearch(options = {}) {
           similarity: cosineSimilarity(queryVectors[targetIndex], candidateVectors[candidateIndex])
         }))
         .sort((left, right) => right.similarity - left.similarity || left.recipe.id.localeCompare(right.recipe.id));
+      const targetResult = ranked.find((item) => item.recipe.id === target.id);
       const originalRank = ranked.findIndex((item) => item.recipe.id === target.id) + 1;
       const available = target.ingredients.map((ingredient) => ({ name: ingredient.normalizedName }));
+      const queryIngredientClassifications = available.map((ingredient) => {
+        const classification = classifyRecipeIngredient({
+          rawName: ingredient.name,
+          normalizedName: ingredient.name
+        });
+        return {
+          name: ingredient.name,
+          type: classification.type,
+          reason: classification.reason
+        };
+      });
+      const candidateIngredientClassifications = classifyRecipeIngredientsForEmbedding(
+        target,
+        target.ingredients
+      ).map((ingredient) => ({
+        name: ingredient.normalizedName,
+        type: ingredient.ingredientType,
+        reason: ingredient.classificationReason
+      }));
       const top5 = ranked.slice(0, 5).map(({ recipe, similarity }) => {
         const structured = getRecipeMatchScore(available, recipe.ingredients, { recipeId: recipe.id });
         missingCounts.push(structured.missingIngredients.length);
@@ -286,6 +306,9 @@ export async function evaluateRecipeSearch(options = {}) {
         name: target.name,
         queryText: queryTexts[targetIndex],
         embeddingText: candidateTexts[candidates.findIndex((candidate) => candidate.id === target.id)],
+        targetSimilarity: round(targetResult?.similarity, 6),
+        queryIngredientClassifications,
+        candidateIngredientClassifications,
         originalRank,
         hit1: originalRank === 1,
         hit5: originalRank <= 5,

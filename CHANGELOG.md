@@ -9,6 +9,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Raised the fixed semantic recipe retrieval fixture from 6/10 to 9/10 Hit@5 by placing normalized ingredient sections before menu metadata in candidate embedding text, without changing the embedding model, vector dimensions, candidate pool, or fixture ground truth.
+- Added target similarity and query-versus-candidate ingredient classification evidence to the read-only recipe search quality report.
 - Added deterministic runtime ingredient classification so empty production categories no longer make every seasoning, liquid, garnish, optional item, or uncertain item a core requirement.
 - Replaced noisy recipe embedding bodies with bounded classification-aware text and aligned semantic query text with the same normalized search-ingredient sections.
 - Made the recipe embedding command write-free by default and separated missing/stale backfill modes from in-memory quality evaluation.

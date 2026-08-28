@@ -39,9 +39,9 @@ Implemented:
 ## AI and Data Roadmap
 
 - Analyze recommendation impression/click exports
-- Improve recipe embedding/query text quality against a reviewed Korean home-meal evaluation set
-- Expand the fixed evaluation set beyond UUID-order smoke coverage and raise the current 6/10 Hit@5 result above the 7/10 release gate
-- Complete the remaining production `recipe_embeddings` backfill only after retrieval quality clears the agreed smoke gate
+- Keep the ingredient-first embedding text at or above the current 9/10 Hit@5 result while expanding the fixture beyond UUID-order smoke coverage
+- Review and execute the checkpointed limited `recipe_embeddings` backfill now that the in-memory 7/10 release gate is satisfied; full replacement remains blocked on stored-vector integrity and smoke checks
+- Keep semantic API publication separate from the backfill and require stored-vector quality verification first
 - Normalize recommendation event keys into `local:<seed-id>` and `catalog:<uuid>` with a nullable catalog recipe FK
 - Add canonical dishes, aliases, and source-attributed popularity signals after catalog recipe IDs are stable
 - Prototype ranking improvements from collected feature snapshots

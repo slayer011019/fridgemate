@@ -19,11 +19,11 @@ describe('recipeEmbeddingTextBuilder', () => {
 
     expect(buildProductionRecipeEmbeddingText(recipe, ingredients)).toBe(
       [
+        '검색재료: egg, kimchi, rice',
+        '핵심재료: kimchi, rice',
         '메뉴: Kimchi Fried Rice',
         '분류: Rice',
-        '조리방식: Stir-fry',
-        '검색재료: egg, kimchi, rice',
-        '핵심재료: kimchi, rice'
+        '조리방식: Stir-fry'
       ].join('\n')
     );
   });

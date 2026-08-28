@@ -27,8 +27,8 @@ describe('classified recipe embedding text', () => {
     const second = buildClassifiedRecipeEmbeddingText(recipe, [...ingredients].reverse());
 
     expect(first).toBe(second);
+    expect(first.startsWith('검색재료: 김치, 돼지고기, 두부')).toBe(true);
     expect(first).toContain('메뉴: 김치찌개');
-    expect(first).toContain('검색재료: 김치, 돼지고기, 두부');
     expect(first).toContain('핵심재료: 김치');
     expect(first).toContain('양념: 마늘');
     expect(first).toContain('액체: 물');

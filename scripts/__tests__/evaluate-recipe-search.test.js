@@ -70,6 +70,11 @@ describe('recipe search evaluation', () => {
     });
     expect(report.preflight.productionWrites).toBe(0);
     expect(report.results.map((result) => result.id)).toEqual([ID_A, ID_B]);
+    expect(report.results[0]).toMatchObject({
+      targetSimilarity: 1,
+      queryIngredientClassifications: [{ name: '감자', type: 'unknown', reason: 'insufficient-evidence' }],
+      candidateIngredientClassifications: [{ name: '감자', type: 'main', reason: 'explicit-category' }]
+    });
     expect(generateBatch).toHaveBeenCalledTimes(1);
     expect(prismaClient.$executeRawUnsafe).toBeUndefined();
   });

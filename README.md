@@ -252,7 +252,7 @@ npm run recipes:embed -- --evaluate --dry-run --limit=1146
 npm run recipes:embed -- --evaluate --execute --limit=1146 --output=docs/recipe-search-quality-report.json
 ```
 
-현재 평가 결과는 Hit@5 `6/10`으로 운영 기준 `7/10`에 미달합니다. 따라서 전체 임베딩 backfill과 semantic 추천 API 공개는 보류합니다. 상세 기준과 결과는 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md)에 있습니다.
+현재 읽기 전용 평가 결과는 Hit@5 `9/10`으로 운영 기준 `7/10`을 통과했습니다. 제한적 임베딩 backfill을 별도 검토할 수 있지만, 전체 교체와 semantic 추천 API 공개는 저장 벡터 무결성 및 smoke test가 끝날 때까지 보류합니다. 상세 기준과 결과는 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md)에 있습니다.
 
 ## 추천 이벤트 내보내기
 
@@ -315,8 +315,8 @@ FridgeMate/
 ## 다음 단계
 
 1. 수동 동기화를 운영 DB와 여러 실제 기기에서 제한적으로 검증
-2. 레시피 재료 분류와 검색 fixture를 개선해 Hit@5 품질 기준 통과
-3. 기준 통과 후 제한적 임베딩 backfill과 무결성 점검
+2. 확대된 검색 fixture에서도 Hit@5 품질 기준 유지
+3. checkpoint 후 제한적 임베딩 backfill과 저장 벡터 무결성 점검
 4. semantic 추천 API와 규칙 기반 reranking 연결
 5. 충분한 행동 데이터가 쌓인 뒤 추천 가중치 또는 순위 모델 검토
 

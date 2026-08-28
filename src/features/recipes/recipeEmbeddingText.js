@@ -106,14 +106,14 @@ export function buildClassifiedRecipeEmbeddingText(recipe = {}, ingredients = []
   );
   const tags = uniqueSorted(readTags(recipe)).slice(0, 8);
   const lines = [
-    name ? `메뉴: ${name}` : '',
-    category ? `분류: ${category}` : '',
-    cookingMethod ? `조리방식: ${cookingMethod}` : '',
     buildSearchIngredientLine(classifiedIngredients),
     buildListLine('핵심재료', classifiedIngredients, ['main'], 12),
     buildListLine('양념', classifiedIngredients, ['seasoning'], 8),
     buildListLine('액체', classifiedIngredients, ['liquid'], 4),
     buildListLine('선택/고명', classifiedIngredients, ['optional', 'garnish'], 6),
+    name ? `메뉴: ${name}` : '',
+    category ? `분류: ${category}` : '',
+    cookingMethod ? `조리방식: ${cookingMethod}` : '',
     tags.length ? `태그: ${tags.join(', ')}` : ''
   ];
 
