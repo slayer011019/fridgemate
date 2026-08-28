@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs';
 const schemaText = readFileSync('prisma/schema.prisma', 'utf8');
 
 describe('recipe schema design', () => {
-  it('includes recipe catalog tables without recipe step storage', () => {
-    expect(schemaText).toContain('@@map("raw_recipes")');
+  it('matches the production UUID recipe catalog tables', () => {
     expect(schemaText).toContain('@@map("recipes")');
     expect(schemaText).toContain('@@map("recipe_ingredients")');
-    expect(schemaText).toContain('@@map("ingredients")');
-    expect(schemaText).toContain('@@map("ingredient_aliases")');
+    expect(schemaText).toContain('@@map("recipe_embeddings")');
+    expect(schemaText).toContain('@map("external_id")');
+    expect(schemaText).toContain('@db.Uuid');
+    expect(schemaText).not.toContain('@@map("raw_recipes")');
     expect(schemaText).not.toContain('recipe_steps');
     expect(schemaText).not.toContain('RecipeStep');
   });
@@ -19,11 +20,15 @@ describe('recipe schema design', () => {
     expect(schemaText).not.toContain('manualImage');
   });
 
-  it('stores recipe embedding metadata and ingredient confidence without recipe body storage', () => {
+  it('stores recipe embeddings in the sidecar table with matching metadata', () => {
+    expect(schemaText).toContain('model RecipeEmbedding');
     expect(schemaText).toContain('embeddingText');
-    expect(schemaText).toContain('Unsupported("vector")');
-    expect(schemaText).toContain('embeddingStatus');
+    expect(schemaText).toContain('Unsupported("vector(1536)")');
+    expect(schemaText).toContain('embeddingModel');
+    expect(schemaText).toContain('embeddingDimensions');
+    expect(schemaText).toContain('contentHash');
     expect(schemaText).toContain('confidence');
-    expect(schemaText).toContain('rawPayload');
+    expect(schemaText).toContain('raw             Json?');
+    expect(schemaText).not.toContain('embeddingStatus');
   });
 });

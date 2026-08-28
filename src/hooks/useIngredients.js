@@ -97,13 +97,16 @@ export function IngredientsProvider({ children }) {
       createLoadIngredientsAction({
         storageScope,
         useApi,
+        syncEnabled: backendSyncAvailable,
         scopeRef,
         commitIngredients,
         commitSyncSummary,
         runRepositoryCommand,
-        setLoading
+        setLoading,
+        setHasUnsyncedChanges,
+        setSyncStatus
       }),
-    [commitIngredients, commitSyncSummary, runRepositoryCommand, storageScope, useApi]
+    [backendSyncAvailable, commitIngredients, commitSyncSummary, runRepositoryCommand, storageScope, useApi]
   );
 
   useEffect(() => {
@@ -123,13 +126,14 @@ export function IngredientsProvider({ children }) {
     () =>
       createCrudActions({
         storageScope,
+        syncEnabled: backendSyncAvailable,
         ingredientsRef,
         commitIngredients,
         commitSyncSummary,
         runRepositoryCommand,
         markDirty
       }),
-    [commitIngredients, commitSyncSummary, markDirty, runRepositoryCommand, storageScope]
+    [backendSyncAvailable, commitIngredients, commitSyncSummary, markDirty, runRepositoryCommand, storageScope]
   );
 
   const pushIngredientsToServer = useMemo(
@@ -138,13 +142,14 @@ export function IngredientsProvider({ children }) {
         isAuthenticated: backendSyncAvailable,
         storageScope,
         commitIngredients,
+        commitSyncSummary,
         setSyncStatus,
         setHasUnsyncedChanges,
         setLastSyncedAt,
         setSyncError,
         setError
       }),
-    [backendSyncAvailable, commitIngredients, storageScope]
+    [backendSyncAvailable, commitIngredients, commitSyncSummary, storageScope]
   );
 
   const pullIngredientsFromServer = useMemo(
@@ -153,11 +158,13 @@ export function IngredientsProvider({ children }) {
         isAuthenticated: backendSyncAvailable,
         storageScope,
         commitIngredients,
+        commitSyncSummary,
         setSyncStatus,
+        setHasUnsyncedChanges,
         setSyncError,
         setError
       }),
-    [backendSyncAvailable, commitIngredients, storageScope]
+    [backendSyncAvailable, commitIngredients, commitSyncSummary, storageScope]
   );
 
   const value = useMemo(

@@ -49,10 +49,11 @@ This checklist is the release gate for the deployable v1 MVP. Recipe source seed
 
 - Add, edit, consume, restore, and delete write to IndexedDB first.
 - These actions must not call `POST /api/ingredients`, `PATCH /api/ingredients/:id`, or `DELETE /api/ingredients/:id`.
-- The account-page sync button sends `POST /api/ingredients/sync` with the current local snapshot.
-- Deleting locally and then syncing should remove the item from the server snapshot.
+- The account-page sync button sends only pending record changes to `POST /api/ingredients/sync`.
+- Deleting locally stores a `pendingDelete` tombstone and the next manual backup uploads it.
 - Reload after deletion sync should not restore the deleted item.
-- v1 uses replace-style sync. v2 should add `updatedAt` merge plus `deletedAt` or tombstone conflict handling for multi-device writes.
+- Server pull uses `GET /api/ingredients/sync`, compares stable `clientId` records by `updatedAt`, and preserves newer pending local changes.
+- Repeating backup or pull must not duplicate records or reapply a completed deletion.
 
 ## Deployment Checks
 

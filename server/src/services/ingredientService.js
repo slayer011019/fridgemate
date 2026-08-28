@@ -1,6 +1,11 @@
 import { withUserDatabaseScope } from '../db/tenantScope.js';
 import { createHttpError } from '../lib/httpError.js';
-import { assertValidIngredient, normalizeIngredientInput } from '../lib/ingredientValidation.js';
+import {
+  assertValidIngredient,
+  assertValidIngredientSyncTimestamps,
+  normalizeIngredientInput,
+  normalizeIngredientSyncInput
+} from '../lib/ingredientValidation.js';
 
 function normalizeAndValidateIngredient(input) {
   const ingredient = normalizeIngredientInput(input);
@@ -10,7 +15,7 @@ function normalizeAndValidateIngredient(input) {
 
 async function findIngredientOrThrow(database, userId, id) {
   const ingredient = await database.ingredient.findFirst({
-    where: { id, userId }
+    where: { id, userId, deletedAt: null }
   });
 
   if (!ingredient) {
@@ -23,7 +28,7 @@ async function findIngredientOrThrow(database, userId, id) {
 export async function listIngredients(userId) {
   return withUserDatabaseScope(userId, (database) =>
     database.ingredient.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       orderBy: { createdAt: 'desc' }
     })
   );
@@ -71,47 +76,73 @@ export async function createIngredientsBulk(userId, items = []) {
   });
 }
 
-export async function replaceIngredientsForUser(userId, items = []) {
-  const normalizedItems = items.map((item) => normalizeAndValidateIngredient(item));
-  const syncedClientIds = normalizedItems.map((ingredient) => ingredient.clientId);
+export async function listIngredientSyncState(userId) {
+  return withUserDatabaseScope(userId, (database) =>
+    database.ingredient.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' }
+    })
+  );
+}
+
+export async function syncIngredientChanges(userId, changes = []) {
+  const normalizedChanges = changes.map((item) => {
+    const ingredient = normalizeIngredientSyncInput(item);
+    assertValidIngredient(ingredient);
+    assertValidIngredientSyncTimestamps(ingredient);
+    return ingredient;
+  });
 
   return withUserDatabaseScope(userId, async (database) => {
-    await database.ingredient.deleteMany({
-      where: {
-        userId,
-        ...(syncedClientIds.length
-          ? {
-              clientId: {
-                notIn: syncedClientIds
-              }
-            }
-          : {})
-      }
-    });
+    let appliedCount = 0;
 
-    for (const ingredient of normalizedItems) {
-      await database.ingredient.upsert({
-        where: {
-          userId_clientId: {
-            userId,
-            clientId: ingredient.clientId
-          }
-        },
-        create: {
-          ...ingredient,
-          userId
-        },
-        update: {
-          ...ingredient,
-          userId
-        }
+    for (const ingredient of normalizedChanges) {
+      const existingIngredient = await database.ingredient.findFirst({
+        where: { userId, clientId: ingredient.clientId }
       });
+      const incomingUpdatedAt = new Date(ingredient.updatedAt);
+
+      if (existingIngredient && new Date(existingIngredient.updatedAt) >= incomingUpdatedAt) continue;
+
+      const { id: _id, ...ingredientData } = ingredient;
+
+      if (existingIngredient) {
+        const result = await database.ingredient.updateMany({
+          where: {
+            userId,
+            clientId: ingredient.clientId,
+            updatedAt: { lt: incomingUpdatedAt }
+          },
+          data: ingredientData
+        });
+        appliedCount += result.count;
+        continue;
+      }
+
+      try {
+        await database.ingredient.create({ data: { ...ingredientData, userId } });
+        appliedCount += 1;
+      } catch (error) {
+        if (error?.code !== 'P2002') throw error;
+
+        const result = await database.ingredient.updateMany({
+          where: {
+            userId,
+            clientId: ingredient.clientId,
+            updatedAt: { lt: incomingUpdatedAt }
+          },
+          data: ingredientData
+        });
+        appliedCount += result.count;
+      }
     }
 
-    return database.ingredient.findMany({
+    const items = await database.ingredient.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { updatedAt: 'desc' }
     });
+
+    return { items, appliedCount };
   });
 }
 
@@ -142,11 +173,14 @@ export async function updateIngredientById(userId, id, input) {
 
 export async function deleteIngredientById(userId, id) {
   return withUserDatabaseScope(userId, async (database) => {
-    const result = await database.ingredient.deleteMany({
+    const deletedAt = new Date();
+    const result = await database.ingredient.updateMany({
       where: {
         id,
-        userId
-      }
+        userId,
+        deletedAt: null
+      },
+      data: { deletedAt, updatedAt: deletedAt }
     });
 
     if (result.count !== 1) {

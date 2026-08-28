@@ -49,10 +49,16 @@ The active working copy lives in IndexedDB. This keeps the app usable when the b
 
 Authenticated users can:
 
-- push the current local ingredient snapshot to the server
-- pull the current server ingredient snapshot into the device cache
+- push only pending local ingredient changes to the server
+- pull the complete server sync state, including deletion tombstones, into the device cache
 
-This is an explicit overwrite sync strategy for the current milestone. Conflict-aware two-way sync is planned.
+Sync remains an explicit account-page action. Each record uses a stable `clientId`; local and server copies are merged with newest-`updatedAt` wins. IndexedDB persists `pendingCreate`, `pendingUpdate`, and `pendingDelete`, while normal UI reads hide records with `deletedAt`. The server keeps soft-deleted rows as tombstones so an older device cannot recreate a deleted ingredient. Clean local records absent from the complete server state are removed, while unsent local records are retained.
+
+The server keeps its existing value when timestamps are equal, making retries and equal-time conflicts deterministic. Sync timestamps more than five minutes ahead of server time are rejected before the transaction starts so one incorrect device clock cannot pin a record in the future. This is a safety bound, not a logical-clock replacement.
+
+`GET /api/ingredients` remains an active-record API. `GET /api/ingredients/sync` includes tombstones for reconciliation, and `POST /api/ingredients/sync` accepts record-level `changes` rather than treating one device's list as a destructive replacement snapshot. All three paths remain authenticated and user-scoped inside the PostgreSQL RLS transaction boundary.
+
+Playwright starts its two Vite modes through `e2e/globalSetup.js`. They run in the Playwright process and are closed by the returned teardown callback, avoiding the Windows child-process leak seen with the built-in `webServer` shell path.
 
 ## Recommendation Flow
 
@@ -81,8 +87,13 @@ Semantic recipe retrieval groundwork:
 - production recipe embeddings are stored separately in `recipe_embeddings`
 - the table references the existing production `recipes(id)` UUID instead of changing `recipes`
 - embedding generation builds deterministic text from production-shaped recipe and recipe ingredient rows
+- empty ingredient categories are resolved at runtime by a shared pure classifier with explicit-category, section-marker, normalized-name, title-match, and substantial-quantity evidence; unsupported rows remain `unknown`
+- structured scoring counts only `main` rows as core requirements, separates seasonings, ignores optional/garnish/liquid rows for `canMakeNow`, and gives unknown rows only a small conservative penalty
+- vector candidate retrieval filters `recipe_embeddings` by model and dimensions, then joins `recipes` and loads matching `recipe_ingredients`
+- Prisma recipe catalog models map the existing UUID-based Supabase columns instead of the earlier experimental cuid/inline-embedding shape
 - pgvector search is a candidate retrieval step, not the final recommendation ranker
 - rule-based reranking keeps ingredient ownership, expiration urgency, and missing ingredient penalties in control
+- the fixed quality fixture and in-memory evaluator prevent old and new embedding-text versions from being mixed during release decisions
 
 ## Security Boundaries
 

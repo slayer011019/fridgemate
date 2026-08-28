@@ -34,4 +34,36 @@ describe('getRecipeMatchScore', () => {
     });
     expect(result.score).toBeGreaterThan(0.7);
   });
+
+  it('does not let seasoning, optional, garnish, liquid, or unknown items inflate core missing count', () => {
+    const result = getRecipeMatchScore(
+      [{ name: '두부' }],
+      [
+        { normalizedName: '두부', ingredientType: 'main' },
+        { normalizedName: '간장', ingredientType: 'seasoning' },
+        { normalizedName: '쪽파', ingredientType: 'garnish' },
+        { normalizedName: '치즈', ingredientType: 'optional' },
+        { normalizedName: '물', ingredientType: 'liquid' },
+        { normalizedName: '새싹채소', ingredientType: 'unknown' }
+      ],
+      { recipeId: 'classified-recipe' }
+    );
+
+    expect(result.missingIngredients).toEqual([]);
+    expect(result.missingSeasonings).toEqual(['진간장']);
+    expect(result.missingUnknown).toEqual(['새싹채소']);
+  });
+
+  it('keeps a missing main ingredient as a core requirement', () => {
+    const result = getRecipeMatchScore(
+      [{ name: '두부' }],
+      [
+        { normalizedName: '두부', ingredientType: 'main' },
+        { normalizedName: '돼지고기', ingredientType: 'main' }
+      ],
+      { recipeId: 'missing-main' }
+    );
+
+    expect(result.missingIngredients).toEqual(['돼지고기']);
+  });
 });

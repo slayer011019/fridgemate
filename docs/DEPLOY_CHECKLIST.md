@@ -83,10 +83,24 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Edit ingredient while authenticated; confirm no immediate `PATCH /api/ingredients/:id`.
 - [ ] Delete ingredient while authenticated; confirm no immediate `DELETE /api/ingredients/:id`.
 - [ ] Account-page sync sends `POST /api/ingredients/sync`.
+- [ ] Apply `20260826000000_add_ingredient_sync_tombstones` before deploying the new API.
+- [ ] Confirm `GET /api/ingredients/sync` returns only the authenticated user's active records and tombstones.
+- [ ] Confirm backup sends only pending changes and preserves a newer change made on another device.
 - [ ] Reload after sync and confirm data remains available.
 - [ ] Delete locally, sync, reload, and confirm deleted item remains deleted.
+- [ ] Reconnect an older device after deletion and confirm its stale active copy does not restore the item.
+- [ ] Confirm an equal-`updatedAt` retry keeps the existing server value.
+- [ ] Confirm a timestamp more than five minutes ahead of server time returns `400` without partially applying the batch.
 - [ ] Direct API update/delete requests return the same `404` for missing ingredient IDs and IDs owned by another user.
-- [ ] Record v2 follow-up for `updatedAt` merge plus `deletedAt`/tombstone conflict handling.
+
+## Disposable PostgreSQL Sync Verification
+
+- [ ] Use only a disposable local PostgreSQL database exposed through `TEST_DATABASE_URL`; never point this check at Supabase or Hyperdrive production.
+- [ ] Temporarily set both Prisma URLs to the disposable URL, apply all migrations, and verify existing `Ingredient` rows retain `deletedAt IS NULL`.
+- [ ] Verify `Ingredient_userId_deletedAt_idx` exists and `Ingredient_userId_clientId_key` remains unique.
+- [ ] Run the API as a non-owner member of `fridgemate_app`, set `app.current_user_id` transaction-locally, and verify user A cannot read or mutate user B rows.
+- [ ] Repeat newer update, stale update, tombstone, stale resurrection, and identical payload cases, then remove the disposable database.
+- [ ] Deploy `20260826000000_add_ingredient_sync_tombstones` before deploying server code that reads `deletedAt`; otherwise the API must be expected to fail safely with a generic `500` before writes.
 
 ## Core Smoke Path
 

@@ -3,6 +3,7 @@ import {
   createIngredientHandler,
   createIngredientsBulkHandler,
   deleteIngredientHandler,
+  getIngredientSyncStateHandler,
   getIngredientHandler,
   listIngredientsHandler,
   syncIngredientsHandler,
@@ -12,6 +13,7 @@ import {
 export const ingredientRoutes = Router();
 
 ingredientRoutes.get('/', listIngredientsHandler);
+ingredientRoutes.get('/sync', getIngredientSyncStateHandler);
 ingredientRoutes.post('/sync', syncIngredientsHandler);
 ingredientRoutes.get('/:id', getIngredientHandler);
 ingredientRoutes.post('/', createIngredientHandler);

@@ -1,0 +1,498 @@
+{
+  "preflight": {
+    "mode": "evaluate",
+    "model": "text-embedding-3-small",
+    "dimensions": 1536,
+    "candidateCount": 1146,
+    "targetCount": 10,
+    "totalEmbeddingInputs": 1156,
+    "expectedApiRequests": 12,
+    "estimatedInputTokens": 38125,
+    "productionWrites": 0,
+    "classificationRate": 0.7935,
+    "unknownRate": 0.2065,
+    "embeddingMissingRate": 0.1335
+  },
+  "metrics": {
+    "hitAt1": "5/10",
+    "hitAt5": "6/10",
+    "mrrAt5": 0.55,
+    "averageOriginalRank": 69.7,
+    "medianMissingIngredientsTop5": 5,
+    "medianMissingSeasoningsTop5": 1.5,
+    "apiRequestCount": 12,
+    "fullBackfillGate": "No-Go"
+  },
+  "results": [
+    {
+      "id": "0018e2ea-05d0-4beb-9d92-7e3c8c43475c",
+      "name": "초코타르트",
+      "queryText": "검색재료: 귀리, 땅콩버터, 무가당 코코아가루, 아몬드가루, 아몬드우유, 요거트\n양념: 소금, 알룰로스, 코코넛오일",
+      "embeddingText": "메뉴: 초코타르트\n분류: 후식\n조리방식: 기타\n검색재료: 귀리, 땅콩버터, 무가당 코코아가루, 아몬드가루, 아몬드우유\n핵심재료: 귀리, 땅콩버터, 무가당 코코아가루, 아몬드가루, 아몬드우유\n양념: 소금, 알룰로스, 코코넛오일\n선택/고명: 요거트",
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "0018e2ea-05d0-4beb-9d92-7e3c8c43475c",
+          "name": "초코타르트",
+          "similarity": 0.729393,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "9a92ee7b-6364-42fd-8dce-72e119d68abe",
+          "name": "녹차귀리라떼",
+          "similarity": 0.644607,
+          "missingIngredientCount": 6,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "8a66df98-60cc-407a-a995-2fb17e948cf5",
+          "name": "코코넛워터 토마토카레",
+          "similarity": 0.632903,
+          "missingIngredientCount": 9,
+          "missingSeasoningCount": 5
+        },
+        {
+          "id": "f47d8b4a-eff6-4345-a5e8-771b3e8c9cf9",
+          "name": "클로－바",
+          "similarity": 0.616371,
+          "missingIngredientCount": 8,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "5127ee99-3530-4d9d-a8b2-5170d58d2369",
+          "name": "귀리죽",
+          "similarity": 0.609314,
+          "missingIngredientCount": 5,
+          "missingSeasoningCount": 1
+        }
+      ]
+    },
+    {
+      "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+      "name": "포니언 스프",
+      "queryText": "검색재료: 감자, 버터, 시판 크루통, 양파, 우유\n양념: 소금, 파슬리가루, 후춧가루",
+      "embeddingText": "메뉴: 포니언 스프\n분류: 일품\n조리방식: 끓이기\n검색재료: 감자, 시판 크루통, 양파, 우유\n핵심재료: 감자, 양파, 우유\n양념: 버터, 소금, 파슬리가루, 후춧가루",
+      "originalRank": 85,
+      "hit1": false,
+      "hit5": false,
+      "reciprocalRankAt5": 0,
+      "top5": [
+        {
+          "id": "2f806288-270e-42ff-8a8c-fd2f3ec763d5",
+          "name": "잡채",
+          "similarity": 0.669033,
+          "missingIngredientCount": 6,
+          "missingSeasoningCount": 5
+        },
+        {
+          "id": "eef67e0f-5847-4219-93e4-c016572ae261",
+          "name": "마늘칩 감자샐러드",
+          "similarity": 0.651397,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "a6747c21-3de8-4696-a6cb-410fedb74576",
+          "name": "삼색 버터롤",
+          "similarity": 0.645586,
+          "missingIngredientCount": 10,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "6cbdad65-2926-44a8-ba6c-1603c1aa152f",
+          "name": "야채볶음",
+          "similarity": 0.645584,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "79e4cf94-40f4-4d96-9645-902190232ae1",
+          "name": "감자냉채",
+          "similarity": 0.645255,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 3
+        }
+      ]
+    },
+    {
+      "id": "0102b7de-0f16-4942-adec-3c55e6581f95",
+      "name": "단호박약식",
+      "queryText": "검색재료: 대추, 미니 단호박, 밤, 찹쌀, 크린베리\n양념: 계피가루, 맛간장, 참기름",
+      "embeddingText": "메뉴: 단호박약식\n분류: 밥\n조리방식: 찌기\n검색재료: 대추, 미니 단호박, 밤, 찹쌀, 크린베리\n핵심재료: 대추, 미니 단호박, 밤, 찹쌀, 크린베리\n양념: 계피가루, 맛간장, 참기름",
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "0102b7de-0f16-4942-adec-3c55e6581f95",
+          "name": "단호박약식",
+          "similarity": 0.671664,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "dc74f778-c0fd-4601-a1af-e4693bc2ec0b",
+          "name": "부추 콩가루 찜",
+          "similarity": 0.668958,
+          "missingIngredientCount": 1,
+          "missingSeasoningCount": 5
+        },
+        {
+          "id": "1288e317-4056-4e35-b374-36a9ab8d32c9",
+          "name": "단호박리조또",
+          "similarity": 0.657101,
+          "missingIngredientCount": 12,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "1ff7d8d3-6e15-4060-9e3c-f1e9297315ac",
+          "name": "단호박몽블랑",
+          "similarity": 0.636814,
+          "missingIngredientCount": 6,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "3caef51c-ddd1-4eff-8981-2bca0335fc8f",
+          "name": "단호박떡갈비",
+          "similarity": 0.629617,
+          "missingIngredientCount": 7,
+          "missingSeasoningCount": 4
+        }
+      ]
+    },
+    {
+      "id": "01c22ab7-882c-4468-969b-bac7c402cdab",
+      "name": "시금치 리조또",
+      "queryText": "검색재료: 두유, 마, 밥, 버터 1½작은술, 시금치\n양념: 소금, 후춧가루",
+      "embeddingText": "메뉴: 시금치 리조또\n분류: 밥\n조리방식: 끓이기\n검색재료: 두유, 마, 밥, 버터 1½작은술, 시금치\n핵심재료: 두유, 마, 밥, 시금치\n양념: 소금, 후춧가루",
+      "originalRank": 2,
+      "hit1": false,
+      "hit5": true,
+      "reciprocalRankAt5": 0.5,
+      "top5": [
+        {
+          "id": "2f806288-270e-42ff-8a8c-fd2f3ec763d5",
+          "name": "잡채",
+          "similarity": 0.662586,
+          "missingIngredientCount": 7,
+          "missingSeasoningCount": 5
+        },
+        {
+          "id": "01c22ab7-882c-4468-969b-bac7c402cdab",
+          "name": "시금치 리조또",
+          "similarity": 0.661711,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "a24aa19c-b320-4363-89ab-58c5d6398f63",
+          "name": "야채빵",
+          "similarity": 0.661439,
+          "missingIngredientCount": 7,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "ddb559d4-cc36-4270-a623-74df5ee52902",
+          "name": "비트두유",
+          "similarity": 0.660084,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "a6747c21-3de8-4696-a6cb-410fedb74576",
+          "name": "삼색 버터롤",
+          "similarity": 0.643475,
+          "missingIngredientCount": 11,
+          "missingSeasoningCount": 0
+        }
+      ]
+    },
+    {
+      "id": "01f2e55d-73fd-4024-9f23-241de3346cd4",
+      "name": "떡갈비콩나물밥",
+      "queryText": "검색재료: 김치, 다진 소고기, 대파, 떡, 배, 버섯, 브로컬리, 쌀, 콩나물\n양념: 마늘, 맛술, 설탕, 진간장, 참기름, 통깨, 후춧가루",
+      "embeddingText": "메뉴: 떡갈비콩나물밥\n분류: 밥\n조리방식: 끓이기\n검색재료: 김치, 다진 마늘, 다진 소고기, 대파, 떡, 배, 버섯, 브로컬리, 쌀, 콩나물\n핵심재료: 김치, 다진 마늘, 다진 소고기, 대파, 떡, 배, 버섯, 브로컬리, 쌀, 콩나물\n양념: 맛술, 설탕, 진간장, 참기름, 통깨, 후춧가루",
+      "originalRank": 57,
+      "hit1": false,
+      "hit5": false,
+      "reciprocalRankAt5": 0,
+      "top5": [
+        {
+          "id": "3b84cd30-21ce-4201-bf01-cb0b7cae97f2",
+          "name": "과일 김치",
+          "similarity": 0.69006,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 3
+        },
+        {
+          "id": "e37be6e7-5a49-4e40-a26f-00b6fa99e22b",
+          "name": "소고기 김말이",
+          "similarity": 0.684981,
+          "missingIngredientCount": 5,
+          "missingSeasoningCount": 6
+        },
+        {
+          "id": "a0ed777e-ec8e-42c3-a552-a27a8bd67385",
+          "name": "나박김치",
+          "similarity": 0.684539,
+          "missingIngredientCount": 5,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "ebadc315-705c-4c20-8478-ea8ac5c315b8",
+          "name": "소고기찜과 검은콩수제비",
+          "similarity": 0.676219,
+          "missingIngredientCount": 15,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "89989797-4336-474a-a28e-43753f4255b4",
+          "name": "감귤 김치",
+          "similarity": 0.660026,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 2
+        }
+      ]
+    },
+    {
+      "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+      "name": "죽순콩나물밥",
+      "queryText": "검색재료: 다진 마늘, 다진파, 삶은 죽순, 쌀, 청양고추, 콩나물, 홍고추\n양념: 고춧가루, 깨소금, 맛술, 설탕, 진간장, 참기름",
+      "embeddingText": "메뉴: 죽순콩나물밥\n분류: 밥\n조리방식: 끓이기\n검색재료: 다진파, 삶은 죽순, 쌀, 청양고추, 콩나물, 홍고추\n핵심재료: 쌀, 콩나물\n양념: 고춧가루, 깨소금, 마늘, 맛술, 설탕, 진간장, 참기름",
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+          "name": "죽순콩나물밥",
+          "similarity": 0.656783,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "dfbcb931-be1b-4efa-925f-94745e4d84e2",
+          "name": "비름나물겉절이",
+          "similarity": 0.632593,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "21552992-4370-4886-9328-6d1cf16090f5",
+          "name": "들깨삼겹살과 참외쌈장",
+          "similarity": 0.628217,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "13383cdf-7c54-43e1-bf52-766bdfd92c85",
+          "name": "견과류통삼겹살찜",
+          "similarity": 0.622874,
+          "missingIngredientCount": 7,
+          "missingSeasoningCount": 3
+        },
+        {
+          "id": "6c2341d8-670b-4211-8023-827c15278ee2",
+          "name": "저염 동치미",
+          "similarity": 0.620586,
+          "missingIngredientCount": 8,
+          "missingSeasoningCount": 0
+        }
+      ]
+    },
+    {
+      "id": "026dac3d-d4a1-4d68-a0c4-bcbaa5259419",
+      "name": "블루베리양갱",
+      "queryText": "검색재료: 블루베리, 한천, 흰앙금\n양념: 설탕",
+      "embeddingText": "메뉴: 블루베리양갱\n분류: 후식\n조리방식: 끓이기\n검색재료: 블루베리, 한천, 흰앙금\n핵심재료: 블루베리, 한천, 흰앙금\n양념: 설탕\n액체: 물",
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "026dac3d-d4a1-4d68-a0c4-bcbaa5259419",
+          "name": "블루베리양갱",
+          "similarity": 0.72818,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "967aba14-0c3d-4a8f-b383-4ae5db32f2c8",
+          "name": "블루베리냉스프",
+          "similarity": 0.596066,
+          "missingIngredientCount": 8,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "762c575b-3222-47ef-869d-ee60347b0a54",
+          "name": "비타민이유식",
+          "similarity": 0.55087,
+          "missingIngredientCount": 4,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "d9ed90f9-810b-41e0-91bd-4d664adee9fb",
+          "name": "삼색 꽃 화전",
+          "similarity": 0.548611,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "29c63dd0-4fe6-489c-b398-a109c7e6a17e",
+          "name": "삼계선",
+          "similarity": 0.545627,
+          "missingIngredientCount": 6,
+          "missingSeasoningCount": 1
+        }
+      ]
+    },
+    {
+      "id": "026fb3ff-6e79-4e1f-89bd-f1cbb2af12eb",
+      "name": "호박잎 삼계탕",
+      "queryText": "검색재료: 닭고기, 닭고기 가슴살, 대추, 미나리, 인삼, 찹쌀, 호박잎\n양념: 소금, 후춧가루",
+      "embeddingText": "메뉴: 호박잎 삼계탕\n분류: 일품\n조리방식: 끓이기\n검색재료: 닭고기, 닭고기 가슴살, 대추, 미나리, 인삼, 찹쌀, 호박잎\n핵심재료: 닭고기 가슴살, 대추, 미나리, 찹쌀, 호박잎\n양념: 소금, 후춧가루",
+      "originalRank": 25,
+      "hit1": false,
+      "hit5": false,
+      "reciprocalRankAt5": 0,
+      "top5": [
+        {
+          "id": "185bcbe6-6951-41d6-838f-54279deeeed3",
+          "name": "닭고기스테이크",
+          "similarity": 0.733958,
+          "missingIngredientCount": 6,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "3a48b6cf-e03a-4e1d-ab43-79657cbebc9b",
+          "name": "닭가슴살카나페",
+          "similarity": 0.724768,
+          "missingIngredientCount": 5,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "417ecc2a-8ef2-4e5e-a3c2-85fbcc2fdb1c",
+          "name": "삼합잡채",
+          "similarity": 0.707855,
+          "missingIngredientCount": 8,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "e57fc445-bd2e-4786-8ad3-26ba12982046",
+          "name": "닭순대",
+          "similarity": 0.706375,
+          "missingIngredientCount": 5,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "ea7b2f14-bc63-43c9-afaa-aad25650cdb5",
+          "name": "닭가슴살스튜",
+          "similarity": 0.701281,
+          "missingIngredientCount": 7,
+          "missingSeasoningCount": 2
+        }
+      ]
+    },
+    {
+      "id": "028cd65f-ff79-4ca6-943e-686b081a6fd6",
+      "name": "완두콩과 당근을 넣은 감자요거트 샐러드",
+      "queryText": "검색재료: 감자, 당근, 완두콩, 요거트",
+      "embeddingText": "메뉴: 완두콩과 당근을 넣은 감자요거트 샐러드\n분류: 기타\n조리방식: 기타\n검색재료: 감자, 당근, 완두콩, 요거트\n핵심재료: 감자, 당근, 완두콩, 요거트",
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "028cd65f-ff79-4ca6-943e-686b081a6fd6",
+          "name": "완두콩과 당근을 넣은 감자요거트 샐러드",
+          "similarity": 0.668202,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "79e4cf94-40f4-4d96-9645-902190232ae1",
+          "name": "감자냉채",
+          "similarity": 0.646575,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "44b3f0d5-76fe-413f-b6de-79199ccb3040",
+          "name": "양배추감자전",
+          "similarity": 0.63864,
+          "missingIngredientCount": 5,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "eef67e0f-5847-4219-93e4-c016572ae261",
+          "name": "마늘칩 감자샐러드",
+          "similarity": 0.634544,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "762c575b-3222-47ef-869d-ee60347b0a54",
+          "name": "비타민이유식",
+          "similarity": 0.633281,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 1
+        }
+      ]
+    },
+    {
+      "id": "02a13f08-f8c9-44ad-91bb-5adf84c45bd4",
+      "name": "케이준 스타일 닭고기 요리",
+      "queryText": "검색재료: 닭고기, 바질마른것, 양파가루, 오레가노마른것, 키엔페퍼, 타임 마른것\n양념: 마늘가루, 식용유, 파프리카가루, 황설탕, 후추, 흰후춧가루",
+      "embeddingText": "메뉴: 케이준 스타일 닭고기 요리\n분류: 반찬\n조리방식: 굽기\n검색재료: 닭고기, 바질마른것, 양파가루, 오레가노마른것, 키엔페퍼, 타임 마른것\n핵심재료: 닭고기\n양념: 마늘가루, 식용유, 파프리카가루, 후추, 흰후춧가루\n선택/고명: 황설탕",
+      "originalRank": 523,
+      "hit1": false,
+      "hit5": false,
+      "reciprocalRankAt5": 0,
+      "top5": [
+        {
+          "id": "a3e8ad1b-703b-4eb9-8ca8-dbb4773a755e",
+          "name": "닭고기 찰깨빵",
+          "similarity": 0.712002,
+          "missingIngredientCount": 8,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "185bcbe6-6951-41d6-838f-54279deeeed3",
+          "name": "닭고기스테이크",
+          "similarity": 0.701041,
+          "missingIngredientCount": 6,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "417ecc2a-8ef2-4e5e-a3c2-85fbcc2fdb1c",
+          "name": "삼합잡채",
+          "similarity": 0.696487,
+          "missingIngredientCount": 9,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "23770c9b-d00a-4050-9628-cbf478516596",
+          "name": "닭고기파스타",
+          "similarity": 0.687605,
+          "missingIngredientCount": 9,
+          "missingSeasoningCount": 6
+        },
+        {
+          "id": "ebadc315-705c-4c20-8478-ea8ac5c315b8",
+          "name": "소고기찜과 검은콩수제비",
+          "similarity": 0.68182,
+          "missingIngredientCount": 16,
+          "missingSeasoningCount": 3
+        }
+      ]
+    }
+  ]
+}

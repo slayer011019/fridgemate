@@ -3,6 +3,13 @@ export const DEFAULT_USER = {
   email: 'user@example.com'
 };
 
+export function createMockApiBackend({ ingredients = [] } = {}) {
+  return {
+    ingredients: [...ingredients],
+    syncFailureStatus: null
+  };
+}
+
 export function createIngredient(id, overrides = {}) {
   return {
     id,
@@ -146,18 +153,81 @@ export async function waitForIngredientNames(page, scope, expectedNames) {
       });
       database.close();
 
-      const currentNames = ingredients.map((ingredient) => ingredient.name).sort();
+      const currentNames = ingredients
+        .filter((ingredient) => !ingredient.deletedAt)
+        .map((ingredient) => ingredient.name)
+        .sort();
       return JSON.stringify(currentNames) === JSON.stringify([...names].sort());
     },
     { scopeName: scope, names: expectedNames }
   );
 }
 
-export async function mockApiSession(page, { user = DEFAULT_USER, ingredients = [], restoreSession = false } = {}) {
+export async function readBrowserIngredients(page, scope) {
+  return page.evaluate(async (scopeName) => {
+    const safeScope = String(scopeName || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const request = window.indexedDB.open(`fridgemate-db__${safeScope}`, 1);
+    const database = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const ingredients = await new Promise((resolve, reject) => {
+      const transaction = database.transaction('ingredients', 'readonly');
+      const getAllRequest = transaction.objectStore('ingredients').getAll();
+      getAllRequest.onsuccess = () => resolve(getAllRequest.result || []);
+      getAllRequest.onerror = () => reject(getAllRequest.error);
+    });
+    database.close();
+    return ingredients;
+  }, scope);
+}
+
+export async function writeBrowserIngredients(page, scope, ingredients) {
+  await page.evaluate(
+    async ({ scopeName, items }) => {
+      const safeScope = String(scopeName || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const request = window.indexedDB.open(`fridgemate-db__${safeScope}`, 1);
+      const database = await new Promise((resolve, reject) => {
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains('ingredients')) {
+            request.result.createObjectStore('ingredients', { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      await new Promise((resolve, reject) => {
+        const transaction = database.transaction('ingredients', 'readwrite');
+        const store = transaction.objectStore('ingredients');
+        store.clear();
+        items.forEach((ingredient) => store.put(ingredient));
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      });
+      database.close();
+    },
+    { scopeName: scope, items: ingredients }
+  );
+}
+
+export async function mockApiSession(
+  page,
+  { user = DEFAULT_USER, ingredients = [], restoreSession = false, backend = null } = {}
+) {
+  const ingredientBackend = backend || createMockApiBackend({ ingredients });
   const state = {
     sessionActive: restoreSession,
-    user,
-    ingredients: [...ingredients]
+    user
+  };
+  const exposedState = {
+    get ingredients() {
+      return ingredientBackend.ingredients;
+    },
+    get sessionActive() {
+      return state.sessionActive;
+    },
+    backend: ingredientBackend
   };
 
   const jsonResponse = (route, body, status = 200) =>
@@ -199,24 +269,58 @@ export async function mockApiSession(page, { user = DEFAULT_USER, ingredients = 
       ...ingredient,
       updatedAt: `2026-04-14T09:00:0${index}.000Z`
     }));
-    state.ingredients = [...savedItems, ...state.ingredients];
+    ingredientBackend.ingredients = [...savedItems, ...ingredientBackend.ingredients];
     await jsonResponse(route, savedItems);
   });
 
   await page.route('**/api/ingredients/sync', async (route) => {
+    if (route.request().method() === 'GET') {
+      await jsonResponse(route, { items: ingredientBackend.ingredients });
+      return;
+    }
+
+    if (ingredientBackend.syncFailureStatus) {
+      await jsonResponse(route, { message: 'Temporary sync failure.' }, ingredientBackend.syncFailureStatus);
+      return;
+    }
+
     const payload = JSON.parse(route.request().postData() || '{}');
-    const items = Array.isArray(payload.items) ? payload.items : [];
-    const savedItems = items.map((ingredient, index) => ({
-      ...ingredient,
-      updatedAt: ingredient.updatedAt || `2026-04-14T11:00:${String(index).padStart(2, '0')}.000Z`
-    }));
-    state.ingredients = savedItems;
-    await jsonResponse(route, savedItems);
+    const changes = Array.isArray(payload.changes) ? payload.changes : [];
+    const now = Date.now();
+
+    if (changes.some((ingredient) => Date.parse(ingredient.updatedAt) > now + 5 * 60 * 1000)) {
+      await jsonResponse(route, { message: 'Ingredient updatedAt is too far in the future.' }, 400);
+      return;
+    }
+
+    const savedItems = changes.map((ingredient, index) => {
+      const { userId: _userId, ...safeIngredient } = ingredient;
+      return {
+        ...safeIngredient,
+        updatedAt: ingredient.updatedAt || `2026-04-14T11:00:${String(index).padStart(2, '0')}.000Z`
+      };
+    });
+    let appliedCount = 0;
+    savedItems.forEach((ingredient) => {
+      const syncKey = ingredient.clientId || ingredient.id;
+      const existingIndex = ingredientBackend.ingredients.findIndex((item) => (item.clientId || item.id) === syncKey);
+
+      if (existingIndex === -1) {
+        ingredientBackend.ingredients.push(ingredient);
+        appliedCount += 1;
+      } else if (
+        Date.parse(ingredient.updatedAt) > Date.parse(ingredientBackend.ingredients[existingIndex].updatedAt || 0)
+      ) {
+        ingredientBackend.ingredients[existingIndex] = ingredient;
+        appliedCount += 1;
+      }
+    });
+    await jsonResponse(route, { items: ingredientBackend.ingredients, appliedCount });
   });
 
   await page.route('**/api/ingredients', async (route) => {
     if (route.request().method() === 'GET') {
-      await jsonResponse(route, state.ingredients);
+      await jsonResponse(route, ingredientBackend.ingredients.filter((ingredient) => !ingredient.deletedAt));
       return;
     }
 
@@ -227,26 +331,48 @@ export async function mockApiSession(page, { user = DEFAULT_USER, ingredients = 
     const request = route.request();
     const id = request.url().split('/').pop();
 
+    if (id === 'sync') {
+      await route.fallback();
+      return;
+    }
+
     if (request.method() === 'PATCH') {
+      const existingIngredient = ingredientBackend.ingredients.find((ingredient) => ingredient.id === id);
+
+      if (!existingIngredient) {
+        await jsonResponse(route, { message: 'Ingredient not found.' }, 404);
+        return;
+      }
+
       const payload = JSON.parse(request.postData() || '{}');
       const savedIngredient = {
         ...payload,
         id,
         updatedAt: '2026-04-14T10:00:00.000Z'
       };
-      state.ingredients = [savedIngredient, ...state.ingredients.filter((ingredient) => ingredient.id !== id)];
+      ingredientBackend.ingredients = [
+        savedIngredient,
+        ...ingredientBackend.ingredients.filter((ingredient) => ingredient.id !== id)
+      ];
       await jsonResponse(route, savedIngredient);
       return;
     }
 
     if (request.method() === 'GET') {
-      const ingredient = state.ingredients.find((item) => item.id === id);
+      const ingredient = ingredientBackend.ingredients.find((item) => item.id === id && !item.deletedAt);
       await jsonResponse(route, ingredient || { message: 'Not found.' }, ingredient ? 200 : 404);
       return;
     }
 
     if (request.method() === 'DELETE') {
-      state.ingredients = state.ingredients.filter((ingredient) => ingredient.id !== id);
+      const existingIngredient = ingredientBackend.ingredients.find((ingredient) => ingredient.id === id);
+
+      if (!existingIngredient) {
+        await jsonResponse(route, { message: 'Ingredient not found.' }, 404);
+        return;
+      }
+
+      ingredientBackend.ingredients = ingredientBackend.ingredients.filter((ingredient) => ingredient.id !== id);
       await route.fulfill({ status: 204, body: '' });
       return;
     }
@@ -254,5 +380,5 @@ export async function mockApiSession(page, { user = DEFAULT_USER, ingredients = 
     await route.fallback();
   });
 
-  return state;
+  return exposedState;
 }

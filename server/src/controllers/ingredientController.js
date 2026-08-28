@@ -3,8 +3,9 @@ import {
   createIngredientsBulk,
   deleteIngredientById,
   getIngredientById,
+  listIngredientSyncState,
   listIngredients,
-  replaceIngredientsForUser,
+  syncIngredientChanges,
   updateIngredientById
 } from '../services/ingredientService.js';
 
@@ -47,9 +48,22 @@ export async function createIngredientsBulkHandler(request, response, next) {
 
 export async function syncIngredientsHandler(request, response, next) {
   try {
-    const items = Array.isArray(request.body?.items) ? request.body.items : [];
-    const ingredients = await replaceIngredientsForUser(request.auth.userId, items);
-    response.json(ingredients);
+    const changes = Array.isArray(request.body?.changes)
+      ? request.body.changes
+      : Array.isArray(request.body?.items)
+        ? request.body.items
+        : [];
+    const result = await syncIngredientChanges(request.auth.userId, changes);
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getIngredientSyncStateHandler(request, response, next) {
+  try {
+    const items = await listIngredientSyncState(request.auth.userId);
+    response.json({ items });
   } catch (error) {
     next(error);
   }

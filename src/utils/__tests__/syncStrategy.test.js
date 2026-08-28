@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getVisibleIngredients,
   markIngredientAsPending,
   markIngredientAsSynced,
   resolveIngredientConflict,
   syncIngredientSnapshot
 } from '../syncStrategy.js';
 
-function createIngredient(id, overrides = {}) {
+function createIngredient(clientId, overrides = {}) {
   return {
-    id,
-    name: `ingredient-${id}`,
-    updatedAt: '2026-04-04T10:00:00.000Z',
+    id: overrides.id || clientId,
+    clientId,
+    name: `ingredient-${clientId}`,
+    updatedAt: '2026-08-26T10:00:00.000Z',
+    deletedAt: null,
     ...overrides
   };
 }
@@ -18,83 +21,118 @@ function createIngredient(id, overrides = {}) {
 describe('syncStrategy', () => {
   it('marks remote ingredients as clean when syncing', () => {
     const ingredient = markIngredientAsSynced(createIngredient('synced'));
-
-    expect(ingredient.syncState).toBe('clean');
-    expect(ingredient.lastSyncedAt).toBe('2026-04-04T10:00:00.000Z');
+    expect(ingredient).toMatchObject({ syncState: 'clean', lastSyncedAt: ingredient.updatedAt });
   });
 
-  it('keeps a newer pending local ingredient when the remote copy is older', () => {
+  it('keeps a pending local change when it is newer than the server copy', () => {
     const localIngredient = markIngredientAsPending(
-      createIngredient('local', { updatedAt: '2026-04-04T11:00:00.000Z' }),
+      createIngredient('shared', { updatedAt: '2026-08-26T11:00:00.000Z' }),
       'pendingUpdate'
     );
-    const remoteIngredient = createIngredient('local', { updatedAt: '2026-04-04T10:00:00.000Z' });
-
-    const resolvedIngredient = resolveIngredientConflict({
-      localIngredient,
-      remoteIngredient
+    const remoteIngredient = createIngredient('shared', {
+      id: 'server-id',
+      updatedAt: '2026-08-26T10:00:00.000Z'
     });
 
-    expect(resolvedIngredient.syncState).toBe('pendingUpdate');
-    expect(resolvedIngredient.updatedAt).toBe('2026-04-04T11:00:00.000Z');
+    expect(resolveIngredientConflict({ localIngredient, remoteIngredient })).toMatchObject({
+      id: 'shared',
+      syncState: 'pendingUpdate',
+      updatedAt: '2026-08-26T11:00:00.000Z'
+    });
   });
 
-  it('prefers the remote ingredient and marks a conflict when a pending local copy is older', () => {
+  it('uses a newer server change and resolves an older pending local change', () => {
     const localIngredient = markIngredientAsPending(
-      createIngredient('conflict', { updatedAt: '2026-04-04T09:00:00.000Z' }),
+      createIngredient('shared', { updatedAt: '2026-08-26T09:00:00.000Z' }),
       'pendingUpdate'
     );
-    const remoteIngredient = createIngredient('conflict', { updatedAt: '2026-04-04T12:00:00.000Z' });
-
-    const resolvedIngredient = resolveIngredientConflict({
-      localIngredient,
-      remoteIngredient
+    const remoteIngredient = createIngredient('shared', {
+      id: 'server-id',
+      updatedAt: '2026-08-26T12:00:00.000Z'
     });
 
-    expect(resolvedIngredient.syncState).toBe('conflict');
-    expect(resolvedIngredient.updatedAt).toBe('2026-04-04T12:00:00.000Z');
-  });
-
-  it('drops a clean local ingredient when it no longer exists remotely', () => {
-    const resolvedIngredient = resolveIngredientConflict({
-      localIngredient: markIngredientAsSynced(createIngredient('stale-local')),
-      remoteIngredient: null
+    expect(resolveIngredientConflict({ localIngredient, remoteIngredient })).toMatchObject({
+      id: 'server-id',
+      clientId: 'shared',
+      syncState: 'clean',
+      updatedAt: '2026-08-26T12:00:00.000Z'
     });
-
-    expect(resolvedIngredient).toBeNull();
   });
 
-  it('keeps a newer local cached ingredient as a pending update when it is ahead of the remote copy', () => {
-    const resolvedIngredient = resolveIngredientConflict({
-      localIngredient: markIngredientAsSynced(
-        createIngredient('ahead-local', {
-          updatedAt: '2026-04-04T12:00:00.000Z',
-          lastSyncedAt: '2026-04-04T10:00:00.000Z'
-        })
-      ),
-      remoteIngredient: createIngredient('ahead-local', {
-        updatedAt: '2026-04-04T11:00:00.000Z'
-      })
+  it.each(['pendingCreate', 'pendingUpdate'])('preserves a local %s when no server copy exists', (syncState) => {
+    const localIngredient = markIngredientAsPending(createIngredient(`local-${syncState}`), syncState);
+    expect(resolveIngredientConflict({ localIngredient, remoteIngredient: null })).toMatchObject({ syncState });
+  });
+
+  it('keeps a local pending delete tombstone ready for upload', async () => {
+    const tombstone = markIngredientAsPending(
+      createIngredient('deleted', {
+        updatedAt: '2026-08-26T12:00:00.000Z',
+        deletedAt: '2026-08-26T12:00:00.000Z'
+      }),
+      'pendingDelete'
+    );
+    const result = await syncIngredientSnapshot({ localIngredients: [tombstone], remoteIngredients: [] });
+
+    expect(result.pendingUploads).toEqual([expect.objectContaining({ clientId: 'deleted', syncState: 'pendingDelete' })]);
+    expect(getVisibleIngredients(result.nextSnapshot)).toEqual([]);
+  });
+
+  it('does not resurrect a server tombstone from an older active device copy', async () => {
+    const oldDeviceCopy = markIngredientAsPending(
+      createIngredient('deleted', { updatedAt: '2026-08-26T09:00:00.000Z' }),
+      'pendingUpdate'
+    );
+    const serverTombstone = createIngredient('deleted', {
+      id: 'server-id',
+      updatedAt: '2026-08-26T12:00:00.000Z',
+      deletedAt: '2026-08-26T12:00:00.000Z'
     });
-
-    expect(resolvedIngredient.syncState).toBe('pendingUpdate');
-    expect(resolvedIngredient.updatedAt).toBe('2026-04-04T12:00:00.000Z');
-  });
-
-  it('builds a merged snapshot with pending uploads and downloads', async () => {
-    const localIngredients = [
-      markIngredientAsPending(createIngredient('pending', { updatedAt: '2026-04-04T11:00:00.000Z' }), 'pendingCreate'),
-      markIngredientAsSynced(createIngredient('stale-local', { updatedAt: '2026-04-04T09:00:00.000Z' }))
-    ];
-    const remoteIngredients = [createIngredient('remote-only', { updatedAt: '2026-04-04T12:00:00.000Z' })];
-
     const result = await syncIngredientSnapshot({
-      localIngredients,
-      remoteIngredients
+      localIngredients: [oldDeviceCopy],
+      remoteIngredients: [serverTombstone]
     });
 
-    expect(result.pendingUploads).toHaveLength(1);
-    expect(result.pendingDownloads).toHaveLength(1);
-    expect(result.nextSnapshot.map((ingredient) => ingredient.id).sort()).toEqual(['pending', 'remote-only']);
+    expect(result.pendingUploads).toEqual([]);
+    expect(result.conflicts).toEqual([expect.objectContaining({ clientId: 'deleted', resolution: 'remote' })]);
+    expect(getVisibleIngredients(result.nextSnapshot)).toEqual([]);
+  });
+
+  it('applies a server deletion to a clean local cache', async () => {
+    const localIngredient = markIngredientAsSynced(
+      createIngredient('deleted', { updatedAt: '2026-08-26T10:00:00.000Z' })
+    );
+    const serverTombstone = createIngredient('deleted', {
+      id: 'server-id',
+      updatedAt: '2026-08-26T11:00:00.000Z',
+      deletedAt: '2026-08-26T11:00:00.000Z'
+    });
+    const result = await syncIngredientSnapshot({
+      localIngredients: [localIngredient],
+      remoteIngredients: [serverTombstone]
+    });
+
+    expect(getVisibleIngredients(result.nextSnapshot)).toEqual([]);
+    expect(result.nextSnapshot[0]).toMatchObject({ clientId: 'deleted', syncState: 'clean' });
+  });
+
+  it('drops a clean local cache record that is absent from the complete server state', async () => {
+    const result = await syncIngredientSnapshot({
+      localIngredients: [markIngredientAsSynced(createIngredient('stale-local'))],
+      remoteIngredients: []
+    });
+    expect(result.nextSnapshot).toEqual([]);
+  });
+
+  it('matches records by clientId and remains idempotent when the same sync repeats', async () => {
+    const local = markIngredientAsPending(createIngredient('stable-key'), 'pendingCreate');
+    const remote = createIngredient('stable-key', { id: 'server-id' });
+    const first = await syncIngredientSnapshot({ localIngredients: [local], remoteIngredients: [remote] });
+    const second = await syncIngredientSnapshot({ localIngredients: first.nextSnapshot, remoteIngredients: [remote] });
+
+    expect(first.nextSnapshot).toHaveLength(1);
+    expect(second.nextSnapshot).toHaveLength(1);
+    expect(second.pendingUploads).toEqual([]);
+    expect(second.nextSnapshot[0]).toMatchObject({ id: 'server-id', clientId: 'stable-key', syncState: 'clean' });
   });
 });

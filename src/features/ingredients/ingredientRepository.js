@@ -107,7 +107,7 @@ export function saveIngredientsInRepository({
 }
 
 export async function pushIngredientsToServerInRepository(ingredients = []) {
-  return ingredientsApi.saveIngredients(ingredients);
+  return ingredientsApi.pushIngredientsToServer(ingredients);
 }
 
 export async function pullIngredientsFromServerInRepository() {
@@ -125,6 +125,7 @@ export function removeIngredientFromRepository({ id, scope, useApi, allowFallbac
 
 export const ingredientCache = {
   getAll: (options) => indexedDb.getAllIngredients(options),
+  getAllForSync: (options) => indexedDb.getAllIngredientsForSync(options),
   getById: (id, options) => indexedDb.getIngredientById(id, options),
   save: (ingredient, options) => indexedDb.saveIngredient(ingredient, options),
   saveMany: (ingredients, options) => indexedDb.saveIngredients(ingredients, options),

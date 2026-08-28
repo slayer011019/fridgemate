@@ -59,9 +59,9 @@ Keep the existing OCR parser behavior intact:
 4. Manual sync strategy
    - local IndexedDB remains the working copy
    - add, edit, consume, restore, and delete do not write to the server immediately
-   - account-page sync sends the current local snapshot to `POST /api/ingredients/sync`
-   - current v1 strategy is local-to-server replace
-   - v2 should evaluate `updatedAt` comparison plus `deletedAt` or tombstone records for delete conflicts
+   - account-page sync sends pending record changes to `POST /api/ingredients/sync`
+   - manual pull reads tombstones from `GET /api/ingredients/sync`
+   - stable `clientId`, newest-`updatedAt` merge, and persisted pending states provide first-pass conflict handling
 
 5. Deployment readiness
    - Vercel frontend env vars

@@ -14,6 +14,7 @@ Implemented:
 - optional Express, Prisma, and PostgreSQL backend
 - JWT auth and session restore
 - manual server backup and pull sync
+- first-pass conflict-aware manual sync with persisted pending states and deletion tombstones
 - recommendation impression and click event collection
 - recommendation training-data export
 - CI, unit tests, and core E2E coverage
@@ -28,8 +29,9 @@ Implemented:
 
 ## v2.0
 
-- Implement conflict-aware two-way sync uploads
-- Add delete conflict handling with tombstones or equivalent server state
+- Validate conflict-aware manual sync against production and multiple real devices
+- Add tombstone retention/compaction after all clients have a safe synchronization checkpoint
+- Replace device-clock ordering with a server-issued revision or hybrid logical version if manual sync expands further
 - Persist pantry staple ownership per authenticated user
 - Expand browser E2E coverage
 - Add release notes and maintainer automation around recurring workflows
@@ -37,8 +39,11 @@ Implemented:
 ## AI and Data Roadmap
 
 - Analyze recommendation impression/click exports
-- Backfill production `recipe_embeddings` for semantic recipe candidate search
-- Add a semantic recommendation API after the embedding migration and backfill are stable
+- Improve recipe embedding/query text quality against a reviewed Korean home-meal evaluation set
+- Expand the fixed evaluation set beyond UUID-order smoke coverage and raise the current 6/10 Hit@5 result above the 7/10 release gate
+- Complete the remaining production `recipe_embeddings` backfill only after retrieval quality clears the agreed smoke gate
+- Normalize recommendation event keys into `local:<seed-id>` and `catalog:<uuid>` with a nullable catalog recipe FK
+- Add canonical dishes, aliases, and source-attributed popularity signals after catalog recipe IDs are stable
 - Prototype ranking improvements from collected feature snapshots
 - Expand ingredient normalization examples
 - Improve OCR parser regression coverage

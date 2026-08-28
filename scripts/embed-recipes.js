@@ -3,13 +3,23 @@ import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import { buildProductionRecipeEmbeddingText } from '../server/src/services/recipeEmbeddingTextBuilder.js';
+import { evaluateRecipeSearch } from './evaluate-recipe-search.js';
 
 const DEFAULT_MODEL = 'text-embedding-3-small';
 const DEFAULT_DIMENSIONS = 1536;
 
-function parseArgs(argv = process.argv.slice(2)) {
+export function parseArgs(argv = process.argv.slice(2)) {
+  const backfillMissing = argv.includes('--backfill-missing');
+  const backfillStale = argv.includes('--backfill-stale');
   const options = {
-    dryRun: argv.includes('--dry-run'),
+    dryRun: argv.includes('--dry-run') || (!backfillMissing && !backfillStale),
+    evaluate: argv.includes('--evaluate'),
+    executeEvaluation: argv.includes('--execute'),
+    backfillMissing,
+    backfillStale,
+    quiet: argv.includes('--quiet'),
+    resumeFrom: '',
+    output: '',
     limit: 25,
     batchSize: 25
   };
@@ -22,7 +32,14 @@ function parseArgs(argv = process.argv.slice(2)) {
     if (arg.startsWith('--batch-size=')) {
       options.batchSize = Math.max(1, Number.parseInt(arg.split('=')[1], 10) || options.batchSize);
     }
+
+    if (arg.startsWith('--resume-from=')) options.resumeFrom = arg.slice('--resume-from='.length).trim();
+    if (arg.startsWith('--output=')) options.output = arg.slice('--output='.length).trim();
   });
+
+  if (backfillMissing && backfillStale) {
+    throw new Error('Choose either --backfill-missing or --backfill-stale, not both.');
+  }
 
   return options;
 }
@@ -79,15 +96,19 @@ async function createEmbedding(text, config) {
   return embedding;
 }
 
-async function fetchRecipeBatch(prisma, { limit, offset }) {
+async function fetchRecipeBatch(prisma, { limit, offset, resumeFrom = '' }) {
+  const whereClause = resumeFrom ? 'WHERE id > $1::uuid' : '';
+  const parameters = resumeFrom ? [resumeFrom] : [];
   return prisma.$queryRawUnsafe(
     `
-      SELECT id, name, dish_type, cooking_method, ingredients_text, steps, raw
+      SELECT id, name, dish_type, cooking_method, ingredients_text, hash_tag, steps, raw
       FROM recipes
+      ${whereClause}
       ORDER BY id
       LIMIT ${limit}
       OFFSET ${offset}
-    `
+    `,
+    ...parameters
   );
 }
 
@@ -99,7 +120,7 @@ async function fetchIngredientsForRecipes(prisma, recipeIds = []) {
   const quotedIds = recipeIds.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(',');
   const rows = await prisma.$queryRawUnsafe(
     `
-      SELECT recipe_id, normalized_name, canonical_name, category, raw_name
+      SELECT recipe_id, normalized_name, canonical_name, category, raw_name, raw_text
       FROM recipe_ingredients
       WHERE recipe_id IN (${quotedIds})
       ORDER BY recipe_id, normalized_name NULLS LAST, canonical_name NULLS LAST, raw_name NULLS LAST
@@ -115,20 +136,21 @@ async function fetchIngredientsForRecipes(prisma, recipeIds = []) {
   }, new Map());
 }
 
-async function hasCurrentEmbedding(prisma, { recipeId, model, dimensions, contentHash }) {
+async function fetchEmbeddingHashes(prisma, { recipeIds, model, dimensions }) {
+  if (!recipeIds.length) return new Map();
   const rows = await prisma.$queryRawUnsafe(
     `
-      SELECT 1
+      SELECT recipe_id, content_hash
       FROM recipe_embeddings
-      WHERE recipe_id = '${String(recipeId).replace(/'/g, "''")}'
-        AND embedding_model = '${String(model).replace(/'/g, "''")}'
-        AND embedding_dimensions = ${dimensions}
-        AND content_hash = '${String(contentHash).replace(/'/g, "''")}'
-      LIMIT 1
-    `
+      WHERE recipe_id = ANY($1::uuid[])
+        AND embedding_model = $2
+        AND embedding_dimensions = $3
+    `,
+    recipeIds.map(String),
+    String(model),
+    Number(dimensions)
   );
-
-  return rows.length > 0;
+  return new Map(rows.map((row) => [String(row.recipe_id), String(row.content_hash || '')]));
 }
 
 async function upsertEmbedding(prisma, { recipeId, embeddingText, embedding, model, dimensions, contentHash }) {
@@ -172,7 +194,11 @@ export async function embedRecipes(options = parseArgs()) {
     processed: 0,
     generated: 0,
     skipped: 0,
-    failed: 0
+    failed: 0,
+    current: 0,
+    missing: 0,
+    stale: 0,
+    lastProcessedRecipeId: null
   };
 
   if (!options.dryRun && !config.apiKey) {
@@ -182,7 +208,7 @@ export async function embedRecipes(options = parseArgs()) {
   try {
     for (let offset = 0; offset < options.limit; offset += options.batchSize) {
       const take = Math.min(options.batchSize, options.limit - offset);
-      const recipes = await fetchRecipeBatch(prisma, { limit: take, offset });
+      const recipes = await fetchRecipeBatch(prisma, { limit: take, offset, resumeFrom: options.resumeFrom });
 
       if (!recipes.length) {
         break;
@@ -192,30 +218,37 @@ export async function embedRecipes(options = parseArgs()) {
         prisma,
         recipes.map((recipe) => recipe.id)
       );
+      const embeddingHashes = await fetchEmbeddingHashes(prisma, {
+        recipeIds: recipes.map((recipe) => recipe.id),
+        model: config.model,
+        dimensions: config.dimensions
+      });
 
       for (const recipe of recipes) {
         const ingredients = ingredientsByRecipeId.get(String(recipe.id)) || [];
         const embeddingText = buildProductionRecipeEmbeddingText(recipe, ingredients);
         const contentHash = contentHashFor(embeddingText);
         summary.processed += 1;
+        summary.lastProcessedRecipeId = String(recipe.id);
+        const storedHash = embeddingHashes.get(String(recipe.id));
+        const embeddingState = !storedHash ? 'missing' : storedHash === contentHash ? 'current' : 'stale';
+        summary[embeddingState] += 1;
 
         if (options.dryRun) {
           summary.skipped += 1;
-          console.log(
-            `[dry-run] ${recipe.id} ${recipe.name || '(untitled)'} hash=${contentHash.slice(0, 12)} chars=${embeddingText.length}`
-          );
+          if (!options.quiet) {
+            console.log(
+              `[dry-run] ${recipe.id} ${recipe.name || '(untitled)'} state=${embeddingState} hash=${contentHash.slice(0, 12)} chars=${embeddingText.length}`
+            );
+          }
           continue;
         }
 
         try {
-          const alreadyEmbedded = await hasCurrentEmbedding(prisma, {
-            recipeId: recipe.id,
-            model: config.model,
-            dimensions: config.dimensions,
-            contentHash
-          });
-
-          if (alreadyEmbedded) {
+          const shouldGenerate =
+            (options.backfillMissing && embeddingState === 'missing') ||
+            (options.backfillStale && embeddingState === 'stale');
+          if (!shouldGenerate) {
             summary.skipped += 1;
             continue;
           }
@@ -238,7 +271,7 @@ export async function embedRecipes(options = parseArgs()) {
     }
 
     console.log(
-      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed}`
+      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'}`
     );
     return summary;
   } finally {
@@ -249,7 +282,16 @@ export async function embedRecipes(options = parseArgs()) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  embedRecipes().catch((error) => {
+  const options = parseArgs();
+  const operation = options.evaluate
+    ? evaluateRecipeSearch({
+        dryRun: !options.executeEvaluation,
+        limit: options.limit,
+        output: options.output
+      }).then((report) => console.log(JSON.stringify(report, null, 2)))
+    : embedRecipes(options);
+
+  operation.catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
   });

@@ -8,99 +8,77 @@ export const SYNC_STATE = {
   CONFLICT: 'conflict'
 };
 
-// Current synchronization strategy:
-// - Guest mode stays fully local and does not reconcile with the server.
-// - Authenticated mode treats the server as canonical, but compares cached
-//   IndexedDB snapshots using updatedAt before replacing them blindly.
-// - Local fallback writes may be marked as pending, so future sync work can
-//   upgrade this flow without rewriting the storage layer.
-
 function getComparableTimestamp(value) {
-  if (!value) {
-    return 0;
-  }
-
+  if (!value) return 0;
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
+export function getIngredientSyncKey(ingredient) {
+  return ingredient?.clientId || ingredient?.id || '';
+}
+
+export function isPendingSyncState(syncState) {
+  return [SYNC_STATE.PENDING_CREATE, SYNC_STATE.PENDING_UPDATE, SYNC_STATE.PENDING_DELETE].includes(syncState);
+}
+
+export function isIngredientDeleted(ingredient) {
+  return Boolean(ingredient?.deletedAt);
+}
+
 function normalizeSyncIngredient(ingredient, overrides = {}) {
-  if (!ingredient) {
-    return null;
-  }
+  if (!ingredient) return null;
+  const id = ingredient.id || ingredient.clientId;
 
   return {
     ...ingredient,
+    id,
+    clientId: ingredient.clientId || id,
+    deletedAt: ingredient.deletedAt || null,
     syncState: ingredient.syncState || SYNC_STATE.CLEAN,
     lastSyncedAt: ingredient.lastSyncedAt || ingredient.updatedAt || null,
     ...overrides
   };
 }
 
-function isPendingSyncState(syncState) {
-  return (
-    syncState === SYNC_STATE.PENDING_CREATE ||
-    syncState === SYNC_STATE.PENDING_UPDATE ||
-    syncState === SYNC_STATE.PENDING_DELETE
-  );
-}
-
 export function markIngredientAsSynced(ingredient) {
   return normalizeSyncIngredient(ingredient, {
     syncState: SYNC_STATE.CLEAN,
-    lastSyncedAt: ingredient?.lastSyncedAt || ingredient?.updatedAt || new Date().toISOString()
+    lastSyncedAt: ingredient?.updatedAt || new Date().toISOString()
   });
 }
 
 export function markIngredientAsPending(ingredient, syncState = SYNC_STATE.PENDING_UPDATE) {
-  return normalizeSyncIngredient(ingredient, {
-    syncState
-  });
+  return normalizeSyncIngredient(ingredient, { syncState });
+}
+
+export function getVisibleIngredients(ingredients = []) {
+  return ingredients.filter((ingredient) => !isIngredientDeleted(ingredient));
+}
+
+export function getPendingIngredients(ingredients = []) {
+  return ingredients.filter((ingredient) => isPendingSyncState(ingredient.syncState));
 }
 
 export function resolveIngredientConflict({ localIngredient = null, remoteIngredient = null } = {}) {
-  if (!localIngredient && !remoteIngredient) {
-    return null;
-  }
-
-  if (!localIngredient) {
-    return markIngredientAsSynced(remoteIngredient);
-  }
-
+  if (!localIngredient && !remoteIngredient) return null;
+  if (!localIngredient) return markIngredientAsSynced(remoteIngredient);
   if (!remoteIngredient) {
-    if (localIngredient.syncState === SYNC_STATE.PENDING_DELETE) {
-      return null;
-    }
-
-    if (isPendingSyncState(localIngredient.syncState)) {
-      return normalizeSyncIngredient(localIngredient);
-    }
-
-    return null;
+    return isPendingSyncState(localIngredient.syncState) ? normalizeSyncIngredient(localIngredient) : null;
   }
 
   const localUpdatedAt = getComparableTimestamp(localIngredient.updatedAt);
   const remoteUpdatedAt = getComparableTimestamp(remoteIngredient.updatedAt);
-  const localIsPending = isPendingSyncState(localIngredient.syncState);
   const localLastSyncedAt = getComparableTimestamp(localIngredient.lastSyncedAt);
 
-  if (remoteUpdatedAt > localUpdatedAt) {
-    if (localIsPending) {
-      return normalizeSyncIngredient(remoteIngredient, {
-        syncState: SYNC_STATE.CONFLICT,
-        lastSyncedAt: remoteIngredient.updatedAt || new Date().toISOString()
-      });
-    }
+  if (remoteUpdatedAt >= localUpdatedAt) return markIngredientAsSynced(remoteIngredient);
+  if (isPendingSyncState(localIngredient.syncState)) return normalizeSyncIngredient(localIngredient);
 
-    return markIngredientAsSynced(remoteIngredient);
-  }
-
-  if (localIsPending) {
-    return normalizeSyncIngredient(localIngredient);
-  }
-
-  if (localUpdatedAt > remoteUpdatedAt && localUpdatedAt > localLastSyncedAt) {
-    return markIngredientAsPending(localIngredient, SYNC_STATE.PENDING_UPDATE);
+  if (localUpdatedAt > localLastSyncedAt) {
+    return markIngredientAsPending(
+      localIngredient,
+      isIngredientDeleted(localIngredient) ? SYNC_STATE.PENDING_DELETE : SYNC_STATE.PENDING_UPDATE
+    );
   }
 
   return markIngredientAsSynced(remoteIngredient);
@@ -111,41 +89,36 @@ export async function syncIngredientSnapshot({
   remoteIngredients = [],
   strategy = SYNC_STRATEGY
 } = {}) {
-  const localMap = new Map(localIngredients.map((ingredient) => [ingredient.id, ingredient]));
-  const remoteMap = new Map(remoteIngredients.map((ingredient) => [ingredient.id, ingredient]));
-  const ids = new Set([...localMap.keys(), ...remoteMap.keys()]);
+  const localMap = new Map(localIngredients.map((ingredient) => [getIngredientSyncKey(ingredient), ingredient]));
+  const remoteMap = new Map(remoteIngredients.map((ingredient) => [getIngredientSyncKey(ingredient), ingredient]));
+  const keys = new Set([...localMap.keys(), ...remoteMap.keys()]);
   const nextSnapshot = [];
-  const pendingUploads = [];
   const pendingDownloads = [];
   const conflicts = [];
 
-  ids.forEach((id) => {
-    const localIngredient = localMap.get(id) || null;
-    const remoteIngredient = remoteMap.get(id) || null;
-    const resolvedIngredient = resolveIngredientConflict({
-      localIngredient,
-      remoteIngredient
-    });
+  keys.forEach((key) => {
+    const localIngredient = localMap.get(key) || null;
+    const remoteIngredient = remoteMap.get(key) || null;
+    const localWasPending = isPendingSyncState(localIngredient?.syncState);
+    const remoteWon =
+      localIngredient &&
+      remoteIngredient &&
+      getComparableTimestamp(remoteIngredient.updatedAt) > getComparableTimestamp(localIngredient.updatedAt);
+    const resolvedIngredient = resolveIngredientConflict({ localIngredient, remoteIngredient });
 
-    if (!resolvedIngredient) {
-      return;
-    }
+    if (!resolvedIngredient) return;
 
     if (!localIngredient && remoteIngredient) {
       pendingDownloads.push(markIngredientAsSynced(remoteIngredient));
     }
 
-    if (resolvedIngredient.syncState === SYNC_STATE.CONFLICT) {
+    if (localWasPending && remoteWon) {
       conflicts.push({
-        id,
-        localIngredient,
-        remoteIngredient,
-        resolvedIngredient
+        clientId: key,
+        localUpdatedAt: localIngredient.updatedAt || null,
+        remoteUpdatedAt: remoteIngredient.updatedAt || null,
+        resolution: 'remote'
       });
-    }
-
-    if (isPendingSyncState(resolvedIngredient.syncState)) {
-      pendingUploads.push(resolvedIngredient);
     }
 
     nextSnapshot.push(resolvedIngredient);
@@ -159,7 +132,7 @@ export async function syncIngredientSnapshot({
 
   return {
     strategy,
-    pendingUploads,
+    pendingUploads: getPendingIngredients(nextSnapshot),
     pendingDownloads,
     conflicts,
     nextSnapshot

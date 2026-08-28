@@ -156,4 +156,37 @@ describe('indexedDB utilities', () => {
     expect(guestIngredients.map((item) => item.id)).toEqual(['guest-1']);
     expect(userIngredients.map((item) => item.id)).toEqual(['user-1']);
   });
+
+  it('migrates legacy authenticated records and preserves pending metadata across reads', async () => {
+    const db = await loadIndexedDbModule();
+    await db.saveIngredient(createIngredient('legacy'), { scope: 'user:user-1' });
+
+    const firstRead = await db.getAllIngredientsForSync({ scope: 'user:user-1' });
+    const secondRead = await db.getAllIngredientsForSync({ scope: 'user:user-1' });
+
+    expect(firstRead[0]).toMatchObject({
+      id: 'legacy',
+      clientId: 'legacy',
+      deletedAt: null,
+      syncState: 'pendingCreate',
+      lastSyncedAt: null
+    });
+    expect(secondRead).toEqual(firstRead);
+  });
+
+  it('keeps tombstones in sync storage but hides them from normal local reads', async () => {
+    const db = await loadIndexedDbModule();
+    const tombstone = createIngredient('deleted', {
+      clientId: 'deleted',
+      updatedAt: '2026-08-26T10:00:00.000Z',
+      deletedAt: '2026-08-26T10:00:00.000Z',
+      syncState: 'pendingDelete'
+    });
+    await db.saveIngredient(tombstone, { scope: 'user:user-1' });
+
+    expect(await db.getAllIngredients({ scope: 'user:user-1' })).toEqual([]);
+    expect(await db.getAllIngredientsForSync({ scope: 'user:user-1' })).toEqual([
+      expect.objectContaining({ clientId: 'deleted', syncState: 'pendingDelete' })
+    ]);
+  });
 });

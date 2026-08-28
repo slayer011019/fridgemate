@@ -1,6 +1,6 @@
 # MFDS Recipe Seeding
 
-FridgeMate can seed public recipe source data from the Food Safety Korea data service into a Supabase `recipes` table, then split the seeded `ingredients_text` into a Supabase `recipe_ingredients` table. This is a direct Supabase lab/import path. It does not use the Express + Prisma recipe models and does not change the current recommendation UI.
+FridgeMate can seed public recipe source data from the Food Safety Korea data service into the production UUID-based Supabase `recipes` table, then split the seeded `ingredients_text` into `recipe_ingredients`. The seeding scripts use Supabase directly, while the Express recommendation path and Prisma catalog models read the same production-shaped tables.
 
 ## Source API
 
@@ -67,7 +67,7 @@ npm run parse:recipe-ingredients -- --all
 
 The parser reads `recipes.id`, `recipes.name`, and `recipes.ingredients_text`, then upserts normalized chunks into `recipe_ingredients`. It stores the raw chunk, raw name, normalized name, canonical name, amount, unit, confidence, and source. Low-confidence rows are logged for manual review.
 
-This path intentionally targets the direct Supabase table shape documented here. The Prisma server models use different column names such as `source_recipe_id`, `raw_ingredients_text`, `section`, and `amount_value`; keep those paths separate until the v2 recommendation integration work explicitly joins them.
+This production Supabase table shape is the recipe catalog source of truth. Semantic vectors remain in `recipe_embeddings`; recommendation services join its `recipe_id` UUID to `recipes.id` and then load canonical or normalized names from `recipe_ingredients`.
 
 ## Export Parser Training Data
 

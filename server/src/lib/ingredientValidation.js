@@ -5,6 +5,7 @@ import { createHttpError } from './httpError.js';
 const MAX_NAME_LENGTH = 60;
 const MAX_QUANTITY_LENGTH = 30;
 const MAX_MEMO_LENGTH = 300;
+export const MAX_SYNC_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
 function normalizeText(value, maxLength) {
   return String(value || '')
@@ -16,6 +17,12 @@ function normalizeText(value, maxLength) {
 function normalizeDate(value) {
   const normalized = String(value || '').trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : '';
+}
+
+function normalizeTimestamp(value, fallback = null) {
+  if (!value) return fallback;
+  const timestamp = new Date(value);
+  return Number.isNaN(timestamp.getTime()) ? fallback : timestamp.toISOString();
 }
 
 export function normalizeIngredientInput(input = {}) {
@@ -34,6 +41,35 @@ export function normalizeIngredientInput(input = {}) {
     memo: normalizeText(input.memo, MAX_MEMO_LENGTH),
     consumed: Boolean(input.consumed)
   };
+}
+
+export function normalizeIngredientSyncInput(input = {}) {
+  const ingredient = normalizeIngredientInput(input);
+  const updatedAt = normalizeTimestamp(input.updatedAt);
+
+  if (!updatedAt) {
+    throw createHttpError(400, 'Ingredient updatedAt is required for sync.');
+  }
+
+  return {
+    ...ingredient,
+    createdAt: normalizeTimestamp(input.createdAt, updatedAt),
+    updatedAt,
+    deletedAt: normalizeTimestamp(input.deletedAt)
+  };
+}
+
+export function assertValidIngredientSyncTimestamps(ingredient, now = Date.now()) {
+  const updatedAt = Date.parse(ingredient.updatedAt);
+  const deletedAt = ingredient.deletedAt ? Date.parse(ingredient.deletedAt) : null;
+
+  if (updatedAt > now + MAX_SYNC_FUTURE_SKEW_MS) {
+    throw createHttpError(400, 'Ingredient updatedAt is too far in the future.');
+  }
+
+  if (deletedAt !== null && deletedAt > updatedAt) {
+    throw createHttpError(400, 'Ingredient deletedAt cannot be later than updatedAt.');
+  }
 }
 
 export function assertValidIngredient(ingredient) {

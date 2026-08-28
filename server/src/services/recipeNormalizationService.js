@@ -4,7 +4,7 @@ import {
 } from '../../../src/features/recipes/recipeImport.js';
 
 const LOW_CONFIDENCE_THRESHOLD = 0.7;
-const ALLOWED_TYPES = new Set(['main', 'seasoning', 'garnish', 'liquid', 'optional']);
+const ALLOWED_TYPES = new Set(['main', 'seasoning', 'garnish', 'liquid', 'optional', 'unknown']);
 
 function clampConfidence(value, fallback = 0.5) {
   const parsed = Number(value);
@@ -50,7 +50,7 @@ function buildNormalizationPrompt(rawIngredients = []) {
   return [
     'Normalize Korean recipe ingredient names for a fridge menu recommendation app.',
     'Return only a JSON array. Preserve rawName exactly. Normalize only normalizedName.',
-    'ingredientType must be one of: main, seasoning, garnish, liquid, optional.',
+    'ingredientType must be one of: main, seasoning, garnish, liquid, optional, unknown.',
     'confidence must be a number from 0 to 1.',
     JSON.stringify(
       rawIngredients.map((ingredient) => ({

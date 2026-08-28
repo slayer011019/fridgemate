@@ -2,6 +2,7 @@ import {
   buildRecipeEmbeddingText,
   parseFoodSafetyRecipeXml
 } from '../../../src/features/recipes/recipeImport.js';
+import { createHash } from 'node:crypto';
 import { normalizeIngredientsWithLLM } from './recipeNormalizationService.js';
 import { generateRecipeEmbedding } from './recipeEmbeddingService.js';
 
@@ -17,24 +18,40 @@ function getNutritionValue(recipe, key) {
   return recipe.nutrition?.[key] ?? null;
 }
 
-async function updateRecipeEmbedding(prismaClient, recipeId, embedding) {
-  await prismaClient.$executeRawUnsafe(
-    'UPDATE recipes SET embedding = $1::vector, embedding_status = $2 WHERE id = $3',
-    vectorToSqlLiteral(embedding),
-    'generated',
-    recipeId
-  );
-}
+async function updateRecipeEmbedding(prismaClient, recipeId, embeddingText, embedding) {
+  const model = process.env.RECIPE_EMBEDDING_MODEL || 'text-embedding-3-small';
+  const dimensions = Number(process.env.RECIPE_EMBEDDING_DIMENSIONS || 1536);
 
-async function markEmbeddingFailed(prismaClient, recipeId) {
-  await prismaClient.recipe.update({
-    where: {
-      id: recipeId
-    },
-    data: {
-      embeddingStatus: 'failed'
-    }
-  });
+  if (embedding.length !== dimensions) {
+    throw new Error(`Recipe embedding must include ${dimensions} dimensions.`);
+  }
+
+  const contentHash = createHash('sha256').update(embeddingText).digest('hex');
+  await prismaClient.$executeRawUnsafe(
+    `
+      INSERT INTO recipe_embeddings (
+        recipe_id,
+        embedding_text,
+        embedding,
+        embedding_model,
+        embedding_dimensions,
+        content_hash
+      )
+      VALUES ($1::uuid, $2, $3::vector, $4, $5, $6)
+      ON CONFLICT (recipe_id, embedding_model, embedding_dimensions)
+      DO UPDATE SET
+        embedding_text = EXCLUDED.embedding_text,
+        embedding = EXCLUDED.embedding,
+        content_hash = EXCLUDED.content_hash,
+        updated_at = now()
+    `,
+    recipeId,
+    embeddingText,
+    vectorToSqlLiteral(embedding),
+    model,
+    dimensions,
+    contentHash
+  );
 }
 
 async function getPrismaClient(options = {}) {
@@ -46,43 +63,21 @@ async function getPrismaClient(options = {}) {
   return prisma;
 }
 
-async function persistRecipe({ recipe, normalizedIngredients, embeddingText, prismaClient }) {
-  await prismaClient.rawRecipe.upsert({
-    where: {
-      source_sourceRecipeId: {
-        source: recipe.source,
-        sourceRecipeId: recipe.sourceRecipeId
-      }
-    },
-    create: {
-      source: recipe.source,
-      sourceRecipeId: recipe.sourceRecipeId,
-      rawPayload: recipe,
-      rawIngredientsText: recipe.rawIngredientsText
-    },
-    update: {
-      rawPayload: recipe,
-      rawIngredientsText: recipe.rawIngredientsText
-    }
-  });
-
+async function persistRecipe({ recipe, normalizedIngredients, prismaClient }) {
   const storedRecipe = await prismaClient.recipe.upsert({
     where: {
-      source_sourceRecipeId: {
-        source: recipe.source,
-        sourceRecipeId: recipe.sourceRecipeId
-      }
+      externalId: recipe.sourceRecipeId
     },
     create: {
+      externalId: recipe.sourceRecipeId,
       source: recipe.source,
-      sourceRecipeId: recipe.sourceRecipeId,
       name: recipe.name,
-      category: recipe.category,
+      dishType: recipe.category,
       cookingMethod: recipe.cookingMethod,
-      rawIngredientsText: recipe.rawIngredientsText,
-      tags: recipe.tags,
-      embeddingText,
-      embeddingStatus: 'pending',
+      ingredientsText: recipe.rawIngredientsText,
+      hashTag: Array.isArray(recipe.tags) ? recipe.tags.join(', ') : null,
+      steps: [],
+      raw: recipe,
       calories: getNutritionValue(recipe, 'calories'),
       carbohydrate: getNutritionValue(recipe, 'carbohydrate'),
       protein: getNutritionValue(recipe, 'protein'),
@@ -90,13 +85,13 @@ async function persistRecipe({ recipe, normalizedIngredients, embeddingText, pri
       sodium: getNutritionValue(recipe, 'sodium')
     },
     update: {
+      source: recipe.source,
       name: recipe.name,
-      category: recipe.category,
+      dishType: recipe.category,
       cookingMethod: recipe.cookingMethod,
-      rawIngredientsText: recipe.rawIngredientsText,
-      tags: recipe.tags,
-      embeddingText,
-      embeddingStatus: 'pending',
+      ingredientsText: recipe.rawIngredientsText,
+      hashTag: Array.isArray(recipe.tags) ? recipe.tags.join(', ') : null,
+      raw: recipe,
       calories: getNutritionValue(recipe, 'calories'),
       carbohydrate: getNutritionValue(recipe, 'carbohydrate'),
       protein: getNutritionValue(recipe, 'protein'),
@@ -111,15 +106,14 @@ async function persistRecipe({ recipe, normalizedIngredients, embeddingText, pri
   await prismaClient.recipeIngredient.createMany({
     data: normalizedIngredients.map((ingredient) => ({
       recipeId: storedRecipe.id,
-      rawName: ingredient.rawName,
-      normalizedName: ingredient.normalizedName,
-      section: ingredient.section,
-      amountText: ingredient.amountText || null,
-      amountValue: ingredient.amountValue,
-      amountUnit: ingredient.amountUnit || null,
-      displayAmount: ingredient.displayAmount || null,
-      ingredientType: ingredient.ingredientType,
-      confidence: ingredient.confidence
+      rawText: [ingredient.rawName, ingredient.displayAmount || ingredient.amountText].filter(Boolean).join(' '),
+      rawName: ingredient.rawName || null,
+      normalizedName: ingredient.normalizedName || null,
+      canonicalName: ingredient.normalizedName || null,
+      amount: ingredient.amountValue,
+      unit: ingredient.amountUnit || null,
+      confidence: ingredient.confidence,
+      source: recipe.source
     }))
   });
 
@@ -142,20 +136,18 @@ export async function importFoodSafetyRecipesFromXml(xmlText, options = {}) {
     const storedRecipe = await persistRecipe({
       recipe,
       normalizedIngredients,
-      embeddingText,
       prismaClient
     });
 
     try {
       const embedding = await (options.generateEmbedding || generateRecipeEmbedding)(embeddingText);
-      await updateRecipeEmbedding(prismaClient, storedRecipe.id, embedding);
+      await updateRecipeEmbedding(prismaClient, storedRecipe.id, embeddingText, embedding);
       results.push({
         recipeId: storedRecipe.id,
         sourceRecipeId: recipe.sourceRecipeId,
         embeddingStatus: 'generated'
       });
     } catch (_error) {
-      await markEmbeddingFailed(prismaClient, storedRecipe.id);
       results.push({
         recipeId: storedRecipe.id,
         sourceRecipeId: recipe.sourceRecipeId,

@@ -22,6 +22,30 @@ export async function generateRecipeEmbedding(embeddingText, options = {}) {
     throw new Error('Recipe embedding text is empty.');
   }
 
+  const [embedding] = await generateRecipeEmbeddings([input], options);
+  return embedding;
+}
+
+/**
+ * Generates a bounded batch of recipe embeddings without logging inputs or vectors.
+ *
+ * @param {string[]} embeddingTexts
+ * @param {{ apiKey?: string, model?: string, dimensions?: number, fetchImpl?: typeof fetch }} [options]
+ * @returns {Promise<number[][]>}
+ */
+export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
+  const inputs = Array.isArray(embeddingTexts)
+    ? embeddingTexts.map((text) => String(text || '').trim())
+    : [];
+
+  if (!inputs.length || inputs.some((input) => !input)) {
+    throw new Error('Recipe embedding text batch contains an empty input.');
+  }
+
+  if (inputs.length > 100) {
+    throw new Error('Recipe embedding batches are limited to 100 inputs.');
+  }
+
   const { apiKey, model, dimensions, fetchImpl } = getEmbeddingConfig(options);
 
   if (!apiKey) {
@@ -40,7 +64,7 @@ export async function generateRecipeEmbedding(embeddingText, options = {}) {
     },
     body: JSON.stringify({
       model,
-      input,
+      input: inputs,
       dimensions
     })
   });
@@ -50,11 +74,23 @@ export async function generateRecipeEmbedding(embeddingText, options = {}) {
   }
 
   const payload = await response.json();
-  const embedding = payload?.data?.[0]?.embedding;
+  const embeddings = Array.isArray(payload?.data)
+    ? [...payload.data]
+        .sort((left, right) => Number(left?.index || 0) - Number(right?.index || 0))
+        .map((item) => item?.embedding)
+    : [];
 
-  if (!Array.isArray(embedding) || !embedding.every((value) => Number.isFinite(value))) {
-    throw new Error('Recipe embedding response did not include a numeric vector.');
+  if (
+    embeddings.length !== inputs.length ||
+    embeddings.some(
+      (embedding) =>
+        !Array.isArray(embedding) ||
+        embedding.length !== dimensions ||
+        !embedding.every((value) => Number.isFinite(value))
+    )
+  ) {
+    throw new Error(`Recipe embedding response must include ${inputs.length} vectors with ${dimensions} dimensions.`);
   }
 
-  return embedding;
+  return embeddings;
 }

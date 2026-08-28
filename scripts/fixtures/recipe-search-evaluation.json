@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "selection": "First 10 production recipes by UUID with a current 1536-dimensional embedding and at least two parsed ingredients, captured on 2026-08-27.",
+  "recipes": [
+    { "id": "0018e2ea-05d0-4beb-9d92-7e3c8c43475c", "name": "초코타르트" },
+    { "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc", "name": "포니언 스프" },
+    { "id": "0102b7de-0f16-4942-adec-3c55e6581f95", "name": "단호박약식" },
+    { "id": "01c22ab7-882c-4468-969b-bac7c402cdab", "name": "시금치 리조또" },
+    { "id": "01f2e55d-73fd-4024-9f23-241de3346cd4", "name": "떡갈비콩나물밥" },
+    { "id": "026d995e-e4f4-4395-8134-d566ea73f7c4", "name": "죽순콩나물밥" },
+    { "id": "026dac3d-d4a1-4d68-a0c4-bcbaa5259419", "name": "블루베리양갱" },
+    { "id": "026fb3ff-6e79-4e1f-89bd-f1cbb2af12eb", "name": "호박잎 삼계탕" },
+    { "id": "028cd65f-ff79-4ca6-943e-686b081a6fd6", "name": "완두콩과 당근을 넣은 감자요거트 샐러드" },
+    { "id": "02a13f08-f8c9-44ad-91bb-5adf84c45bd4", "name": "케이준 스타일 닭고기 요리" }
+  ]
+}

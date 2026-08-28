@@ -43,7 +43,7 @@ export function saveIngredient(ingredient) {
   );
 }
 
-export function pushIngredientsToServer(ingredients) {
+export function pushIngredientsToServer(changes) {
   return requestJson(
     '/ingredients/sync',
     {
@@ -51,7 +51,7 @@ export function pushIngredientsToServer(ingredients) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ items: ingredients })
+      body: JSON.stringify({ changes })
     },
     { authMode: 'required', errorClass: IngredientsApiError }
   );
@@ -63,7 +63,7 @@ export function saveIngredients(ingredients) {
 
 export function pullIngredientsFromServer() {
   return requestJson(
-    '/ingredients',
+    '/ingredients/sync',
     {
       method: 'GET'
     },

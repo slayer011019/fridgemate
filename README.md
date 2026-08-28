@@ -1,442 +1,336 @@
-# FridgeMate
+# 오늘뭐먹지 (FridgeMate)
 
-FridgeMate is an open-source AI-powered refrigerator management app that helps users track ingredients, reduce food waste, and generate recipe suggestions based on available ingredients and expiration dates.
+냉장고 속 재료와 유통기한을 관리하고, 지금 가진 재료로 만들기 좋은 메뉴를 추천하는 로컬 우선 웹 애플리케이션입니다.
 
-It also serves as a practical reference project for students and junior developers building local-first, AI-assisted food management applications with React, Express, Prisma, PostgreSQL, OCR, and recommendation workflows.
+- 공개 서비스: [https://오늘뭐먹지.com](https://오늘뭐먹지.com)
+- 현재 마일스톤: `v1.5`
+- 라이선스: [MIT](LICENSE)
 
-Live demo: https://오늘뭐먹지.com/
+## 프로젝트 소개
 
-## Problem Statement
+냉장고에 무엇이 있는지 잊거나, 유통기한을 놓치거나, 남은 재료로 무엇을 먹을지 결정하지 못하는 문제를 줄이는 것이 목표입니다.
 
-People often forget what is already in the fridge, miss expiration dates, buy duplicate ingredients, or struggle to decide what to cook before food goes bad. FridgeMate focuses on a practical daily workflow:
+핵심 사용 흐름은 다음과 같습니다.
 
-- register ingredients quickly
-- keep expiration dates visible
-- prioritize ingredients that should be used soon
-- suggest recipes from available fridge and pantry items
-- reduce manual input with OCR-based import and correction learning
+```text
+재료 등록 -> 유통기한 확인 -> 메뉴 추천 -> 외부 레시피 확인 -> 재료 소비/복구
+```
 
-## Key Features
+브라우저의 IndexedDB를 일상적인 작업 사본으로 사용하므로 가입하지 않아도 주요 기능을 사용할 수 있습니다. 로그인한 사용자는 계정 화면에서 서버 백업과 가져오기를 직접 실행할 수 있습니다.
 
-Implemented:
+## 주요 기능
 
-- Ingredient CRUD with quantity, category, storage type, purchase date, expiration date, and notes
-- D-day style expiration labels, expiring-soon summaries, and expired item visibility
-- Local-first IndexedDB persistence for guest and authenticated scopes
-- Shopping panel for consumed ingredients and buy-again workflows
-- Pantry staple ownership controls for common seasonings and sauces
-- Rule-based recipe recommendation groups: ready now, buy one more, and use soon
-- OCR import with review-before-save and correction learning
-- JWT signup, login, logout, refresh-cookie session restore, and protected routes
-- Optional Express API on Node or Cloudflare Workers with Prisma + PostgreSQL
-- Recipe catalog imports are restricted to trusted local/CI seeding scripts and are not exposed as user-facing API routes
-- Manual server backup and pull sync from the account page
-- API fallback behavior that keeps local IndexedDB usable during network or 5xx failures
-- Bounded, rate-limited recommendation impression and click event persistence in backend-connected mode
-- Public service, contact, privacy, crawler, and sitemap pages for production site transparency
-- Recommendation training-data export script for future ranking experiments
-- Vitest, React Testing Library, Playwright, ESLint, and GitHub Actions CI
+### 냉장고와 장보기
 
-Planned or experimental:
+- 재료 이름, 수량, 분류, 보관 위치, 구매일, 유통기한, 메모 관리
+- D-day 기반 임박·만료 상태 표시
+- 재료 소비와 복구, 다시 살 항목을 위한 장보기 패널
+- 자주 쓰는 양념과 소스의 팬트리 보유 상태 관리
+- 네트워크 없이도 동작하는 IndexedDB 기반 로컬 모드
 
-- Conflict-aware two-way sync across devices
-- Production operations hardening for hosted frontend/backend deployments
-- Broader browser/device E2E coverage
-- User-level pantry staple persistence
-- Stronger auth recovery UX for expired sessions and offline fallback
-- ML-assisted recommendation ranking using collected recommendation events
-- Expanded recipe embeddings and pgvector-backed search
+### 등록과 OCR
 
-## AI Features
+- 사진과 영수증 형태의 텍스트를 읽는 Tesseract.js OCR
+- 인식 결과를 바로 저장하지 않고 사용자가 검토한 뒤 반영
+- 반복 교정을 재사용하는 가져오기 교정 학습
 
-FridgeMate uses AI-adjacent and optional AI workflows without making the core app dependent on a paid API key.
+### 레시피 추천
 
-Implemented:
+- 바로 만들기, 하나만 더 사기, 임박 재료 활용 추천 그룹
+- 보유 재료, 팬트리 재료, 유통기한 임박도를 반영한 규칙 기반 점수
+- PostgreSQL 레시피 카탈로그와 pgvector 임베딩을 이용한 후보 검색 기반
+- 추천 노출과 클릭 이벤트 저장 및 학습 데이터 내보내기
+- 외부 레시피 검색 링크 제공
 
-- Browser OCR with Tesseract.js for shopping screenshots and receipt-style text
-- Ingredient normalization and correction learning for repeated import edits
-- Expiration-date aware recommendation scoring that boosts recipes using ingredients that should be consumed soon
-- Optional backend AI recipe suggestions when `ANTHROPIC_API_KEY` is configured
-- Recommendation event collection for impressions and clicks so future ranking models can learn from real usage
-- Training-data export to JSONL or CSV for future model experiments
-- Recipe embedding groundwork for future pgvector candidate search
+### 계정과 동기화
 
-Experimental or planned:
+- JWT 기반 회원가입, 로그인, 로그아웃, 세션 복구
+- `httpOnly` 쿠키, 단일 사용 refresh token 회전, CSRF origin 검증
+- 사용자 범위를 강제하는 조회·수정·삭제와 PostgreSQL RLS
+- 계정 화면에서 실행하는 수동 서버 백업과 가져오기
+- `clientId + updatedAt + deletedAt` 기반 레코드별 충돌 해결
+- 네트워크 오류와 5xx에서 로컬 변경 및 재시도 상태 보존
+- 4xx 오류를 성공으로 처리하지 않고 사용자에게 표시
 
-- OpenAI-compatible embedding support for OCR correction suggestions and recipe catalog ranking
-- Model-assisted recipe ingredient normalization
-- Maintainer automation for issue triage, code review assistance, release note drafting, and documentation updates
+## 현재 구현 상태
 
-See [docs/AI_FEATURES.md](docs/AI_FEATURES.md) for details.
+구현되어 있습니다.
 
-## Current Implementation Status
+- 게스트용 local-only CRUD와 오프라인 사용
+- 선택형 Express API 및 Cloudflare Workers 실행 경로
+- Prisma + PostgreSQL/Supabase 데이터 계층
+- 충돌을 고려한 수동 재료 동기화와 삭제 tombstone
+- OCR 등록, 검토, 교정 학습
+- 규칙 기반 추천과 DB·임베딩 혼합 후보 검색
+- 추천 이벤트 수집 및 데이터 내보내기
+- Vitest, React Testing Library, Playwright, ESLint, GitHub Actions CI
+- 공개 서비스·연락처·개인정보처리방침·사이트맵·`ads.txt`
 
-FridgeMate is in the v1.5 milestone. The app is usable in local-only mode and has an optional backend mode, but production operations and full two-way sync are still being hardened.
+아직 운영 단계가 아닙니다.
 
-Current boundaries:
+- 자동 백그라운드 및 실시간 동기화
+- 공유 냉장고와 다중 사용자 협업
+- 사용자별 팬트리 상태의 서버 영속화
+- 행동 데이터를 학습한 ML 순위 모델
+- 전체 레시피 임베딩 재생성 및 semantic API 공개
+- 광범위한 브라우저·실기기 E2E
 
-- Local-only mode is the safest default for everyday CRUD.
-- Backend mode is enabled by `VITE_API_URL`.
-- Ingredient CRUD writes locally first.
-- Authenticated users can manually back up the local snapshot to the server or pull the server snapshot into the local device cache.
-- Network failures and 5xx API failures fall back to IndexedDB.
-- 4xx API errors should surface to the UI instead of being silently swallowed.
-- AI recipe suggestions are optional and require `ANTHROPIC_API_KEY`.
-- Embedding and pgvector work is treated as lab/v2 infrastructure unless explicitly wired into a user-facing flow.
+## 기술 구성
 
-## Tech Stack
+| 영역 | 기술 |
+| --- | --- |
+| 프론트엔드 | React, Vite, JavaScript, Tailwind CSS |
+| 상태·로컬 저장 | React Context, custom hooks, IndexedDB |
+| 백엔드 | Express, Cloudflare Workers |
+| 데이터베이스 | Prisma, PostgreSQL, Supabase, pgvector |
+| 인증 | JWT, `httpOnly` cookies, refresh token rotation, PostgreSQL RLS |
+| OCR | Tesseract.js |
+| 선택형 AI | Anthropic API, OpenAI-compatible embedding API |
+| 테스트 | Vitest, React Testing Library, Playwright |
+| 배포 | Vercel, Cloudflare, Supabase |
 
-Frontend:
-
-- React
-- Vite
-- JavaScript
-- Tailwind CSS
-- React Context and custom hooks
-- IndexedDB
-
-Backend:
-
-- Express
-- Prisma
-- PostgreSQL
-- JWT auth with `httpOnly` access cookies, atomic single-use refresh-token rotation, and server-side CSRF origin verification
-- Atomic Redis-backed auth throttling for production Node and SQLite Durable Object throttling for Workers; KV stores Worker token revocations
-- Tenant-scoped ingredient reads, updates, and deletes always include the authenticated user ID in database conditions
-- PostgreSQL RLS binds ingredient/OCR rows to the authenticated user, account lookup to the submitted normalized email, and refresh sessions to the presented token hash when the API uses the dedicated non-bypass database role
-
-AI, OCR, and data:
-
-- Tesseract.js
-- Optional Anthropic API recipe suggestions
-- OpenAI-compatible embedding scaffolding
-- Recommendation event export for future model training
-
-Testing and tooling:
-
-- Vitest
-- React Testing Library
-- Playwright
-- ESLint
-- Prettier
-- GitHub Actions
-
-## Architecture Overview
-
-FridgeMate keeps the browser database as the day-to-day working copy and treats the backend as an optional authenticated persistence layer.
+## 아키텍처
 
 ```text
 React UI
-  -> page components
-  -> hooks and API clients
-  -> IndexedDB local cache
-  -> optional Express API when VITE_API_URL is configured
+  -> hooks / API clients
+  -> IndexedDB 작업 사본
+  -> 선택형 Express 또는 Cloudflare Workers API
   -> Prisma
-  -> PostgreSQL
+  -> PostgreSQL / Supabase
 ```
 
-Ingredient CRUD:
+### 재료 저장
 
 ```text
-UI action
-  -> useIngredients
-  -> IndexedDB save/update/delete
-  -> mark local sync status as dirty
-  -> update React state
+사용자 작업
+  -> IndexedDB에 생성·수정·삭제 상태 저장
+  -> pendingCreate / pendingUpdate / pendingDelete 유지
+  -> React 화면 갱신
 ```
 
-Manual sync:
+### 수동 동기화
 
 ```text
-Account backup
-  -> read local IndexedDB snapshot
-  -> POST /api/ingredients/sync
-  -> backend upserts by clientId and removes missing remote rows
+서버 백업
+  -> pending 레코드와 tombstone 전송
+  -> 서버가 userId + clientId 범위에서 최신 변경 적용
+  -> 전체 서버 상태를 updatedAt 기준으로 로컬에 병합
 
-Account pull
-  -> GET /api/ingredients
-  -> replace the authenticated local cache
+서버 가져오기
+  -> 서버 레코드와 tombstone 조회
+  -> 최신 pending 로컬 변경 보존
+  -> 서버에서 삭제된 깨끗한 로컬 캐시 제거
 ```
 
-Recommendation events:
+동일한 동기화를 반복해도 `clientId` 기준으로 중복 생성되지 않으며, 삭제 시각보다 오래된 다른 기기의 데이터는 삭제 항목을 되살리지 못합니다. 자동 업로드는 아직 하지 않습니다.
 
-```text
-RecipesPage
-  -> RecommendationRow
-  -> impression/click event
-  -> /api/recommendation-events
-  -> RecommendationEvent table
-  -> export:recommendation-training script
-```
+자세한 내용은 [아키텍처 문서](docs/ARCHITECTURE.md)를 참고하세요.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deeper overview.
+## 빠른 시작
 
-## Getting Started
+요구 사항:
 
-Install dependencies:
+- Node.js `20` 이상 권장
+- npm
+- 백엔드 모드 사용 시 PostgreSQL
+
+의존성을 설치합니다.
 
 ```bash
 npm install
 ```
 
-Create an environment file:
+환경 설정 예시를 복사합니다.
 
 ```bash
 cp .env.example .env
 ```
 
-Run frontend-only local mode:
+프론트엔드 local-only 모드를 실행합니다.
 
 ```bash
 npm run dev
 ```
 
-Open:
+기본 주소는 `http://localhost:5173`입니다.
 
-```text
-http://localhost:5173
-```
-
-## Environment Variables
-
-Important variables are documented in [.env.example](.env.example) and [server/.env.example](server/.env.example). Use placeholder values locally and never commit real secrets.
-
-Common frontend variables:
-
-```env
-VITE_API_URL=
-VITE_API_BASE_URL=
-VITE_ENABLE_OCR=true
-VITE_SENTRY_DSN=
-VITE_ADSENSE_ENABLED=false
-VITE_ADSENSE_CLIENT=
-VITE_ADSENSE_HOME_SLOT=
-VITE_ADSENSE_RECIPES_SLOT=
-```
-
-Common backend variables:
-
-```env
-PORT=4000
-CLIENT_ORIGIN=http://localhost:5173
-ALLOWED_ORIGINS=http://localhost:5173
-DATABASE_URL=postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=public
-DIRECT_URL=postgresql://DB_USER:DB_PASSWORD@DB_HOST:5432/fridgemate?schema=public
-JWT_SECRET=
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-RECIPE_EMBEDDING_MODEL=text-embedding-3-small
-RECIPE_EMBEDDING_DIMENSIONS=1536
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-FOODSAFETY_API_KEY=
-```
-
-Rules:
-
-- Keep `JWT_SECRET` strong and private.
-- Keep all service role keys server-side only.
-- Do not expose private keys with a `VITE_` prefix.
-- Leave optional AI keys empty when testing the core app.
-- Keep `RECIPE_EMBEDDING_DIMENSIONS` aligned with the `recipe_embeddings.embedding` vector dimension.
-
-Cloudflare Workers deployment is documented in [docs/CLOUDFLARE_DEPLOYMENT.md](docs/CLOUDFLARE_DEPLOYMENT.md). AdSense activation and `ads.txt` generation are documented in [docs/ADSENSE_SETUP.md](docs/ADSENSE_SETUP.md).
-
-## Database / Prisma Setup
-
-Validate the Prisma schema:
-
-```bash
-npm run prisma:validate
-```
-
-Generate Prisma Client:
-
-```bash
-npm run prisma:generate
-```
-
-Create or apply local migrations:
-
-```bash
-npm run prisma:migrate
-```
-
-Production deploys should use:
-
-```bash
-npm run prisma:deploy
-```
-
-## Running Frontend and Backend
-
-Backend mode:
+백엔드 모드를 함께 사용할 때는 별도 터미널에서 실행합니다.
 
 ```bash
 npm run dev:server
-```
-
-In another terminal:
-
-```bash
 npm run dev
 ```
 
-Health check:
+백엔드 상태 확인 주소:
 
 ```text
 http://localhost:4000/health
 http://localhost:4000/api/health
 ```
 
-## Testing
+## 환경 변수
 
-Core checks:
+전체 목록과 설명은 [.env.example](.env.example)과 [server/.env.example](server/.env.example)에 있습니다. 실제 키와 데이터베이스 주소는 커밋하지 마세요.
+
+주요 프론트엔드 변수:
+
+```env
+VITE_API_URL=
+VITE_ENABLE_OCR=true
+VITE_SENTRY_DSN=
+VITE_ADSENSE_VERIFICATION_ENABLED=true
+VITE_ADSENSE_SERVING_ENABLED=false
+```
+
+주요 백엔드 변수:
+
+```env
+PORT=4000
+CLIENT_ORIGIN=http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:5173
+DATABASE_URL=
+DIRECT_URL=
+JWT_SECRET=
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+RECIPE_EMBEDDING_MODEL=text-embedding-3-small
+RECIPE_EMBEDDING_DIMENSIONS=1536
+```
+
+주의 사항:
+
+- 서비스 역할 키와 AI API 키는 서버에서만 사용합니다.
+- 비밀값에 `VITE_` 접두사를 붙이지 않습니다.
+- `RECIPE_EMBEDDING_DIMENSIONS`는 DB의 `recipe_embeddings.embedding` 차원과 같아야 합니다.
+- 핵심 앱 기능은 AI API 키 없이도 동작합니다.
+
+## 데이터베이스
+
+Prisma schema 검증과 Client 생성:
 
 ```bash
-npm run lint
-npm run test:run
-npm run build
+npm run prisma:validate
+npm run prisma:generate
 ```
 
-Optional checks:
+로컬 migration 생성·적용:
 
 ```bash
-npm run test:coverage
-npm run test:e2e
-npx prisma validate
+npm run prisma:migrate
 ```
 
-Playwright projects cover local-only CRUD/OCR journeys and mocked API-mode auth, sync, deletion, fallback, and expired-session flows.
-
-## Project Structure
-
-```text
-fridgemate/
-|-- .github/
-|   |-- ISSUE_TEMPLATE/
-|   |-- pull_request_template.md
-|   `-- workflows/
-|-- docs/
-|-- e2e/
-|-- prisma/
-|   |-- migrations/
-|   `-- schema.prisma
-|-- scripts/
-|-- server/
-|   `-- src/
-|       |-- controllers/
-|       |-- db/
-|       |-- lib/
-|       |-- middleware/
-|       |-- routes/
-|       `-- services/
-|-- src/
-|   |-- api/
-|   |-- components/
-|   |-- data/
-|   |-- db/
-|   |-- hooks/
-|   |-- pages/
-|   |-- test/
-|   `-- utils/
-|-- .env.example
-|-- package.json
-`-- README.md
-```
-
-## Recommendation Event Export
-
-Backend-connected recommendation rows store impression and click events when the API is available. The event table captures ranking-oriented feature snapshots such as rank, score, match rate, missing ingredient count, urgent match count, source, and click labels.
-
-Export JSONL:
+운영 migration은 배포 체크리스트와 SQL을 검토한 뒤 별도 작업으로 수행합니다.
 
 ```bash
-npm run export:recommendation-training -- --format=jsonl --output=data/training/recommendation-training.jsonl
+npm run prisma:deploy
 ```
 
-Export CSV:
+이 명령은 개발·테스트 과정에서 자동으로 실행하지 않습니다.
 
-```bash
-npm run export:recommendation-training -- --format=csv --output=data/training/recommendation-training.csv
-```
+## 레시피 임베딩과 검색
 
-This export is intended for offline analysis and future model-ranking experiments. It is not required for normal app usage.
+임베딩 저장은 모델 훈련이 아닙니다. 레시피 제목·설명·분류된 재료를 벡터로 변환해 semantic 후보를 가져오고, 최종 순위는 재료 일치도와 유통기한 규칙으로 다시 계산합니다.
 
-## Recipe Embedding Groundwork
+현재 source of truth:
 
-Recipe embeddings are stored vectors for semantic candidate retrieval; storing them is not model training. The first safe step uses a separate production-compatible `recipe_embeddings` table keyed to the existing Supabase-shaped `recipes.id` UUID, leaving the production `recipes` table unchanged.
+- 레시피: UUID 기반 `recipes`
+- 재료: `recipe_ingredients`
+- 벡터: `recipe_embeddings`
+- 검색 연결: `recipe_embeddings.recipe_id -> recipes.id`
 
-Dry-run the embedding text and content hash pipeline:
+임베딩 명령은 기본적으로 쓰지 않는 안전 모드입니다.
 
 ```bash
 npm run recipes:embed -- --dry-run --limit=10
 ```
 
-Semantic retrieval should use pgvector to fetch candidates, then rule-based reranking should prioritize owned ingredients, expiring ingredients, and low missing-ingredient counts. Ranking model training is future work and requires enough recommendation event history.
+고정 fixture를 이용한 읽기 전용 품질 평가:
 
-## Roadmap
+```bash
+npm run recipes:embed -- --evaluate --dry-run --limit=1146
+npm run recipes:embed -- --evaluate --execute --limit=1146 --output=docs/recipe-search-quality-report.json
+```
 
-Near term:
+현재 평가 결과는 Hit@5 `6/10`으로 운영 기준 `7/10`에 미달합니다. 따라서 전체 임베딩 backfill과 semantic 추천 API 공개는 보류합니다. 상세 기준과 결과는 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md)에 있습니다.
 
-- Deploy frontend and backend to stable public environments
-- Keep CI green across lint, unit tests, build, and core E2E
-- Harden auth recovery, guest import, and offline fallback UX
-- Document production smoke checks and release notes consistently
+## 추천 이벤트 내보내기
 
-Next:
+추천 노출·클릭 이벤트를 향후 오프라인 분석용 JSONL 또는 CSV로 내보낼 수 있습니다.
 
-- Implement conflict-aware two-way sync uploads and delete resolution
-- Persist pantry ownership per authenticated user
-- Expand recommendation event analysis and ranking experiments
-- Broaden Playwright coverage across browsers and important devices
+```bash
+npm run export:recommendation-training -- --format=jsonl --output=data/training/recommendation-training.jsonl
+npm run export:recommendation-training -- --format=csv --output=data/training/recommendation-training.csv
+```
 
-Longer term:
+이 데이터는 자동 학습에 사용되지 않으며, 일반 앱 실행에도 필요하지 않습니다.
 
-- Use AI-assisted maintainership workflows for issue triage, code review assistance, and release note generation
-- Improve OCR taxonomy and normalization without removing the review-before-save safety step
-- Explore model-assisted recipe search, ingredient matching, and personalization
+## 검사와 테스트
 
-See [docs/ROADMAP.md](docs/ROADMAP.md).
+필수 검사:
 
-## Why Open Source
+```bash
+npm run lint
+npm run test:run
+npm run build
+npm run prisma:validate
+```
 
-FridgeMate is open source so students and junior developers can study a realistic, compact application that combines:
+선택 검사:
 
-- local-first frontend architecture
-- optional backend persistence
-- auth and session restore
-- OCR import with human review
-- recommendation scoring
-- AI/API integration boundaries
-- CI, tests, deployment notes, and contributor workflows
+```bash
+npm run test:coverage
+npm run test:e2e
+npm run worker:dry-run
+```
 
-The goal is not to present a perfect production system. The goal is to show readable tradeoffs and a maintainable path from MVP to deployable full-stack app.
+Playwright는 local-only 핵심 흐름과 API 모드의 로그인, 동기화, 삭제 충돌, 네트워크 실패, 세션 만료 흐름을 확인합니다.
 
-## Maintainer
+## 주요 디렉터리
 
-Maintained by the FridgeMate project maintainer and contributors.
+```text
+FridgeMate/
+|-- .github/              # 이슈·PR 템플릿과 CI
+|-- docs/                 # 아키텍처, 배포, AI, 품질 문서
+|-- e2e/                  # Playwright 테스트
+|-- prisma/               # schema와 migrations
+|-- scripts/              # seed, embedding, 평가, export
+|-- server/src/           # Express/Workers 백엔드
+|-- src/                  # React 애플리케이션
+|-- .env.example
+|-- package.json
+`-- README.md
+```
 
-Maintainer workflow priorities:
+## 배포와 운영 문서
 
-- keep issues reproducible
-- keep PRs small enough to review
-- protect secrets and user data
-- require tests or verification notes for behavior changes
-- use automation where it improves triage, review, and release documentation
+- [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md)
+- [배포 체크리스트](docs/DEPLOY_CHECKLIST.md)
+- [AdSense 설정](docs/ADSENSE_SETUP.md)
+- [AI 기능과 안전 경계](docs/AI_FEATURES.md)
+- [레시피 데이터 가져오기](docs/recipe-seeding.md)
+- [로드맵](docs/ROADMAP.md)
+- [변경 이력](CHANGELOG.md)
 
-## Contributing
+## 다음 단계
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then open an issue or pull request using the GitHub templates.
+1. 수동 동기화를 운영 DB와 여러 실제 기기에서 제한적으로 검증
+2. 레시피 재료 분류와 검색 fixture를 개선해 Hit@5 품질 기준 통과
+3. 기준 통과 후 제한적 임베딩 backfill과 무결성 점검
+4. semantic 추천 API와 규칙 기반 reranking 연결
+5. 충분한 행동 데이터가 쌓인 뒤 추천 가중치 또는 순위 모델 검토
 
-Good first contribution areas:
+## 기여하기
 
-- documentation improvements
-- test coverage for existing behavior
-- accessibility and responsive UI fixes
-- OCR parser examples and regression cases
-- recipe recommendation scoring explanations
+기여는 언제든 환영합니다. [CONTRIBUTING.md](CONTRIBUTING.md)를 확인한 뒤 이슈 또는 Pull Request를 등록해 주세요.
 
-## License
+처음 기여하기 좋은 영역:
 
-FridgeMate is released under the [MIT License](LICENSE).
+- 문서와 테스트 보강
+- 접근성 및 반응형 UI 개선
+- OCR 파서 회귀 사례 추가
+- 재료 분류와 추천 점수 설명 개선
+
+## 라이선스
+
+이 프로젝트는 [MIT License](LICENSE)로 배포됩니다.

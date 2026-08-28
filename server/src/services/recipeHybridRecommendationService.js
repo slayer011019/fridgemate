@@ -2,6 +2,7 @@ import { generateRecipeSearchLinks } from '../../../src/features/recipes/recipeS
 import { normalizeIngredientName } from '../../../src/features/ingredients/ingredientDomain.js';
 import { getRecipeMatchScore } from '../../../src/utils/recommendations.js';
 import { buildRecipeVectorQueryText, searchSimilarRecipesByVector } from './recipeVectorService.js';
+import { getProductionRecipesByIds, getRecentProductionRecipes } from './recipeCatalogService.js';
 
 const DEFAULT_STRUCTURED_WEIGHT = 0.7;
 const DEFAULT_VECTOR_WEIGHT = 0.3;
@@ -85,6 +86,7 @@ function buildHybridResult(recipe, structuredScore, vectorScore = 0) {
     matchedIngredients: structuredScore.matchedIngredients,
     missingIngredients: structuredScore.missingIngredients,
     missingSeasonings: structuredScore.missingSeasonings,
+    missingUnknownIngredients: structuredScore.missingUnknown || [],
     expiringMatchedIngredients: structuredScore.expiringMatchedIngredients,
     matchedCount: structuredScore.matchedIngredients.length,
     missingCount: structuredScore.missingIngredients.length,
@@ -107,16 +109,27 @@ function buildHybridResult(recipe, structuredScore, vectorScore = 0) {
 export async function recommendRecipes(userIngredients = [], options = {}) {
   const prismaClient = await getPrismaClient(options);
   const limit = Number.isFinite(options.limit) ? options.limit : 20;
+  const candidateCount = Number.isFinite(options.candidateCount)
+    ? Math.max(limit, Math.min(500, Math.floor(options.candidateCount)))
+    : Math.max(limit * 5, 50);
   const expandedUserIngredients = await expandUserIngredientsWithAliases(userIngredients, prismaClient);
-  const recipes = await prismaClient.recipe.findMany({
-    include: {
-      ingredients: true
-    },
-    take: Math.max(limit * 5, 50),
-    orderBy: {
-      updatedAt: 'desc'
-    }
-  });
+  const queryText = buildRecipeVectorQueryText(expandedUserIngredients);
+  let vectorResults = [];
+
+  try {
+    vectorResults = await (options.vectorSearch || searchSimilarRecipesByVector)(queryText, candidateCount, {
+      prismaClient
+    });
+  } catch (_error) {
+    vectorResults = [];
+  }
+
+  const recipeIds = vectorResults.map((result) => result.recipeId || result.id).filter(Boolean);
+  const loadRecipesByIds = options.loadRecipesByIds || getProductionRecipesByIds;
+  const loadRecentRecipes = options.loadRecentRecipes || getRecentProductionRecipes;
+  const recipes = recipeIds.length
+    ? await loadRecipesByIds(prismaClient, recipeIds)
+    : await loadRecentRecipes(prismaClient, candidateCount);
 
   if (!recipes.length) {
     return [];
@@ -132,17 +145,6 @@ export async function recommendRecipes(userIngredients = [], options = {}) {
       })
     };
   });
-  const queryText = buildRecipeVectorQueryText(expandedUserIngredients);
-  let vectorResults = [];
-
-  try {
-    vectorResults = await (options.vectorSearch || searchSimilarRecipesByVector)(queryText, limit, {
-      prismaClient
-    });
-  } catch (_error) {
-    vectorResults = [];
-  }
-
   const vectorScoreById = new Map(vectorResults.map((result) => [result.recipeId || result.id, Number(result.vectorScore || 0)]));
 
   return structuredResults

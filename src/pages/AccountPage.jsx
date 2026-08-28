@@ -59,8 +59,8 @@ function AccountPage() {
           <p className="kicker">재료 동기화</p>
           <h3 className="mt-2 text-xl font-semibold text-slate-900">로컬 저장 후 원하는 때 서버에 저장합니다</h3>
           <p className="mt-2 text-sm leading-6 muted">
-            재료는 먼저 이 기기에 저장됩니다. 로그인 후 동기화 버튼을 누르면 현재 재료 목록이 서버에 저장되어 다른
-            기기에서도 사용할 수 있습니다.
+            재료는 먼저 이 기기에 저장됩니다. 로그인 후 백업 버튼을 누르면 아직 보내지 않은 변경사항이 서버의 최신
+            상태와 안전하게 병합됩니다.
           </p>
           <p className="mt-2 text-sm leading-6 muted">
             재료를 삭제해도 서버에는 즉시 반영되지 않습니다. 삭제 내용을 다른 기기에도 반영하려면 서버와 동기화를
@@ -91,7 +91,7 @@ function AccountPage() {
 
         {syncStatus === 'synced' ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-            현재 로컬 재료 목록을 서버에 저장했습니다.
+            로컬 변경사항을 서버와 병합했습니다.
           </div>
         ) : null}
 
@@ -104,7 +104,7 @@ function AccountPage() {
             className="btn-primary"
             disabled={!user || syncStatus === 'syncing'}
             onClick={async () => {
-              if (window.confirm('현재 이 기기의 재료 목록으로 서버 데이터를 덮어씁니다. 계속할까요?')) {
+              if (window.confirm('이 기기에서 아직 보내지 않은 변경사항을 서버의 최신 상태와 병합할까요?')) {
                 await pushIngredientsToServer();
               }
             }}
@@ -116,7 +116,7 @@ function AccountPage() {
             className="btn-secondary"
             disabled={!user || syncStatus === 'syncing'}
             onClick={async () => {
-              if (window.confirm('서버에 저장된 재료 목록으로 현재 기기의 재료 목록을 덮어씁니다. 계속할까요?')) {
+              if (window.confirm('서버의 최신 상태를 가져오고 이 기기의 미전송 변경사항과 병합할까요?')) {
                 await pullIngredientsFromServer();
               }
             }}

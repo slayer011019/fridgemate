@@ -9,6 +9,13 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Added deterministic runtime ingredient classification so empty production categories no longer make every seasoning, liquid, garnish, optional item, or uncertain item a core requirement.
+- Replaced noisy recipe embedding bodies with bounded classification-aware text and aligned semantic query text with the same normalized search-ingredient sections.
+- Made the recipe embedding command write-free by default and separated missing/stale backfill modes from in-memory quality evaluation.
+- Aligned the Prisma recipe catalog models with the production UUID/Supabase table shape and changed pgvector retrieval to join `recipe_embeddings` with `recipes` instead of querying the nonexistent `recipes.embedding` column.
+- Made DB-backed hybrid recommendations load only retrieved production recipe UUIDs and their canonical ingredient rows, with a recent-catalog fallback when vector retrieval is unavailable.
+- Made equal sync timestamps keep the existing server value and reject timestamps more than five minutes in the future before any batch write.
+- Replaced Playwright's Windows-leaking `webServer` child-process path with explicit in-process Vite startup and teardown.
 - Hardened production auth cookies with `SameSite=Lax` and `__Host-` names, and reject cookie-authenticated state changes whose `Origin` or fallback `Referer` is missing or untrusted.
 - Rate-limited recommendation event ingestion by authenticated user/client address and replaced arbitrary analytics metadata with a bounded allowlisted schema.
 - Reduced public health responses to a static liveness signal so database connectivity and runtime timestamps are not exposed to unauthenticated callers.
@@ -18,6 +25,11 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added a fixed ten-recipe semantic retrieval fixture, an all-catalog read-only evaluation command, Hit@1/Hit@5/MRR metrics, and a vector-free JSON quality report.
+- Added first-pass conflict-aware manual ingredient sync with stable `clientId` matching, persisted pending create/update/delete states, and server deletion tombstones.
+- Added a record-level ingredient sync API and complete sync-state pull endpoint while preserving authenticated user scoping and PostgreSQL RLS boundaries.
+- Added backward-compatible IndexedDB sync metadata migration and conflict, deletion, failure, idempotency, tenant-isolation, and local-only regression coverage.
+- Added separate-browser-context sync E2E coverage for propagation, conflicts, offline recovery, deletion, idempotency, and account isolation.
 - Added a mobile category select to the ingredient filters while keeping wrapped category buttons on larger screens.
 - Added route-specific titles, descriptions, canonical URLs, search-index controls, and a Not Found page with production 404 routing.
 - Added a Cloudflare Workers Express entry point, Prisma PostgreSQL driver adapter support for Hyperdrive, and optional Workers KV auth security storage.
@@ -58,6 +70,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+- Replaced destructive whole-snapshot ingredient backup with newest-`updatedAt` record changes; manual backup and pull now merge without overwriting newer pending local work.
 - Simplified recommendation cards so matching, owned ingredients, and missing items are easier to scan.
 - Strengthened typography hierarchy, text contrast, card borders, and restrained accent colors across core app screens.
 - Reduced oversized corner radii and removed decorative gradients from operational screens.

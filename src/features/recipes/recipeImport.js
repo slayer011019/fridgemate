@@ -1,5 +1,9 @@
-import { normalizeIngredientName as normalizeDomainIngredientName } from '../ingredients/ingredientDomain.js';
 import { generateRecipeSearchLinks } from './recipeSearchLinks.js';
+import {
+  classifyRecipeIngredient,
+  normalizeRecipeIngredientName
+} from './recipeIngredientClassification.js';
+import { buildClassifiedRecipeEmbeddingText } from './recipeEmbeddingText.js';
 
 const DEFAULT_SECTION = 'main';
 const REVIEW_CONFIDENCE_THRESHOLD = 0.7;
@@ -55,32 +59,6 @@ const UNICODE_FRACTIONS = {
   '⅞': '7/8'
 };
 
-const NORMALIZE_RULES = [
-  { pattern: /^다진\s+마늘$/u, value: '마늘' },
-  { pattern: /^다진\s+대파$/u, value: '대파' },
-  { pattern: /^저염간장$/u, value: '간장' },
-  { pattern: /^달걀$/u, value: '계란' },
-  { pattern: /^칵테일새우$/u, value: '새우' },
-  { pattern: /^북어채$/u, value: '북어' },
-  { pattern: /^무염버터$/u, value: '버터' },
-  { pattern: /^멸치액젓$/u, value: '액젓' }
-];
-
-const SEASONING_NAMES = new Set([
-  '고춧가루',
-  '간장',
-  '마늘',
-  '설탕',
-  '참기름',
-  '참깨',
-  '액젓',
-  '요리당',
-  '소금',
-  '후추'
-]);
-
-const LIQUID_NAMES = ['물', '육수', '다시마육수', '멸치육수', '채수', '쌀뜨물'];
-
 /**
  * @typedef {Object} ParsedRecipeIngredient
  * @property {string} section
@@ -90,7 +68,7 @@ const LIQUID_NAMES = ['물', '육수', '다시마육수', '멸치육수', '채�
  * @property {number|null} amountValue
  * @property {string} amountUnit
  * @property {string} displayAmount
- * @property {'main'|'seasoning'|'optional'|'garnish'|'liquid'} ingredientType
+ * @property {'main'|'seasoning'|'optional'|'garnish'|'liquid'|'unknown'} ingredientType
  * @property {number} confidence
  * @property {boolean} reviewNeeded
  */
@@ -321,59 +299,20 @@ function splitIngredientNameAndAmount(segment = '') {
   };
 }
 
-function dedupe(values = []) {
-  return [...new Set(values.map((value) => normalizeSpaces(value)).filter(Boolean))];
-}
-
-function buildIngredientLine(label, ingredients = []) {
-  const names = dedupe(ingredients.map((ingredient) => ingredient.normalizedName));
-  return names.length ? `${label}: ${names.join(', ')}` : '';
-}
-
 /**
  * @param {string} name
  * @returns {string}
  */
 export function normalizeIngredientName(name = '') {
-  const cleanedName = normalizeSpaces(String(name || '').replace(/\([^)]*\)/gu, ''));
-  const matchedRule = NORMALIZE_RULES.find((rule) => rule.pattern.test(cleanedName));
-
-  if (matchedRule) {
-    return matchedRule.value;
-  }
-
-  return normalizeDomainIngredientName(cleanedName);
+  return normalizeRecipeIngredientName(name);
 }
 
 /**
  * @param {{ section?: string, rawName?: string, normalizedName?: string }} input
- * @returns {'main'|'seasoning'|'optional'|'garnish'|'liquid'}
+ * @returns {'main'|'seasoning'|'optional'|'garnish'|'liquid'|'unknown'}
  */
 export function classifyRecipeIngredientType({ section = DEFAULT_SECTION, rawName = '', normalizedName = '' } = {}) {
-  const normalizedSection = normalizeSectionName(section);
-  const comparableName = normalizeSpaces(normalizedName || rawName);
-
-  if (normalizedSection === '고명') {
-    return 'garnish';
-  }
-
-  if (normalizedSection === '양념장' || normalizedSection === '소스') {
-    return 'seasoning';
-  }
-
-  if (normalizedSection === 'optional') {
-    return 'optional';
-  }
-
-  if (LIQUID_NAMES.some((value) => comparableName === value || comparableName.endsWith(value))) {
-    return 'liquid';
-  }
-
-  if (SEASONING_NAMES.has(comparableName)) {
-    return 'seasoning';
-  }
-
-  return 'main';
+  return classifyRecipeIngredient({ section, rawName, normalizedName }).type;
 }
 
 /**
@@ -475,27 +414,7 @@ export function parseRecipeIngredients(rawText = '') {
  * @returns {string}
  */
 export function buildRecipeEmbeddingText(recipe = {}, ingredients = []) {
-  const mainIngredients = ingredients.filter((ingredient) => ingredient.ingredientType === 'main');
-  const optionalIngredients = ingredients.filter(
-    (ingredient) => ingredient.ingredientType === 'optional' || ingredient.ingredientType === 'garnish'
-  );
-  const seasoningIngredients = ingredients.filter((ingredient) => ingredient.ingredientType === 'seasoning');
-  const liquidIngredients = ingredients.filter((ingredient) => ingredient.ingredientType === 'liquid');
-  const rawPreview = normalizeSpaces(recipe.rawIngredientsText || '').slice(0, 180);
-  const tags = dedupe(recipe.tags || []);
-  const lines = [
-    recipe.name ? `메뉴: ${recipe.name}` : '',
-    recipe.category ? `분류: ${recipe.category}` : '',
-    recipe.cookingMethod ? `조리방식: ${recipe.cookingMethod}` : '',
-    buildIngredientLine('핵심재료', mainIngredients),
-    buildIngredientLine('보조재료', optionalIngredients),
-    buildIngredientLine('양념재료', seasoningIngredients),
-    buildIngredientLine('액체재료', liquidIngredients),
-    tags.length ? `특징: ${tags.join(', ')}` : '',
-    rawPreview ? `원재료요약: ${rawPreview}` : ''
-  ];
-
-  return lines.filter(Boolean).join('\n');
+  return buildClassifiedRecipeEmbeddingText(recipe, ingredients);
 }
 
 /**

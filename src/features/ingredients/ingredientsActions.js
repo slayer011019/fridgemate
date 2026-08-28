@@ -6,7 +6,14 @@ import {
   pushIngredientsToServerInRepository
 } from './ingredientRepository';
 import { buildScopeOptions, createEmptySyncSummary, getScopeState } from './ingredientsScopeState';
-import { markIngredientAsSynced, syncIngredientSnapshot } from '../../utils/syncStrategy';
+import {
+  getPendingIngredients,
+  getVisibleIngredients,
+  markIngredientAsPending,
+  markIngredientAsSynced,
+  SYNC_STATE,
+  syncIngredientSnapshot
+} from '../../utils/syncStrategy';
 
 const FALLBACK_WARNING_MESSAGE =
   'The API connection is unstable, so FridgeMate is temporarily using the authenticated local cache.';
@@ -86,16 +93,22 @@ async function syncIndexedDbCache(actionLabel, operation) {
 export function createLoadIngredientsAction({
   storageScope,
   useApi,
+  syncEnabled,
   scopeRef,
   commitIngredients,
   commitSyncSummary,
   runRepositoryCommand,
-  setLoading
+  setLoading,
+  setHasUnsyncedChanges,
+  setSyncStatus
 }) {
   return async function loadIngredients({ force = false } = {}) {
     const scopeState = getScopeState(storageScope);
 
     if (!force && scopeState.loaded) {
+      const hasPendingChanges = scopeState.syncSummary.pendingUploads.length > 0;
+      setHasUnsyncedChanges(hasPendingChanges);
+      if (hasPendingChanges) setSyncStatus('dirty');
       setLoading(false);
       return scopeState.items;
     }
@@ -109,6 +122,9 @@ export function createLoadIngredientsAction({
         if (scopeRef.current === storageScope) {
           commitIngredients(items, storageScope);
           commitSyncSummary(sync, storageScope);
+          const hasPendingChanges = sync.pendingUploads.length > 0;
+          setHasUnsyncedChanges(hasPendingChanges);
+          if (hasPendingChanges) setSyncStatus('dirty');
         }
 
         return items;
@@ -131,15 +147,24 @@ export function createLoadIngredientsAction({
       let nextSyncSummary = createEmptySyncSummary();
 
       if (source === 'api') {
-        const localIngredients = await ingredientCache.getAll(buildScopeOptions(storageScope));
+        const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
         nextSyncSummary = await syncIngredientSnapshot({
           localIngredients,
           remoteIngredients: items
         });
-        items = nextSyncSummary.nextSnapshot;
+        items = getVisibleIngredients(nextSyncSummary.nextSnapshot);
         await syncIndexedDbCache('loadIngredients', () =>
-          ingredientCache.replaceAll(items, buildScopeOptions(storageScope))
+          ingredientCache.replaceAll(nextSyncSummary.nextSnapshot, buildScopeOptions(storageScope))
         );
+      } else if (syncEnabled) {
+        const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+        const pendingUploads = getPendingIngredients(localIngredients);
+        nextSyncSummary = {
+          ...createEmptySyncSummary(),
+          pendingUploads,
+          nextSnapshot: localIngredients
+        };
+        items = getVisibleIngredients(localIngredients);
       }
 
       return {
@@ -156,6 +181,9 @@ export function createLoadIngredientsAction({
       if (scopeRef.current === storageScope) {
         commitIngredients(items, storageScope);
         commitSyncSummary(sync, storageScope);
+        const hasPendingChanges = sync.pendingUploads.length > 0;
+        setHasUnsyncedChanges(hasPendingChanges);
+        if (hasPendingChanges) setSyncStatus('dirty');
       }
 
       return items;
@@ -171,21 +199,58 @@ export function createLoadIngredientsAction({
 
 export function createCrudActions({
   storageScope,
+  syncEnabled,
   ingredientsRef,
   commitIngredients,
   commitSyncSummary,
   runRepositoryCommand,
   markDirty
 }) {
+  const prepareLocalIngredient = (ingredient, pendingState) => {
+    if (!syncEnabled) return ingredient;
+
+    const now = new Date().toISOString();
+    return markIngredientAsPending(
+      {
+        ...ingredient,
+        createdAt: ingredient.createdAt || now,
+        updatedAt: now,
+        deletedAt: null
+      },
+      pendingState
+    );
+  };
+
+  const refreshLocalSyncSummary = async () => {
+    if (!syncEnabled) {
+      commitSyncSummary(createEmptySyncSummary(), storageScope);
+      return;
+    }
+
+    try {
+      const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+      commitSyncSummary(
+        {
+          ...createEmptySyncSummary(),
+          pendingUploads: getPendingIngredients(localIngredients),
+          nextSnapshot: localIngredients
+        },
+        storageScope
+      );
+    } catch (nextError) {
+      console.warn('[useIngredients] Failed to refresh local sync metadata.', nextError);
+    }
+  };
+
   const saveLocalIngredient = async (ingredient) => {
     await ingredientCache.save(ingredient, buildScopeOptions(storageScope));
-    commitSyncSummary(createEmptySyncSummary(), storageScope);
+    await refreshLocalSyncSummary();
     markDirty();
   };
 
   const saveLocalIngredients = async (ingredients) => {
     await ingredientCache.saveMany(ingredients, buildScopeOptions(storageScope));
-    commitSyncSummary(createEmptySyncSummary(), storageScope);
+    await refreshLocalSyncSummary();
     markDirty();
   };
 
@@ -197,7 +262,10 @@ export function createCrudActions({
 
   return {
     async addIngredient(ingredient) {
-      const optimisticIngredient = ensureIngredientId({ ...ingredient });
+      const optimisticIngredient = prepareLocalIngredient(
+        ensureIngredientId({ ...ingredient }),
+        SYNC_STATE.PENDING_CREATE
+      );
       commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
 
       try {
@@ -210,7 +278,12 @@ export function createCrudActions({
     },
 
     async updateIngredient(ingredient) {
-      const optimisticIngredient = ensureIngredientId({ ...ingredient });
+      const existingIngredient = ingredientsRef.current.find((item) => item.id === ingredient.id);
+      const pendingState =
+        existingIngredient?.syncState === SYNC_STATE.PENDING_CREATE
+          ? SYNC_STATE.PENDING_CREATE
+          : SYNC_STATE.PENDING_UPDATE;
+      const optimisticIngredient = prepareLocalIngredient(ensureIngredientId({ ...ingredient }), pendingState);
       const previousIndex = ingredientsRef.current.findIndex((item) => item.id === optimisticIngredient.id);
       const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
 
@@ -231,7 +304,9 @@ export function createCrudActions({
     },
 
     async addIngredients(items) {
-      const optimisticIngredients = items.map((ingredient) => ensureIngredientId({ ...ingredient }));
+      const optimisticIngredients = items.map((ingredient) =>
+        prepareLocalIngredient(ensureIngredientId({ ...ingredient }), SYNC_STATE.PENDING_CREATE)
+      );
       const optimisticIds = new Set(optimisticIngredients.map((ingredient) => ingredient.id));
 
       commitIngredients((current) =>
@@ -254,7 +329,21 @@ export function createCrudActions({
       commitIngredients((current) => current.filter((ingredient) => ingredient.id !== id));
 
       try {
-        await removeLocalIngredient(id);
+        if (syncEnabled && previousIngredient) {
+          const deletedAt = new Date().toISOString();
+          await saveLocalIngredient(
+            markIngredientAsPending(
+              {
+                ...previousIngredient,
+                updatedAt: deletedAt,
+                deletedAt
+              },
+              SYNC_STATE.PENDING_DELETE
+            )
+          );
+        } else {
+          await removeLocalIngredient(id);
+        }
       } catch (nextError) {
         if (previousIngredient) {
           commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
@@ -301,6 +390,7 @@ export function createPushAction({
   isAuthenticated,
   storageScope,
   commitIngredients,
+  commitSyncSummary,
   setSyncStatus,
   setHasUnsyncedChanges,
   setLastSyncedAt,
@@ -322,27 +412,33 @@ export function createPushAction({
     setError('');
 
     try {
-      const localIngredients = await ingredientCache.getAll(buildScopeOptions(storageScope));
-      const syncedIngredients = await pushIngredientsToServerInRepository(
-        localIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ({
+      const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+      const pendingIngredients = getPendingIngredients(localIngredients);
+      const response = await pushIngredientsToServerInRepository(
+        pendingIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ({
           ...ingredient,
           clientId: ingredient.clientId || ingredient.id
         }))
       );
+      const remoteIngredients = Array.isArray(response) ? response : response.items || [];
+      const syncSummary = await syncIngredientSnapshot({ localIngredients, remoteIngredients });
       const now = new Date().toISOString();
-      const nextIngredients = syncedIngredients.map((ingredient) => markIngredientAsSynced(ingredient));
+      const nextSnapshot = syncSummary.nextSnapshot;
+      const nextIngredients = getVisibleIngredients(nextSnapshot);
+      const hasPendingChanges = syncSummary.pendingUploads.length > 0;
 
-      await ingredientCache.replaceAll(nextIngredients, buildScopeOptions(storageScope));
+      await ingredientCache.replaceAll(nextSnapshot, buildScopeOptions(storageScope));
       commitIngredients(nextIngredients, storageScope);
+      commitSyncSummary(syncSummary, storageScope);
       window.localStorage.setItem('fridgemate-last-synced-at', now);
       setLastSyncedAt(now);
-      setSyncStatus('synced');
-      setHasUnsyncedChanges(false);
+      setSyncStatus(hasPendingChanges ? 'dirty' : 'synced');
+      setHasUnsyncedChanges(hasPendingChanges);
       setSyncError(null);
 
       return {
         ok: true,
-        syncedCount: nextIngredients.length,
+        syncedCount: Number.isInteger(response?.appliedCount) ? response.appliedCount : pendingIngredients.length,
         lastSyncedAt: now
       };
     } catch (nextError) {
@@ -360,7 +456,9 @@ export function createPullAction({
   isAuthenticated,
   storageScope,
   commitIngredients,
+  commitSyncSummary,
   setSyncStatus,
+  setHasUnsyncedChanges,
   setSyncError,
   setError
 }) {
@@ -378,12 +476,19 @@ export function createPullAction({
     setError('');
 
     try {
-      const remoteIngredients = await pullIngredientsFromServerInRepository();
-      const nextIngredients = remoteIngredients.map((ingredient) => markIngredientAsSynced(ingredient));
+      const response = await pullIngredientsFromServerInRepository();
+      const remoteIngredients = Array.isArray(response) ? response : response.items || [];
+      const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+      const syncSummary = await syncIngredientSnapshot({ localIngredients, remoteIngredients });
+      const nextSnapshot = syncSummary.nextSnapshot;
+      const nextIngredients = getVisibleIngredients(nextSnapshot);
+      const hasPendingChanges = syncSummary.pendingUploads.length > 0;
 
-      await ingredientCache.replaceAll(nextIngredients, buildScopeOptions(storageScope));
+      await ingredientCache.replaceAll(nextSnapshot, buildScopeOptions(storageScope));
       commitIngredients(nextIngredients, storageScope);
-      setSyncStatus('synced');
+      commitSyncSummary(syncSummary, storageScope);
+      setSyncStatus(hasPendingChanges ? 'dirty' : 'synced');
+      setHasUnsyncedChanges(hasPendingChanges);
       setSyncError(null);
 
       return {

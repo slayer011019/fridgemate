@@ -18,12 +18,14 @@ const apiMocks = {
   getIngredientById: vi.fn(),
   saveIngredient: vi.fn(),
   saveIngredients: vi.fn(),
+  pushIngredientsToServer: vi.fn(),
   pullIngredientsFromServer: vi.fn(),
   deleteIngredient: vi.fn()
 };
 
 const dbMocks = {
   getAllIngredients: vi.fn(),
+  getAllIngredientsForSync: vi.fn(),
   getIngredientById: vi.fn(),
   saveIngredient: vi.fn(),
   saveIngredients: vi.fn(),
@@ -48,12 +50,14 @@ vi.mock('../../api/ingredientsApi.js', () => ({
   getIngredientById: (...args) => apiMocks.getIngredientById(...args),
   saveIngredient: (...args) => apiMocks.saveIngredient(...args),
   saveIngredients: (...args) => apiMocks.saveIngredients(...args),
+  pushIngredientsToServer: (...args) => apiMocks.pushIngredientsToServer(...args),
   pullIngredientsFromServer: (...args) => apiMocks.pullIngredientsFromServer(...args),
   deleteIngredient: (...args) => apiMocks.deleteIngredient(...args)
 }));
 
 vi.mock('../../db/indexedDB.js', () => ({
   getAllIngredients: (...args) => dbMocks.getAllIngredients(...args),
+  getAllIngredientsForSync: (...args) => dbMocks.getAllIngredientsForSync(...args),
   getIngredientById: (...args) => dbMocks.getIngredientById(...args),
   saveIngredient: (...args) => dbMocks.saveIngredient(...args),
   saveIngredients: (...args) => dbMocks.saveIngredients(...args),
@@ -138,10 +142,12 @@ function resetMockState() {
   apiMocks.getIngredientById.mockResolvedValue(undefined);
   apiMocks.saveIngredient.mockImplementation(async (ingredient) => ingredient);
   apiMocks.saveIngredients.mockImplementation(async (ingredients) => ingredients);
+  apiMocks.pushIngredientsToServer.mockImplementation(async (changes) => ({ items: changes, appliedCount: changes.length }));
   apiMocks.pullIngredientsFromServer.mockResolvedValue([]);
   apiMocks.deleteIngredient.mockResolvedValue(undefined);
 
   dbMocks.getAllIngredients.mockResolvedValue([]);
+  dbMocks.getAllIngredientsForSync.mockResolvedValue([]);
   dbMocks.getIngredientById.mockResolvedValue(undefined);
   dbMocks.saveIngredient.mockImplementation(async () => undefined);
   dbMocks.saveIngredients.mockImplementation(async () => undefined);
@@ -226,6 +232,24 @@ describe('useIngredients', () => {
   });
 
   describe('authenticated local-first updates', () => {
+    it('restores persisted pending state after the provider starts again', async () => {
+      backendState.enabled = true;
+      setAuthenticatedMode();
+      const pendingIngredient = createIngredient('pending-restart', {
+        updatedAt: '2026-08-26T10:00:00.000Z',
+        syncState: 'pendingUpdate'
+      });
+      dbMocks.getAllIngredients.mockResolvedValue([pendingIngredient]);
+      dbMocks.getAllIngredientsForSync.mockResolvedValue([pendingIngredient]);
+
+      const { result } = await renderUseIngredients();
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.ingredients).toEqual([pendingIngredient]);
+      expect(result.current.syncStatus).toBe('dirty');
+      expect(result.current.hasUnsyncedChanges).toBe(true);
+    });
+
     it('stores authenticated adds locally without calling the API', async () => {
       backendState.enabled = true;
       backendState.preferredDataSource = 'api';
@@ -245,9 +269,13 @@ describe('useIngredients', () => {
 
       expect(result.current.ingredients[0]).toMatchObject({
         id: 'optimistic-1',
-        name: 'tofu'
+        name: 'tofu',
+        syncState: 'pendingCreate'
       });
-      expect(dbMocks.saveIngredient).toHaveBeenCalledWith(ingredient, { scope: 'user:user-1' });
+      expect(dbMocks.saveIngredient).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'optimistic-1', clientId: 'optimistic-1', syncState: 'pendingCreate' }),
+        { scope: 'user:user-1' }
+      );
       expect(apiMocks.saveIngredient).not.toHaveBeenCalled();
       expect(result.current.syncStatus).toBe('dirty');
       expect(result.current.hasUnsyncedChanges).toBe(true);
@@ -287,6 +315,35 @@ describe('useIngredients', () => {
       expect(result.current.ingredients.map((item) => item.id)).not.toContain('rollback-1');
       expect(apiMocks.saveIngredient).not.toHaveBeenCalled();
     });
+
+    it('stores an authenticated deletion as a pending tombstone', async () => {
+      backendState.enabled = true;
+      setAuthenticatedMode();
+      const ingredient = createIngredient('delete-local', {
+        updatedAt: '2026-08-26T09:00:00.000Z',
+        syncState: 'clean'
+      });
+      dbMocks.getAllIngredients.mockResolvedValue([ingredient]);
+      dbMocks.getAllIngredientsForSync.mockResolvedValue([ingredient]);
+      const { result } = await renderUseIngredients();
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.removeIngredient('delete-local');
+      });
+
+      expect(result.current.ingredients).toEqual([]);
+      expect(dbMocks.deleteIngredient).not.toHaveBeenCalled();
+      expect(dbMocks.saveIngredient).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'delete-local',
+          clientId: 'delete-local',
+          syncState: 'pendingDelete',
+          deletedAt: expect.any(String)
+        }),
+        { scope: 'user:user-1' }
+      );
+    });
   });
 
   describe('storage fallback', () => {
@@ -312,7 +369,9 @@ describe('useIngredients', () => {
       backendState.enabled = true;
       backendState.preferredDataSource = 'api';
       setAuthenticatedMode();
-      dbMocks.getAllIngredients.mockResolvedValue([createIngredient('fallback-1', { name: 'kimchi' })]);
+      const cachedIngredients = [createIngredient('fallback-1', { name: 'kimchi', syncState: 'clean' })];
+      dbMocks.getAllIngredients.mockResolvedValue(cachedIngredients);
+      dbMocks.getAllIngredientsForSync.mockResolvedValue(cachedIngredients);
 
       const { result } = await renderUseIngredients();
 
@@ -357,15 +416,20 @@ describe('useIngredients', () => {
   });
 
   describe('manual server sync', () => {
-    it('calls saveIngredients only when syncIngredientsToServer is requested', async () => {
+    it('sends only pending record changes when syncIngredientsToServer is requested', async () => {
       backendState.enabled = true;
       backendState.preferredDataSource = 'api';
       setAuthenticatedMode();
-      const localIngredients = [createIngredient('sync-1', { name: 'api-loaded-item' })];
+      const localIngredients = [
+        createIngredient('sync-1', {
+          name: 'api-loaded-item',
+          updatedAt: '2026-05-01T10:00:00.000Z',
+          syncState: 'pendingCreate'
+        })
+      ];
       dbMocks.getAllIngredients.mockResolvedValue(localIngredients);
-      apiMocks.saveIngredients.mockResolvedValue([
-        { ...localIngredients[0], updatedAt: '2026-05-01T10:00:00.000Z' }
-      ]);
+      dbMocks.getAllIngredientsForSync.mockResolvedValue(localIngredients);
+      apiMocks.pushIngredientsToServer.mockResolvedValue({ items: localIngredients, appliedCount: 1 });
 
       const { result } = await renderUseIngredients();
 
@@ -373,11 +437,7 @@ describe('useIngredients', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(apiMocks.saveIngredients).not.toHaveBeenCalled();
-
-      await act(async () => {
-        await result.current.addIngredient(localIngredients[0]);
-      });
+      expect(apiMocks.pushIngredientsToServer).not.toHaveBeenCalled();
 
       let response;
       await act(async () => {
@@ -386,8 +446,10 @@ describe('useIngredients', () => {
 
       expect(response.ok).toBe(true);
       expect(response.syncedCount).toBe(1);
-      expect(apiMocks.saveIngredients).toHaveBeenCalledTimes(1);
-      expect(apiMocks.saveIngredients).toHaveBeenCalledWith([localIngredients[0]]);
+      expect(apiMocks.pushIngredientsToServer).toHaveBeenCalledTimes(1);
+      expect(apiMocks.pushIngredientsToServer).toHaveBeenCalledWith([
+        expect.objectContaining({ id: 'sync-1', clientId: 'sync-1' })
+      ]);
       expect(window.localStorage.getItem('fridgemate-last-synced-at')).toBeTruthy();
       expect(result.current.syncStatus).toBe('synced');
       expect(result.current.hasUnsyncedChanges).toBe(false);
@@ -403,7 +465,10 @@ describe('useIngredients', () => {
       setAuthenticatedMode();
       const ingredient = createIngredient('sync-fail-1', { name: 'api-write-item' });
       dbMocks.getAllIngredients.mockResolvedValue([ingredient]);
-      apiMocks.saveIngredients.mockRejectedValue(new MockIngredientsApiError('Server down.', { status: 500 }));
+      dbMocks.getAllIngredientsForSync.mockResolvedValue([
+        { ...ingredient, updatedAt: '2026-08-26T10:00:00.000Z', syncState: 'pendingUpdate' }
+      ]);
+      apiMocks.pushIngredientsToServer.mockRejectedValue(new MockIngredientsApiError('Server down.', { status: 500 }));
 
       const { result } = await renderUseIngredients();
 
@@ -420,6 +485,33 @@ describe('useIngredients', () => {
       expect(result.current.syncStatus).toBe('error');
       expect(result.current.hasUnsyncedChanges).toBe(true);
       expect(result.current.syncError).toBe('Server down.');
+      expect(dbMocks.replaceIngredients).not.toHaveBeenCalled();
+    });
+
+    it('keeps pending state and reports a 4xx sync failure as incomplete', async () => {
+      backendState.enabled = true;
+      setAuthenticatedMode();
+      const pending = createIngredient('invalid', {
+        updatedAt: '2026-08-26T10:00:00.000Z',
+        syncState: 'pendingUpdate'
+      });
+      dbMocks.getAllIngredients.mockResolvedValue([pending]);
+      dbMocks.getAllIngredientsForSync.mockResolvedValue([pending]);
+      apiMocks.pushIngredientsToServer.mockRejectedValue(
+        new MockIngredientsApiError('Ingredient payload is invalid.', { status: 400 })
+      );
+      const { result } = await renderUseIngredients();
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let response;
+      await act(async () => {
+        response = await result.current.syncIngredientsToServer();
+      });
+
+      expect(response.ok).toBe(false);
+      expect(result.current.syncStatus).toBe('error');
+      expect(result.current.hasUnsyncedChanges).toBe(true);
+      expect(dbMocks.replaceIngredients).not.toHaveBeenCalled();
     });
 
     it('does not sync to the server when the user is not authenticated', async () => {
@@ -438,7 +530,7 @@ describe('useIngredients', () => {
       });
 
       expect(response).toEqual({ ok: false, message: '로그인이 필요합니다.' });
-      expect(apiMocks.saveIngredients).not.toHaveBeenCalled();
+      expect(apiMocks.pushIngredientsToServer).not.toHaveBeenCalled();
       expect(result.current.syncStatus).toBe('error');
     });
 
@@ -447,7 +539,7 @@ describe('useIngredients', () => {
       backendState.preferredDataSource = 'api';
       setAuthenticatedMode();
       const remoteIngredients = [createIngredient('remote-1', { name: 'server-item' })];
-      apiMocks.pullIngredientsFromServer.mockResolvedValue(remoteIngredients);
+      apiMocks.pullIngredientsFromServer.mockResolvedValue({ items: remoteIngredients });
 
       const { result } = await renderUseIngredients();
 
@@ -468,6 +560,34 @@ describe('useIngredients', () => {
       );
       expect(result.current.ingredients).toEqual([expect.objectContaining({ id: 'remote-1', syncState: 'clean' })]);
       expect(result.current.syncStatus).toBe('synced');
+    });
+
+    it('does not overwrite a newer pending local update during server pull', async () => {
+      backendState.enabled = true;
+      setAuthenticatedMode();
+      const pendingLocal = createIngredient('shared', {
+        name: 'newer-local',
+        updatedAt: '2026-08-26T12:00:00.000Z',
+        syncState: 'pendingUpdate'
+      });
+      const olderRemote = createIngredient('server-id', {
+        clientId: 'shared',
+        name: 'older-server',
+        updatedAt: '2026-08-26T11:00:00.000Z'
+      });
+      dbMocks.getAllIngredients.mockResolvedValue([pendingLocal]);
+      dbMocks.getAllIngredientsForSync.mockResolvedValue([pendingLocal]);
+      apiMocks.pullIngredientsFromServer.mockResolvedValue({ items: [olderRemote] });
+      const { result } = await renderUseIngredients();
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.pullIngredientsFromServer();
+      });
+
+      expect(result.current.ingredients[0]).toMatchObject({ name: 'newer-local', syncState: 'pendingUpdate' });
+      expect(result.current.hasUnsyncedChanges).toBe(true);
+      expect(result.current.syncStatus).toBe('dirty');
     });
   });
 

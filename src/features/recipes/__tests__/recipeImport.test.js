@@ -46,7 +46,7 @@ describe('recipe import utilities', () => {
 
     expect(recipe.embeddingText).toContain('메뉴: 새우 두부 계란찜');
     expect(embeddingText).toContain('핵심재료:');
-    expect(embeddingText).toContain('양념재료: 참깨');
+    expect(embeddingText).toContain('양념: 참깨');
     expect(embeddingText).not.toContain('MANUAL01');
   });
 
@@ -61,7 +61,7 @@ describe('recipe import utilities', () => {
       amountValue: 150,
       amountUnit: 'g',
       displayAmount: '5개',
-      ingredientType: 'main'
+      ingredientType: 'unknown'
     });
   });
 

@@ -50,9 +50,15 @@ Current boundaries:
 
 - recipe vectors belong in the separate `recipe_embeddings` table
 - the existing production `recipes` table shape should not be changed for the first rollout
+- vector search joins `recipe_embeddings.recipe_id` to the production UUID `recipes.id` and never expects `recipes.embedding`
+- model and dimensions are part of the retrieval filter as well as the embedding-generation configuration
 - pgvector search should only choose candidates
 - final ordering should remain rule-based, using owned ingredient match, expiration urgency, missing ingredient count, and existing recommendation score
 - ranking model training should wait until recommendation events are plentiful enough for offline evaluation
+
+The August 2026 read-only production baseline found 993 current embeddings for 1,146 recipes, with no duplicate keys or orphans. The historical ten-recipe ingredient-query check returned 2/10 in the top five; the newly fixed fixture reproduced 3/10 against old vectors. Classification-aware text improved the full in-memory re-embedding evaluation to Hit@1 5/10, Hit@5 6/10, and MRR@5 0.55. Because the agreed Hit@5 gate is 7/10, production backfill remains No-Go.
+
+The embedding command defaults to dry-run. `--evaluate --execute` embeds public catalog text only in memory, never stores vectors, and records request counts and aggregate metrics. Production writes require an explicit `--backfill-missing` or `--backfill-stale` mode after the quality gate is approved.
 
 ## Experimental
 

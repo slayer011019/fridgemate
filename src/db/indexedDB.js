@@ -68,7 +68,36 @@ function runTransaction(mode, handler, scopeOrOptions) {
 }
 
 export function getAllIngredients(scopeOrOptions) {
-  return runTransaction('readonly', (store) => store.getAll(), scopeOrOptions);
+  return runTransaction('readonly', (store) => store.getAll(), scopeOrOptions).then((ingredients = []) =>
+    ingredients.filter((ingredient) => !ingredient.deletedAt)
+  );
+}
+
+function migrateIngredientForSync(ingredient) {
+  const id = ingredient.id || ingredient.clientId;
+  const migratedAt = ingredient.updatedAt || ingredient.createdAt || new Date().toISOString();
+
+  return {
+    ...ingredient,
+    id,
+    clientId: ingredient.clientId || id,
+    createdAt: ingredient.createdAt || migratedAt,
+    updatedAt: migratedAt,
+    deletedAt: ingredient.deletedAt || null,
+    syncState: ingredient.syncState || 'pendingCreate',
+    lastSyncedAt: ingredient.lastSyncedAt || null
+  };
+}
+
+export async function getAllIngredientsForSync(scopeOrOptions) {
+  const ingredients = await runTransaction('readonly', (store) => store.getAll(), scopeOrOptions);
+  const migratedIngredients = ingredients.map(migrateIngredientForSync);
+  const needsMigration = migratedIngredients.some(
+    (ingredient, index) => JSON.stringify(ingredient) !== JSON.stringify(ingredients[index])
+  );
+
+  if (needsMigration) await saveIngredients(migratedIngredients, scopeOrOptions);
+  return migratedIngredients;
 }
 
 export function getIngredientById(id, scopeOrOptions) {

@@ -19,14 +19,11 @@ describe('recipeEmbeddingTextBuilder', () => {
 
     expect(buildProductionRecipeEmbeddingText(recipe, ingredients)).toBe(
       [
-        'Title: Kimchi Fried Rice',
-        'Dish type: Rice',
-        'Cooking method: Stir-fry',
-        'Ingredients: egg, kimchi, rice',
-        'Ingredient categories: grain, protein, vegetable',
-        'Raw ingredients: kimchi, rice, egg',
-        'Steps: Stir fry kimchi. Add rice and egg.',
-        'Description: A quick leftover rice meal.'
+        '메뉴: Kimchi Fried Rice',
+        '분류: Rice',
+        '조리방식: Stir-fry',
+        '검색재료: egg, kimchi, rice',
+        '핵심재료: kimchi, rice'
       ].join('\n')
     );
   });
@@ -41,9 +38,12 @@ describe('recipeEmbeddingTextBuilder', () => {
       [{ normalized_name: '김치' }, { normalized_name: '달걀' }]
     );
 
-    expect(text).toContain('Title: 김치볶음밥');
-    expect(text).toContain('Ingredients: 김치, 달걀');
-    expect(text).not.toContain('Cooking method:');
+    expect(text).toContain('메뉴: 김치볶음밥');
+    expect(text).toContain('검색재료: 계란, 김치');
+    expect(text).toContain('핵심재료: 김치');
+    expect(text).not.toContain('조리방식:');
+    expect(text).not.toContain('원재료요약:');
+    expect(text).not.toContain('Steps:');
     expect(text).not.toContain('undefined');
   });
 });

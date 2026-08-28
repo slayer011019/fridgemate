@@ -25,7 +25,8 @@ describe('embed-recipes script', () => {
             category: 'vegetable',
             raw_name: 'kimchi'
           }
-        ]),
+        ])
+        .mockResolvedValueOnce([]),
       $executeRawUnsafe: vi.fn(),
       $disconnect: vi.fn()
     };
@@ -42,7 +43,11 @@ describe('embed-recipes script', () => {
       processed: 1,
       generated: 0,
       skipped: 1,
-      failed: 0
+      failed: 0,
+      current: 0,
+      missing: 1,
+      stale: 0,
+      lastProcessedRecipeId: '11111111-1111-1111-1111-111111111111'
     });
     expect(prismaClient.$executeRawUnsafe).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Summary: processed=1'));

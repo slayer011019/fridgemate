@@ -128,7 +128,8 @@ function buildIngredientGroups(recipe = {}) {
         (item) => item.ingredientType === 'optional' || item.ingredientType === 'garnish'
       ),
       seasoningIngredients: normalizedIngredients.filter((item) => item.ingredientType === 'seasoning'),
-      liquidIngredients: normalizedIngredients.filter((item) => item.ingredientType === 'liquid')
+      liquidIngredients: normalizedIngredients.filter((item) => item.ingredientType === 'liquid'),
+      unknownIngredients: normalizedIngredients.filter((item) => item.ingredientType === 'unknown')
     };
   }
 
@@ -150,7 +151,8 @@ function buildIngredientGroups(recipe = {}) {
     mainIngredients,
     optionalIngredients,
     seasoningIngredients,
-    liquidIngredients: []
+    liquidIngredients: [],
+    unknownIngredients: []
   };
 }
 
@@ -199,19 +201,23 @@ function computeMatchMetrics(preparedRecipe, ingredientIndex, recipeId = prepare
   const mainNames = preparedRecipe.ingredientGroups.mainIngredients.map((item) => item.normalizedName);
   const optionalNames = preparedRecipe.ingredientGroups.optionalIngredients.map((item) => item.normalizedName);
   const seasoningNames = preparedRecipe.ingredientGroups.seasoningIngredients.map((item) => item.normalizedName);
+  const unknownNames = preparedRecipe.ingredientGroups.unknownIngredients.map((item) => item.normalizedName);
 
   const matchedMain = mainNames.filter((item) => ingredientIndex.availableSet.has(item));
   const missingMain = mainNames.filter((item) => !ingredientIndex.availableSet.has(item));
   const matchedOptional = optionalNames.filter((item) => ingredientIndex.availableSet.has(item));
   const matchedSeasonings = seasoningNames.filter((item) => ingredientIndex.availableSet.has(item));
   const missingSeasonings = seasoningNames.filter((item) => !ingredientIndex.availableSet.has(item));
+  const matchedUnknown = unknownNames.filter((item) => ingredientIndex.availableSet.has(item));
+  const missingUnknown = unknownNames.filter((item) => !ingredientIndex.availableSet.has(item));
   const { satisfiedGroups, missingGroups } = evaluateRequiredGroups(preparedRecipe.requiredGroups, ingredientIndex);
-  const matchedIngredients = uniqueNormalizedIngredients([...matchedMain, ...matchedOptional]);
+  const matchedIngredients = uniqueNormalizedIngredients([...matchedMain, ...matchedUnknown, ...matchedOptional]);
   const expiringMatchedIngredients = matchedIngredients.filter((item) => ingredientIndex.urgentSet.has(item)).slice(0, 3);
 
   const mainCoverage = mainNames.length ? matchedMain.length / mainNames.length : 0;
   const optionalCoverage = optionalNames.length ? matchedOptional.length / optionalNames.length : 0;
   const seasoningCoverage = seasoningNames.length ? matchedSeasonings.length / seasoningNames.length : 1;
+  const unknownCoverage = unknownNames.length ? matchedUnknown.length / unknownNames.length : 1;
   const groupCoverage = preparedRecipe.requiredGroups.length
     ? satisfiedGroups.length / preparedRecipe.requiredGroups.length
     : 1;
@@ -223,15 +229,21 @@ function computeMatchMetrics(preparedRecipe, ingredientIndex, recipeId = prepare
     ? (missingGroups.length / preparedRecipe.requiredGroups.length) * 0.18
     : 0;
   const seasoningPenalty = seasoningNames.length ? (missingSeasonings.length / seasoningNames.length) * 0.04 : 0;
+  const unknownPenalty = unknownNames.length ? (missingUnknown.length / unknownNames.length) * 0.08 : 0;
+  const weightedComponents = [
+    mainNames.length ? { score: mainCoverage, weight: 0.7 } : null,
+    unknownNames.length ? { score: unknownCoverage, weight: 0.15 } : null,
+    optionalNames.length ? { score: optionalCoverage, weight: 0.05 } : null,
+    preparedRecipe.requiredGroups.length ? { score: groupCoverage, weight: 0.05 } : null,
+    seasoningNames.length ? { score: seasoningCoverage, weight: 0.05 } : null
+  ].filter(Boolean);
+  const totalComponentWeight = weightedComponents.reduce((total, component) => total + component.weight, 0);
+  const normalizedCoverage = totalComponentWeight
+    ? weightedComponents.reduce((total, component) => total + component.score * component.weight, 0) /
+      totalComponentWeight
+    : 0;
   const weightedBase = clamp(
-    mainCoverage * 0.7 +
-      optionalCoverage * 0.1 +
-      groupCoverage * 0.1 +
-      seasoningCoverage * 0.1 +
-      urgencyBonus -
-      mainPenalty -
-      groupPenalty -
-      seasoningPenalty
+    normalizedCoverage + urgencyBonus - mainPenalty - groupPenalty - seasoningPenalty - unknownPenalty
   );
 
   return {
@@ -240,6 +252,8 @@ function computeMatchMetrics(preparedRecipe, ingredientIndex, recipeId = prepare
     matchedIngredients,
     missingIngredients: missingMain,
     missingSeasonings,
+    matchedUnknown,
+    missingUnknown,
     expiringMatchedIngredients,
     matchedMain,
     missingMain,

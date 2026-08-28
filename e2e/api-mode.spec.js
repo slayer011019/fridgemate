@@ -81,7 +81,7 @@ test('guest ingredients can be imported after login and synced manually', async 
   await waitForIngredientNames(page, 'user:user-1', ['감자']);
 
   await clickServerBackupButton(page);
-  await expect(page.getByText('현재 로컬 재료 목록을 서버에 저장했습니다.')).toBeVisible();
+  await expect(page.getByText('로컬 변경사항을 서버와 병합했습니다.')).toBeVisible();
   expect(apiState.ingredients.map((ingredient) => ingredient.name)).toContain('감자');
 
   await page.reload();
@@ -96,8 +96,13 @@ test('guest ingredients can be imported after login and synced manually', async 
 
   await gotoAndWait(page, '/account');
   await clickServerBackupButton(page);
-  await expect(page.getByText('현재 로컬 재료 목록을 서버에 저장했습니다.')).toBeVisible();
-  expect(apiState.ingredients.map((ingredient) => ingredient.name)).not.toContain('감자');
+  await expect(page.getByText('로컬 변경사항을 서버와 병합했습니다.')).toBeVisible();
+  expect(apiState.ingredients.filter((ingredient) => !ingredient.deletedAt).map((ingredient) => ingredient.name)).not.toContain(
+    '감자'
+  );
+  expect(apiState.ingredients).toEqual([
+    expect.objectContaining({ name: '감자', deletedAt: expect.any(String) })
+  ]);
 });
 
 test('expired session clears stored auth and returns to login', async ({ page }) => {
