@@ -123,6 +123,23 @@ describe('useDBRecommendations', () => {
     expect(latestState.error).toBe('');
   });
 
+  it('hides the DB row after a complete network failure', async () => {
+    let latestState;
+    apiMocks.getRecipeRecommendations.mockRejectedValue(new MockRecipesApiError('Network down.'));
+
+    render(createElement(HookProbe, { onState: (state) => { latestState = state; } }));
+
+    await act(async () => {
+      observerInstances[0].callback([{ isIntersecting: true }]);
+    });
+
+    await waitFor(() => {
+      expect(latestState.hidden).toBe(true);
+    });
+    expect(latestState.recommendations).toEqual([]);
+    expect(latestState.error).toBe('');
+  });
+
   it('keeps the row visible with inline errors for 4xx failures', async () => {
     let latestState;
     apiMocks.getRecipeRecommendations.mockRejectedValue(new MockRecipesApiError('로그인이 필요합니다.', { status: 401 }));

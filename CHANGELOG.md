@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added a reproducible MFDS/MAFRA recipe dataset validation script and an evidence-backed source-selection report for Korean home-cooking candidates.
 - Added a cost-controlled daily production database backup workflow that validates the pinned Supabase owner/TLS target, verifies a custom-format dump, encrypts it to an offline recovery key, uploads only ciphertext with a checksum, and expires GitHub artifacts after 14 days.
 
 ### Fixed
@@ -72,7 +73,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added consent-gated GA4 delivery behind the existing analytics interface, including SPA page views, identifier filtering, accessible allow/deny controls, and revocable footer settings.
 - Added optional Search Console HTML-tag verification and strengthened the WebSite entity with natural `오늘 뭐 먹지` and `FridgeMate` alternate names without adding typo keywords to visible copy.
 - Added a read-only recipe embedding verifier that checks staged expected counts, current/missing/stale coverage, model/dimensions, vector type, duplicate keys, and orphan rows without API calls or row-level output.
-- Added metadata-only API request IDs, failure/latency telemetry, client-side error correlation, and optional embedding token/cost metrics without logging prompts, request bodies, user IDs, or vectors.
+- Added metadata-only request identifiers, failure and latency telemetry, client-side error correlation, and optional embedding token/cost metrics without logging prompts, request bodies, user IDs, or vectors.
 - Added a separate 20-recipe Korean home-meal search fixture with realistic three-to-five-ingredient queries, expiring ingredients, alias coverage, category balance, Hit@5 rate, owned-ingredient ratio, and missing-ingredient metrics.
 - Added 100 source-backed Food Safety Korea recipe detail pages with stable slugs, ingredients, cooking steps, nutrition, images, canonical URLs, sitemap entries, and truthful `Recipe` JSON-LD.
 - Added a safe public-recipe export command that is read-only by default, strips raw source payloads, upgrades image URLs to HTTPS, and writes only with an explicit `--write` flag.
