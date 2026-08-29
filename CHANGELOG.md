@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Completed the first separately approved 25-row stale embedding replacement with zero failures, then verified `current=208`, `missing=0`, `stale=958`, full 1,166-row coverage, duplicate/orphan counts of zero, and `vector(1536)`.
 - Completed the final separately approved 13-row missing embedding batch with zero failures, then verified full 1,166-row coverage, `current=183`, `missing=0`, `stale=983`, duplicate/orphan counts of zero, and `vector(1536)`.
 - Completed the sixth separately approved 25-row missing embedding batch with zero failures, then verified 1,153 embeddings, `current=170`, `missing=13`, `stale=983`, duplicate/orphan counts of zero, and `vector(1536)`.
 - Completed the fifth separately approved 25-row missing embedding batch with zero failures, then verified 1,128 embeddings, `current=145`, `missing=38`, `stale=983`, duplicate/orphan counts of zero, and `vector(1536)`.

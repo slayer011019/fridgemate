@@ -436,3 +436,39 @@ The immediate read-only verifier passed with:
 - Verification production writes: `0`
 
 Every catalog recipe now has a stored embedding. The remaining 983 stale rows require separately approved staged replacement; this batch did not run a quality-evaluation API call or publish the semantic endpoint.
+
+## First 25-Row Stale Replacement
+
+After separate approval, production was reverified at `embeddings=1,166`, `current=183`, `missing=0`, and `stale=983`. The protected post-missing checkpoint was independently hash-verified before any API call or write.
+
+- Checkpoint rows: `1,166`
+- Compressed bytes: `8,014,845`
+- SHA-256: `2de31839eb0c041c02370c1a2ee50f92dae6c5b7e528614ef474d47e65be550f`
+- Hash verification: passed
+- Checkpoint production writes: `0`
+
+The runner executed once with `--backfill-stale --all --max-writes=25`. It scanned clean rows while selecting stale candidates, so two multi-input API requests covered the 25 approved writes.
+
+- Processed: `36`
+- Generated/written: `25`
+- Skipped current rows: `11`
+- Failed: `0`
+- API inputs: `25`
+- API requests: `2`
+- Retries: `0`
+- Estimated input tokens: `722`
+- Write limit reached: `true`
+
+The immediate read-only verifier passed with:
+
+- Recipes: `1,166`
+- Embeddings: `1,166`
+- Current/missing/stale: `208 / 0 / 958`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Verification API requests: `0`
+- Verification production writes: `0`
+
+No quality-evaluation API call or semantic endpoint publication was included in this approval. The next separately approved operation is the fixed ten-query and Korean home-meal stored-vector quality rerun before increasing stale replacement batch sizes.
