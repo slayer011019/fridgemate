@@ -264,6 +264,8 @@ npm run recipes:embed -- --dry-run --limit=10
 
 제한적 운영 backfill은 조회 범위와 실제 쓰기 상한을 분리합니다. `--all`은 실행 시점의 전체 카탈로그 수를 자동으로 읽으며, 실제 쓰기에서는 유한한 `--max-writes`가 없으면 실행 자체를 거부합니다.
 
+품질 fixture에 포함된 레시피만 선택적으로 점검할 때는 `--target-fixture`를 사용합니다. 이 모드는 fixture의 `id` 또는 `externalId`를 실제 카탈로그와 대조하고 이름 불일치·누락·중복을 거부하며, 실제 쓰기에서는 `--all`과 마찬가지로 `--max-writes`가 필수입니다.
+
 대량 작업 전에는 checkpoint를 만들고, API batch·재시도·재개 상태를 사용하는 명령으로 실행합니다. checkpoint 파일에는 원시 벡터가 있으므로 `.local/` 또는 별도의 보호된 로컬 경로에만 보관합니다.
 
 ```bash
@@ -272,6 +274,7 @@ npm run recipes:checkpoint -- --label=before-staged-backfill
 npm run recipes:embed -- --backfill-missing --all --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
 npm run recipes:embed -- --backfill-missing --all --resume --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
 npm run recipes:verify-embeddings -- --expect-recipes=1166 --expect-embeddings=1028 --expect-current=45 --expect-missing=138 --expect-stale=983
+npm run recipes:embed -- --dry-run --backfill-stale --target-fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json --batch-size=25 --api-batch-size=18 --max-writes=18 --quiet
 ```
 
 실제 backfill은 `.local/recipe-embedding-backfill-state.json`에 마지막으로 안전하게 반영된 UUID를 기록합니다. `--resume`은 operation, model, dimension이 일치할 때만 이 위치부터 keyset pagination으로 재개합니다. 429, 5xx, 네트워크 오류는 지수 backoff로 재시도하며 4xx는 즉시 실패합니다. 요약에는 API 입력·요청·재시도·예상 토큰·처리량만 표시되고 비밀값과 원시 벡터는 표시되지 않습니다.
@@ -289,7 +292,7 @@ npm run recipes:embed -- --evaluate --execute --limit=1166 --output=docs/recipe-
 npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1166 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
 ```
 
-현재 저장 운영 벡터의 읽기 전용 평가는 Hit@1 `9/10`, Hit@5 `10/10`으로 운영 기준 `7/10`을 통과했습니다. 전체 카탈로그는 MFDS 1,146개와 재료 행을 갖춘 `curated_home_v1` 20개를 합친 1,166개입니다. checkpoint 이후 별도로 승인된 missing backfill과 첫 25-row stale 교체가 실패 없이 완료되어 현재 기준점은 `embeddings=1,166`, `current=208`, `missing=0`, `stale=958`, 중복 0, 고아 0, `vector(1536)`입니다. 다음 단계는 별도 승인된 10-query 및 한국 가정식 fixture 품질 재평가이며, 나머지 stale embedding 교체와 semantic 추천 API 공개는 해당 결과 확인 후 진행합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
+첫 25-row stale 교체 후 저장 운영 벡터를 다시 평가한 결과, 고정 10-query는 Hit@1 `8/10`, Hit@5 `9/10`, MRR@5 `0.85`로 운영 기준을 통과했습니다. 반면 한국 가정식 20-query는 Hit@5 `2/20`이었고, 대상 20개 중 current 2개·stale 18개라는 세대 불일치가 확인됐습니다. 전체 카탈로그는 MFDS 1,146개와 재료 행을 갖춘 `curated_home_v1` 20개를 합친 1,166개이며, 현재 기준점은 `embeddings=1,166`, `current=208`, `missing=0`, `stale=958`, 중복 0, 고아 0, `vector(1536)`입니다. `--target-fixture` dry-run은 API 호출과 DB 쓰기 없이 정확히 stale 18개만 계획했습니다. 다음 단계는 checkpoint 후 이 18개만 별도 승인된 범위로 교체하고 두 fixture를 재평가하는 것이며, 전체 stale 교체 확대와 semantic 추천 API 공개는 계속 보류합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
 
 ## 추천 이벤트 내보내기
 

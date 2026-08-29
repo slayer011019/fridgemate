@@ -472,3 +472,22 @@ The immediate read-only verifier passed with:
 - Verification production writes: `0`
 
 No quality-evaluation API call or semantic endpoint publication was included in this approval. The next separately approved operation is the fixed ten-query and Korean home-meal stored-vector quality rerun before increasing stale replacement batch sizes.
+
+## Post-Stale-Replacement Quality Rerun
+
+Under separate approval, both stored-vector fixtures were evaluated without database writes.
+
+| Fixture | API inputs | API requests | Hit@1 | Hit@5 | MRR@5 | Gate |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Fixed UUID regression, 10 queries | 10 | 1 | 8/10 | 9/10 | 0.85 | Go |
+| Korean home meal, 20 queries | 20 | 1 | 2/20 | 2/20 | 0.10 | No-Go |
+
+The Korean home-meal report had no unavailable targets, but its average target rank was `208.2`, median Top 5 missing-ingredient count was `5`, median missing-seasoning count was `2`, and median owned-ingredient ratio was `0.1381`. A separate write-free catalog scan then established that 18 fixture targets were stale and only 2 were current. The current count matched the two successful Hit@5 cases, so stored-vector generation mismatch is the primary gate blocker; no retrieval-weight or fixture-ground-truth change was made.
+
+The runner now supports a fixture-scoped safety boundary:
+
+```bash
+npm run recipes:embed -- --dry-run --backfill-stale --target-fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json --batch-size=25 --api-batch-size=18 --max-writes=18 --quiet
+```
+
+The verified dry-run result was `processed=20`, `current=2`, `missing=0`, `stale=18`, `plannedInputs=18`, `apiInputCount=0`, `apiRequestCount=0`, and `generated=0`. Production use of `--target-fixture` refuses to start without an explicit finite `--max-writes`, validates every fixture target against the catalog, and records the target fixture in resume state. This dry-run does not authorize the 18 writes or another quality-evaluation API call.

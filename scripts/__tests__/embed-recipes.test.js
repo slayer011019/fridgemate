@@ -114,6 +114,68 @@ describe('embed-recipes script', () => {
     ).rejects.toThrow('--all production backfills require an explicit --max-writes safety cap.');
   });
 
+  it('requires an explicit write cap for target-fixture production backfills', async () => {
+    const prismaClient = {
+      $queryRawUnsafe: vi.fn(),
+      $disconnect: vi.fn()
+    };
+
+    await expect(
+      embedRecipes({
+        dryRun: false,
+        targetFixture: 'scripts/fixtures/recipe-search-home-meal-evaluation.json',
+        backfillStale: true,
+        prismaClient,
+        embeddingConfig: { apiKey: 'test-key', model: 'test-model', dimensions: 3 }
+      })
+    ).rejects.toThrow(
+      '--target-fixture production backfills require an explicit --max-writes safety cap.'
+    );
+  });
+
+  it('scans only recipes resolved from the target fixture', async () => {
+    const recipes = Array.from({ length: 2 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-00000000002${index}`,
+      name: `Fixture Recipe ${index}`,
+      dish_type: 'Rice',
+      cooking_method: 'Boil',
+      ingredients_text: '',
+      steps: [],
+      raw: {}
+    }));
+    const prismaClient = {
+      $queryRawUnsafe: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+      $disconnect: vi.fn()
+    };
+    const loadTargetFixtureRecipes = vi.fn(async () => recipes);
+
+    const summary = await embedRecipes({
+      dryRun: true,
+      backfillMissing: true,
+      targetFixture: 'scripts/fixtures/test-targets.json',
+      limit: 1,
+      batchSize: 25,
+      quiet: true,
+      prismaClient,
+      loadTargetFixtureRecipes
+    });
+
+    expect(loadTargetFixtureRecipes).toHaveBeenCalledWith(
+      prismaClient,
+      'scripts/fixtures/test-targets.json'
+    );
+    expect(summary).toMatchObject({
+      processed: 2,
+      generated: 0,
+      missing: 2,
+      plannedInputs: 2,
+      apiInputCount: 0,
+      catalogMode: 'fixture',
+      catalogLimit: 2,
+      targetFixture: 'scripts/fixtures/test-targets.json'
+    });
+  });
+
   it('stops after the configured maximum number of successful writes', async () => {
     const recipes = Array.from({ length: 3 }, (_, index) => ({
       id: `00000000-0000-4000-8000-00000000000${index}`,
@@ -213,6 +275,24 @@ describe('embed-recipes script', () => {
       backfillStale: false,
       limit: 1146,
       fixture: 'scripts/fixtures/recipe-search-home-meal-evaluation.json'
+    });
+  });
+
+  it('parses a fixture-scoped backfill independently from evaluation fixtures', () => {
+    expect(
+      parseArgs([
+        '--dry-run',
+        '--backfill-stale',
+        '--target-fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json',
+        '--max-writes=18'
+      ])
+    ).toMatchObject({
+      dryRun: true,
+      evaluate: false,
+      backfillStale: true,
+      fixture: '',
+      targetFixture: 'scripts/fixtures/recipe-search-home-meal-evaluation.json',
+      maxWrites: 18
     });
   });
 

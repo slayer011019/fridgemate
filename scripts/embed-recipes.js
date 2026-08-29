@@ -32,6 +32,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     resumeFrom: '',
     stateFile: DEFAULT_STATE_FILE,
     fixture: '',
+    targetFixture: '',
     output: '',
     limit: 25,
     batchSize: 25,
@@ -77,6 +78,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
     if (arg.startsWith('--resume-from=')) options.resumeFrom = arg.slice('--resume-from='.length).trim();
     if (arg.startsWith('--state-file=')) options.stateFile = arg.slice('--state-file='.length).trim();
     if (arg.startsWith('--fixture=')) options.fixture = arg.slice('--fixture='.length).trim();
+    if (arg.startsWith('--target-fixture=')) {
+      options.targetFixture = arg.slice('--target-fixture='.length).trim();
+    }
     if (arg.startsWith('--output=')) options.output = arg.slice('--output='.length).trim();
   });
 
@@ -147,6 +151,76 @@ async function saveBackfillState(filePath, state) {
   await mkdir(path.dirname(resolved), { recursive: true });
   await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
   await rename(temporary, resolved);
+}
+
+async function loadTargetFixtureRecipes(prisma, filePath) {
+  const resolved = resolveWorkspaceFile(filePath, '--target-fixture');
+  let fixture;
+  try {
+    fixture = JSON.parse(await readFile(resolved, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      throw new Error(`Target fixture not found: ${filePath}`);
+    }
+    throw new Error(`Target fixture is invalid: ${filePath}`);
+  }
+
+  if (!Array.isArray(fixture?.recipes) || fixture.recipes.length === 0) {
+    throw new Error(`Target fixture has no recipes: ${filePath}`);
+  }
+
+  const specifications = fixture.recipes.map((recipe) => ({
+    id: String(recipe?.id || '').trim(),
+    externalId: String(recipe?.externalId || '').trim(),
+    name: String(recipe?.name || '').trim()
+  }));
+  if (specifications.some((recipe) => !recipe.id && !recipe.externalId)) {
+    throw new Error('Every target fixture recipe must include id or externalId.');
+  }
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (specifications.some((recipe) => recipe.id && !uuidPattern.test(recipe.id))) {
+    throw new Error('Every target fixture id must be a valid UUID.');
+  }
+
+  const ids = specifications.map((recipe) => recipe.id).filter(Boolean);
+  const externalIds = specifications.map((recipe) => recipe.externalId).filter(Boolean);
+  const rows = await prisma.$queryRawUnsafe(
+    `
+      SELECT id, external_id, name, dish_type, cooking_method, ingredients_text, hash_tag, steps, raw
+      FROM recipes
+      WHERE id = ANY($1::uuid[])
+         OR external_id = ANY($2::text[])
+      ORDER BY id
+    `,
+    ids,
+    externalIds
+  );
+  const byId = new Map(rows.map((recipe) => [String(recipe.id), recipe]));
+  const byExternalId = new Map(
+    rows
+      .filter((recipe) => recipe.external_id !== null && recipe.external_id !== undefined)
+      .map((recipe) => [String(recipe.external_id), recipe])
+  );
+  const selected = specifications.map((specification) => {
+    const recipe = specification.id
+      ? byId.get(specification.id)
+      : byExternalId.get(specification.externalId);
+    if (!recipe) {
+      throw new Error(
+        `Target fixture recipe is missing from the catalog: ${specification.id || specification.externalId}`
+      );
+    }
+    if (specification.name && String(recipe.name || '') !== specification.name) {
+      throw new Error(`Target fixture recipe name does not match the catalog: ${specification.name}`);
+    }
+    return recipe;
+  });
+  const uniqueIds = new Set(selected.map((recipe) => String(recipe.id)));
+  if (uniqueIds.size !== selected.length) {
+    throw new Error('Target fixture resolves to duplicate recipes.');
+  }
+
+  return selected.sort((left, right) => String(left.id).localeCompare(String(right.id)));
 }
 
 export function getEmbeddingConfig() {
@@ -417,6 +491,7 @@ export async function embedRecipes(options = parseArgs()) {
   const readState = options.loadState || loadBackfillState;
   const writeState = options.saveState || saveBackfillState;
   const readRecipeCount = options.loadRecipeCount || fetchRecipeCount;
+  const readTargetFixtureRecipes = options.loadTargetFixtureRecipes || loadTargetFixtureRecipes;
   const maxWrites = Number.isFinite(settings.maxWrites)
     ? Math.max(1, Math.floor(settings.maxWrites))
     : Number.POSITIVE_INFINITY;
@@ -428,9 +503,20 @@ export async function embedRecipes(options = parseArgs()) {
   if (!settings.dryRun && settings.all && !Number.isFinite(maxWrites)) {
     throw new Error('--all production backfills require an explicit --max-writes safety cap.');
   }
-  const scanLimit = settings.all
-    ? await readRecipeCount(prisma)
-    : Math.max(1, Number(settings.limit) || 25);
+  if (settings.all && settings.targetFixture) {
+    throw new Error('Choose either --all or --target-fixture, not both.');
+  }
+  if (!settings.dryRun && settings.targetFixture && !Number.isFinite(maxWrites)) {
+    throw new Error('--target-fixture production backfills require an explicit --max-writes safety cap.');
+  }
+  const targetFixtureRecipes = settings.targetFixture
+    ? await readTargetFixtureRecipes(prisma, settings.targetFixture)
+    : null;
+  const scanLimit = targetFixtureRecipes
+    ? targetFixtureRecipes.length
+    : settings.all
+      ? await readRecipeCount(prisma)
+      : Math.max(1, Number(settings.limit) || 25);
   const summary = {
     processed: 0,
     generated: 0,
@@ -448,8 +534,9 @@ export async function embedRecipes(options = parseArgs()) {
     elapsedMs: 0,
     throughputPerSecond: 0,
     resumed: false,
-    catalogMode: settings.all ? 'all' : 'limited',
+    catalogMode: targetFixtureRecipes ? 'fixture' : settings.all ? 'all' : 'limited',
     catalogLimit: scanLimit,
+    targetFixture: settings.targetFixture || null,
     maxWrites: Number.isFinite(maxWrites) ? maxWrites : null,
     writeLimitReached: false,
     lastProcessedRecipeId: null,
@@ -469,9 +556,12 @@ export async function embedRecipes(options = parseArgs()) {
     if (
       savedState.operation !== operation ||
       savedState.model !== config.model ||
-      Number(savedState.dimensions) !== Number(config.dimensions)
+      Number(savedState.dimensions) !== Number(config.dimensions) ||
+      String(savedState.targetFixture || '') !== String(settings.targetFixture || '')
     ) {
-      throw new Error('Backfill state does not match the requested operation, model, or dimensions.');
+      throw new Error(
+        'Backfill state does not match the requested operation, model, dimensions, or target fixture.'
+      );
     }
     resumeFrom = String(savedState.lastSuccessfulRecipeId || '');
     summary.resumed = true;
@@ -495,6 +585,7 @@ export async function embedRecipes(options = parseArgs()) {
       operation,
       model: config.model,
       dimensions: Number(config.dimensions),
+      targetFixture: settings.targetFixture || null,
       lastSuccessfulRecipeId: summary.lastSuccessfulRecipeId,
       generated: summary.generated,
       failed: summary.failed,
@@ -508,7 +599,11 @@ export async function embedRecipes(options = parseArgs()) {
   try {
     while (summary.processed < scanLimit && !stopRequested) {
       const take = Math.min(settings.batchSize, scanLimit - summary.processed);
-      const recipes = await fetchRecipeBatch(prisma, { limit: take, resumeFrom: cursor });
+      const recipes = targetFixtureRecipes
+        ? targetFixtureRecipes
+          .filter((recipe) => !cursor || String(recipe.id) > cursor)
+          .slice(0, take)
+        : await fetchRecipeBatch(prisma, { limit: take, resumeFrom: cursor });
 
       if (!recipes.length) {
         break;
@@ -680,7 +775,7 @@ export async function embedRecipes(options = parseArgs()) {
       : null;
 
     console.log(
-      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} plannedInputs=${summary.plannedInputs} apiInputCount=${summary.apiInputCount} apiRequestCount=${summary.apiRequestCount} retries=${summary.retryCount} estimatedInputTokens=${summary.estimatedInputTokens} estimatedCostUsd=${summary.estimatedCostUsd ?? 'unconfigured'} elapsedMs=${summary.elapsedMs} throughputPerSecond=${summary.throughputPerSecond} resumed=${summary.resumed} catalogMode=${summary.catalogMode} catalogLimit=${summary.catalogLimit} maxWrites=${summary.maxWrites ?? 'unbounded'} writeLimitReached=${summary.writeLimitReached} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'} lastSuccessfulRecipeId=${summary.lastSuccessfulRecipeId || 'none'}`
+      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} plannedInputs=${summary.plannedInputs} apiInputCount=${summary.apiInputCount} apiRequestCount=${summary.apiRequestCount} retries=${summary.retryCount} estimatedInputTokens=${summary.estimatedInputTokens} estimatedCostUsd=${summary.estimatedCostUsd ?? 'unconfigured'} elapsedMs=${summary.elapsedMs} throughputPerSecond=${summary.throughputPerSecond} resumed=${summary.resumed} catalogMode=${summary.catalogMode} catalogLimit=${summary.catalogLimit} targetFixture=${summary.targetFixture || 'none'} maxWrites=${summary.maxWrites ?? 'unbounded'} writeLimitReached=${summary.writeLimitReached} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'} lastSuccessfulRecipeId=${summary.lastSuccessfulRecipeId || 'none'}`
     );
     return summary;
   } finally {

@@ -9,6 +9,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Added a guarded `--target-fixture` recipe embedding mode that resolves fixture IDs against the catalog, rejects missing/name-mismatched/duplicate targets, requires an explicit production write cap, and dry-ran the Korean home-meal fixture at exactly 2 current and 18 stale rows with zero API calls or writes.
+- Re-ran both stored-production-vector quality fixtures after the first 25-row stale replacement: the fixed ten-query gate passed at Hit@5 9/10, while the Korean home-meal gate stopped further rollout at Hit@5 2/20 because 18 of its 20 target vectors were stale.
 - Completed the first separately approved 25-row stale embedding replacement with zero failures, then verified `current=208`, `missing=0`, `stale=958`, full 1,166-row coverage, duplicate/orphan counts of zero, and `vector(1536)`.
 - Completed the final separately approved 13-row missing embedding batch with zero failures, then verified full 1,166-row coverage, `current=183`, `missing=0`, `stale=983`, duplicate/orphan counts of zero, and `vector(1536)`.
 - Completed the sixth separately approved 25-row missing embedding batch with zero failures, then verified 1,153 embeddings, `current=170`, `missing=13`, `stale=983`, duplicate/orphan counts of zero, and `vector(1536)`.
