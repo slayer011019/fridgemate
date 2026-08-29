@@ -228,3 +228,38 @@ The immediate read-only verifier passed with:
 - Verification production writes: `0`
 
 The resume state is `paused` at the last successfully committed recipe UUID and contains operation metadata only. It contains no secret, recipe text, user data, or vector. No additional missing or stale rows are authorized by this record; the next capped batch requires separate approval.
+
+## Second 25-Row Missing Backfill
+
+After separate approval, production was reverified at `embeddings=1,028`, `current=45`, `missing=138`, and `stale=983`. A new protected checkpoint was then created before any API call or write.
+
+- Checkpoint rows: `1,028`
+- Compressed bytes: `7,123,952`
+- SHA-256: `27e0f2f3cb0e153a2e80f629bb653229b9ffcdba078e77e9be509164dda28a37`
+- Hash verification: passed
+- Checkpoint production writes: `0`
+
+The runner resumed after the prior successful UUID and executed once with `--backfill-missing --all --resume --max-writes=25`.
+
+- Processed: `25`
+- Generated/written: `25`
+- Failed: `0`
+- API inputs: `25`
+- API requests: `1`
+- Retries: `0`
+- Estimated input tokens: `668`
+- Write limit reached: `true`
+
+The immediate read-only verifier passed with:
+
+- Recipes: `1,166`
+- Embeddings: `1,053`
+- Current/missing/stale: `70 / 113 / 983`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Verification API requests: `0`
+- Verification production writes: `0`
+
+The next missing or stale write batch remains unauthorized until separately approved.

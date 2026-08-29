@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Completed the second separately approved 25-row missing embedding batch with zero failures, then verified 1,053 embeddings, `current=70`, `missing=113`, `stale=983`, duplicate/orphan counts of zero, and `vector(1536)`.
 - Completed the first approved 25-row full-catalog missing embedding batch with zero failures, then verified 1,028 embeddings, `current=45`, `missing=138`, `stale=983`, duplicate/orphan counts of zero, and `vector(1536)`.
 - Added a guarded `--all` backfill mode that reads the live catalog count and refuses production execution without an explicit finite `--max-writes` cap.
 - Detected that production had grown from 1,146 to 1,166 recipes, removed the verifier's hardcoded catalog limit, and corrected staged backfill expectations so 20 new catalog rows cannot be silently omitted.
