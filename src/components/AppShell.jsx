@@ -1,6 +1,7 @@
 import Header from './Header';
 import ConnectionStatusToast from './ConnectionStatusToast';
 import SiteFooter from './SiteFooter';
+import AnalyticsConsentBanner from './AnalyticsConsentBanner';
 
 function AppShell({ children }) {
   return (
@@ -11,6 +12,7 @@ function AppShell({ children }) {
         {children}
       </main>
       <SiteFooter />
+      <AnalyticsConsentBanner />
     </div>
   );
 }

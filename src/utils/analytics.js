@@ -1,5 +1,6 @@
 import { getRemainingDays } from './date';
 import { isBackendEnabled } from './backendConfig';
+import { trackGoogleAnalyticsEvent } from './googleAnalytics';
 
 const ANALYTICS_ID_KEY = 'fridgemate-analytics-id';
 const ANALYTICS_SESSION_ID_KEY = 'fridgemate-analytics-session-id';
@@ -136,6 +137,7 @@ export function recordAnalyticsEvent(payload) {
   events.push(payload);
   window[ANALYTICS_EVENT_STORE_KEY] = events;
   window.dispatchEvent(new CustomEvent(ANALYTICS_EVENT_NAME, { detail: payload }));
+  trackGoogleAnalyticsEvent(payload);
 
   if (import.meta.env.DEV) {
     console.info('[analytics]', payload.event_name, payload);

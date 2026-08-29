@@ -26,9 +26,12 @@ export function createIngredient(id, overrides = {}) {
   };
 }
 
-export async function seedBrowserState(page, { session = null, scope = 'guest', ingredients = [], ocrResult = null } = {}) {
+export async function seedBrowserState(
+  page,
+  { session = null, scope = 'guest', ingredients = [], ocrResult = null, analyticsConsent = 'denied' } = {}
+) {
   await page.addInitScript(
-    ({ nextSession, nextScope, nextIngredients, nextOcrResult }) => {
+    ({ nextSession, nextScope, nextIngredients, nextOcrResult, nextAnalyticsConsent }) => {
       const seedKey = '__fridgemate-e2e-seeded__';
 
       function getDatabaseName(scopeName) {
@@ -85,6 +88,9 @@ export async function seedBrowserState(page, { session = null, scope = 'guest', 
       }
 
       window.localStorage.clear();
+      if (nextAnalyticsConsent) {
+        window.localStorage.setItem('fridgemate-analytics-consent', nextAnalyticsConsent);
+      }
       window.__FRIDGEMATE_TEST__ = window.__FRIDGEMATE_TEST__ || {};
       window.__FRIDGEMATE_TEST__.setupComplete = false;
 
@@ -118,7 +124,8 @@ export async function seedBrowserState(page, { session = null, scope = 'guest', 
       nextSession: session,
       nextScope: scope,
       nextIngredients: ingredients,
-      nextOcrResult: ocrResult
+      nextOcrResult: ocrResult,
+      nextAnalyticsConsent: analyticsConsent
     }
   );
 }

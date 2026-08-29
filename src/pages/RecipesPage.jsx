@@ -9,6 +9,18 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { useDBRecommendations } from '../hooks/useDBRecommendations';
 import { useRecipesPageModel } from '../hooks/useRecipesPageModel';
 import { getPublicRecipePath, publicRecipeCatalog } from '../features/recipes/publicRecipeCatalog';
+import {
+  getPublicRecipeLinkItems,
+  guidePages,
+  ingredientHubs
+} from '../features/recipes/recipeContentHubs';
+
+const publicRecipeLinksByDishType = Object.entries(
+  getPublicRecipeLinkItems().reduce((groups, recipe) => {
+    groups[recipe.dishType] = [...(groups[recipe.dishType] || []), recipe];
+    return groups;
+  }, {})
+).sort(([first], [second]) => first.localeCompare(second, 'ko'));
 
 function RecipesPage() {
   const { trackEvent } = useAnalytics();
@@ -90,6 +102,35 @@ function RecipesPage() {
 
       <section className="card space-y-4">
         <div>
+          <p className="kicker">재료별 메뉴 찾기</p>
+          <h2 className="mt-1.5 text-xl font-semibold text-slate-900">자주 남는 재료부터 골라보세요</h2>
+          <p className="mt-1.5 text-sm leading-6 muted">
+            실제 공개 레시피의 이름과 재료 정보를 기준으로 관련 메뉴를 모았습니다.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {ingredientHubs.map((hub) => (
+            <Link
+              key={hub.slug}
+              to={hub.path}
+              className="soft-panel block transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2"
+            >
+              <p className="font-semibold text-slate-900">{hub.name}</p>
+              <p className="mt-1 text-sm leading-6 muted">관련 공개 레시피 {hub.recipes.length}개</p>
+            </Link>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {guidePages.map((guide) => (
+            <Link key={guide.slug} to={guide.path} className="btn-secondary">
+              {guide.slug === 'fridge-cleanout' ? '냉장고 파먹기 가이드' : '임박 재료 활용 가이드'}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="card space-y-4">
+        <div>
           <p className="kicker">공개 레시피</p>
           <h2 className="mt-1.5 text-xl font-semibold text-slate-900">식약처 조리법부터 둘러보세요</h2>
           <p className="mt-1.5 text-sm leading-6 muted">
@@ -113,9 +154,29 @@ function RecipesPage() {
             </Link>
           ))}
         </div>
-        <p className="text-xs leading-5 text-slate-500">
-          전체 {publicRecipeCatalog.length}개 레시피는 각각 공개 상세 URL로 제공되며 검색엔진용 사이트맵에도 포함됩니다.
-        </p>
+        <details className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <summary className="cursor-pointer font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700">
+            전체 {publicRecipeCatalog.length}개 공개 레시피 목록
+          </summary>
+          <div className="mt-4 grid gap-5 sm:grid-cols-2">
+            {publicRecipeLinksByDishType.map(([dishType, recipes]) => (
+              <section key={dishType} aria-labelledby={`recipe-group-${dishType}`}>
+                <h3 id={`recipe-group-${dishType}`} className="text-sm font-semibold text-slate-900">
+                  {dishType} {recipes.length}개
+                </h3>
+                <ul className="mt-2 space-y-1.5 text-sm leading-6">
+                  {recipes.map((recipe) => (
+                    <li key={recipe.id}>
+                      <Link className="text-slate-600 underline-offset-2 hover:text-brand-700 hover:underline" to={recipe.path}>
+                        {recipe.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </details>
       </section>
 
       <section className="stats-grid">

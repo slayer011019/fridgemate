@@ -4,7 +4,9 @@ import AboutPage from './pages/AboutPage';
 import AccountPage from './pages/AccountPage';
 import ContactPage from './pages/ContactPage';
 import HomePage from './pages/HomePage';
+import GuidePage from './pages/GuidePage';
 import ImportPage from './pages/ImportPage';
+import IngredientHubPage from './pages/IngredientHubPage';
 import IngredientFormPage from './pages/IngredientFormPage';
 import IngredientsPage from './pages/IngredientsPage';
 import LoginPage from './pages/LoginPage';
@@ -20,7 +22,9 @@ const pages = {
   AccountPage,
   ContactPage,
   HomePage,
+  GuidePage,
   ImportPage,
+  IngredientHubPage,
   IngredientFormPage,
   IngredientsPage,
   LoginPage,

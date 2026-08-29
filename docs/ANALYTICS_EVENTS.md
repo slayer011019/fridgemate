@@ -444,7 +444,9 @@ FridgeMate의 초기 사업 KPI를 제품 이벤트로 연결하기 위한 추�
 
 ## Near-Term Repo Follow-Ups
 
-- analytics adapter 인터페이스 정의
+- GA4 adapter는 기존 `trackEvent(name, properties)` 인터페이스 뒤에서 동작하며 `VITE_GA_MEASUREMENT_ID`가 유효하고 이용자가 분석을 허용한 경우에만 외부 이벤트를 전송한다.
+- GA4 전송 시 `user_id`, `analytics_id`, `session_id`, 이메일, 객체형 자유 입력은 제거한다.
+- SPA 경로 변경은 `page_view`로 기록하고 `activation_completed`, `signup_completed`는 GA4 속성에서 주요 이벤트로 지정한다.
 - route/page 단위 추적 지점 명세
 - guest anonymous id 저장 방식 확정
 - recommendation card CTA 구조와 click event 매핑

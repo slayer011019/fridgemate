@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PUBLIC_ROUTES, getRouteMetadata } from '../src/utils/routeMetadata.js';
+import { PUBLIC_RECIPE_PATHS } from '../src/features/recipes/publicRecipeCatalog.js';
 
 const outputDirectory = resolve(process.cwd(), 'dist');
 const routeOutputFiles = {
@@ -14,6 +15,7 @@ const routeOutputFiles = {
 function getRouteOutputFile(pathname) {
   if (routeOutputFiles[pathname]) return routeOutputFiles[pathname];
   if (pathname.startsWith('/recipes/')) return `_seo${pathname}.html`;
+  if (pathname.startsWith('/guides/')) return `_seo${pathname}.html`;
   return '';
 }
 
@@ -34,12 +36,25 @@ for (const pathname of PUBLIC_ROUTES) {
   assert(/<h1(?:\s|>)/i.test(html), `${pathname} has no prerendered h1`);
   assert(html.includes('<!--seo-prerender-start-->'), `${pathname} has no prerendered body marker`);
   assert(html.includes('application/ld+json'), `${pathname} has no structured data`);
+  assert(
+    !html.includes('googletagmanager.com'),
+    `${pathname} loads Google Analytics before the visitor has granted consent`
+  );
 }
 
 const sitemap = await readFile(resolve(outputDirectory, 'sitemap.xml'), 'utf8');
+assert(PUBLIC_ROUTES.length === 113, `Expected 113 public routes, found ${PUBLIC_ROUTES.length}`);
 for (const pathname of PUBLIC_ROUTES) {
   const canonical = getRouteMetadata(pathname).canonical.replaceAll('&', '&amp;');
   assert(sitemap.includes(`<loc>${canonical}</loc>`), `${pathname} is missing from sitemap.xml`);
+}
+for (const privatePath of ['/account', '/import', '/ingredients', '/login', '/signup']) {
+  assert(!sitemap.includes(`${privatePath}</loc>`), `${privatePath} must not appear in sitemap.xml`);
+}
+
+const recipeIndexHtml = await readFile(resolve(outputDirectory, '_seo/recipes.html'), 'utf8');
+for (const pathname of PUBLIC_RECIPE_PATHS) {
+  assert(recipeIndexHtml.includes(`href="${pathname}"`), `${pathname} has no internal link from /recipes`);
 }
 
 const appShell = await readFile(resolve(outputDirectory, '_seo/app.html'), 'utf8');

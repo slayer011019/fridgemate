@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { openAnalyticsConsentSettings } from '../utils/analyticsConsent';
 
 function SiteFooter() {
   return (
@@ -15,6 +16,16 @@ function SiteFooter() {
           <Link to="/privacy" className="font-medium text-slate-600 hover:text-slate-900">
             개인정보 처리 안내
           </Link>
+          <Link to="/guides/fridge-cleanout" className="font-medium text-slate-600 hover:text-slate-900">
+            냉장고 활용 가이드
+          </Link>
+          <button
+            className="min-h-11 font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700"
+            onClick={openAnalyticsConsentSettings}
+            type="button"
+          >
+            분석 설정
+          </button>
         </nav>
       </div>
     </footer>

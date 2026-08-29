@@ -19,7 +19,7 @@ function PrivacyPage() {
         <div>
           <h2 className="text-base font-semibold text-slate-900">서비스 분석과 오류 확인</h2>
           <p className="mt-1">
-            서비스 품질 개선을 위해 화면 이용 흐름과 추천 반응 같은 비식별 이용 기록을 처리할 수 있습니다. 오류 수집 도구는 운영 환경에서 별도로 설정된 경우에만 동작합니다.
+            서비스 품질 개선을 위해 화면 이용 흐름과 추천 반응 같은 비식별 이용 기록을 처리할 수 있습니다. Google Analytics는 이용자가 분석을 허용한 경우에만 불러오며, 오늘뭐먹지 내부 사용자 ID와 이메일은 분석 도구로 전송하지 않습니다. 분석 설정은 사이트 하단에서 언제든 변경할 수 있습니다. 오류 수집 도구는 운영 환경에서 별도로 설정된 경우에만 동작합니다.
           </p>
         </div>
         <div>
@@ -41,7 +41,7 @@ function PrivacyPage() {
             으로 보내주세요.
           </p>
         </div>
-        <p className="border-t border-slate-200 pt-4 text-xs text-slate-500">시행일: 2026년 8월 22일</p>
+        <p className="border-t border-slate-200 pt-4 text-xs text-slate-500">시행일: 2026년 8월 30일</p>
       </section>
     </div>
   );

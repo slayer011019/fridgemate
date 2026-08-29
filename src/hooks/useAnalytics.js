@@ -33,6 +33,15 @@ export function AnalyticsProvider({ children }) {
   );
 
   useEffect(() => {
+    if (loading) return;
+
+    trackEvent('page_view', {
+      page_path: `${location.pathname}${location.search}`,
+      page_title: typeof document === 'undefined' ? '' : document.title
+    });
+  }, [loading, location.pathname, location.search, trackEvent]);
+
+  useEffect(() => {
     if (loading || hasTrackedSessionStarted()) {
       return;
     }

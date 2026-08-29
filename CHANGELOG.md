@@ -45,6 +45,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added six source-backed ingredient recipe hubs, two fridge-use guides, complete internal linking for all 100 public recipes, and 113-route prerender/sitemap verification.
+- Added consent-gated GA4 delivery behind the existing analytics interface, including SPA page views, identifier filtering, accessible allow/deny controls, and revocable footer settings.
 - Added optional Search Console HTML-tag verification and strengthened the WebSite entity with natural `오늘 뭐 먹지` and `FridgeMate` alternate names without adding typo keywords to visible copy.
 - Added a read-only recipe embedding verifier that checks staged expected counts, current/missing/stale coverage, model/dimensions, vector type, duplicate keys, and orphan rows without API calls or row-level output.
 - Added metadata-only API request IDs, failure/latency telemetry, client-side error correlation, and optional embedding token/cost metrics without logging prompts, request bodies, user IDs, or vectors.

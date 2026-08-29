@@ -56,4 +56,26 @@ describe('structuredData', () => {
     expect(schema.isPartOf['@id']).toBe('https://xn--wh1bs8l5xa003adme.com/#website');
     expect(schema).not.toHaveProperty('aggregateRating');
   });
+
+  it('emits CollectionPage and ItemList schemas for ingredient hubs', () => {
+    const pathname = '/recipes/ingredients/tofu';
+    const schemas = getRouteStructuredData(pathname, getRouteMetadata(pathname));
+
+    expect(schemas.map((schema) => schema['@type'])).toEqual(['CollectionPage', 'ItemList']);
+    expect(schemas[1].numberOfItems).toBeGreaterThan(0);
+    expect(schemas[1].itemListElement[0]).toMatchObject({
+      '@type': 'ListItem',
+      position: 1
+    });
+    expect(schemas[1].itemListElement[0].url).toMatch(/^https:\/\/xn--wh1bs8l5xa003adme\.com\/recipes\//u);
+  });
+
+  it('uses truthful WebPage structured data for public guides', () => {
+    const pathname = '/guides/use-expiring-ingredients';
+    const [schema] = getRouteStructuredData(pathname, getRouteMetadata(pathname));
+
+    expect(schema['@type']).toBe('WebPage');
+    expect(schema.name).toContain('유통기한 임박 재료');
+    expect(schema.url).toBe(`https://xn--wh1bs8l5xa003adme.com${pathname}`);
+  });
 });

@@ -177,6 +177,31 @@ function HomePage() {
           </div>
         </div>
       </section>
+      <section className="card space-y-4">
+        <div>
+          <p className="kicker">처음 시작한다면</p>
+          <h2 className="mt-1.5 text-xl font-semibold text-slate-900">냉장고 재료를 정리하는 순서부터 확인하세요</h2>
+          <p className="mt-1.5 text-sm leading-6 muted">
+            보관 상태를 확인하고 먼저 쓸 재료를 정한 뒤, 가지고 있는 재료가 많이 겹치는 메뉴를 찾는 방법을 안내합니다.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link
+            to="/guides/fridge-cleanout"
+            className="soft-panel block transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2"
+          >
+            <p className="font-semibold text-slate-900">냉장고 파먹기 순서</p>
+            <p className="mt-1 text-sm leading-6 muted">재료 확인부터 메뉴 선택과 장보기 목록까지 5단계로 살펴봅니다.</p>
+          </Link>
+          <Link
+            to="/guides/use-expiring-ingredients"
+            className="soft-panel block transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2"
+          >
+            <p className="font-semibold text-slate-900">유통기한 임박 재료 활용</p>
+            <p className="mt-1 text-sm leading-6 muted">날짜 표시와 보관 상태를 함께 확인하고 우선순위를 정합니다.</p>
+          </Link>
+        </div>
+      </section>
       <AdSenseSlot placement="home" />
     </div>
   );

@@ -1,5 +1,5 @@
 import { SITE_ORIGIN } from './routeMetadata.js';
-import { getRecipeIngredientLines } from '../features/recipes/publicRecipeCatalog.js';
+import { getPublicRecipePath, getRecipeIngredientLines } from '../features/recipes/publicRecipeCatalog.js';
 
 const SITE_NAME = '오늘뭐먹지';
 const SITE_ALTERNATE_NAMES = Object.freeze(['오늘 뭐 먹지', 'FridgeMate']);
@@ -24,7 +24,7 @@ function webPageSchema(pathname, metadata, type = 'WebPage') {
     url: metadata.canonical,
     inLanguage: 'ko-KR',
     isPartOf: websiteReference(),
-    ...(pathname === '/privacy' ? { dateModified: '2026-08-22' } : {})
+    ...(pathname === '/privacy' ? { dateModified: '2026-08-30' } : {})
   };
 }
 
@@ -53,6 +53,35 @@ export function getRouteStructuredData(pathname, metadata) {
         description: metadata.description
       }
     ];
+  }
+
+  if (metadata.contentHub) {
+    const hub = metadata.contentHub;
+    const itemListId = `${metadata.canonical}#recipe-list`;
+
+    return [
+      {
+        ...webPageSchema(pathname, metadata, 'CollectionPage'),
+        mainEntity: { '@id': itemListId }
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        '@id': itemListId,
+        name: `${hub.name} 관련 레시피`,
+        numberOfItems: hub.recipes.length,
+        itemListElement: hub.recipes.map((recipe, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: recipe.name,
+          url: new URL(getPublicRecipePath(recipe), SITE_ORIGIN).href
+        }))
+      }
+    ];
+  }
+
+  if (metadata.guide) {
+    return [webPageSchema(pathname, metadata, 'WebPage')];
   }
 
   if (metadata.recipe) {

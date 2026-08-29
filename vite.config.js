@@ -56,6 +56,18 @@ function searchConsoleHeadPlugin(mode) {
   };
 }
 
-export default defineConfig(({ mode }) => ({
-  plugins: [react(), adsenseHeadPlugin(mode), searchConsoleHeadPlugin(mode)]
-}));
+function validateGoogleAnalyticsConfig(mode) {
+  const measurementId = loadEnv(mode, process.cwd(), '').VITE_GA_MEASUREMENT_ID?.trim();
+
+  if (measurementId && !/^G-[A-Z0-9]+$/.test(measurementId)) {
+    throw new Error('VITE_GA_MEASUREMENT_ID must use the G-XXXXXXXXXX format.');
+  }
+}
+
+export default defineConfig(({ mode }) => {
+  validateGoogleAnalyticsConfig(mode);
+
+  return {
+    plugins: [react(), adsenseHeadPlugin(mode), searchConsoleHeadPlugin(mode)]
+  };
+});

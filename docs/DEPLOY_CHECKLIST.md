@@ -22,6 +22,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] `VITE_API_URL=https://YOUR_API_DOMAIN/api`
 - [ ] `VITE_ENABLE_OCR=true`
 - [ ] Optional: `VITE_SENTRY_DSN`
+- [ ] Optional: `VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX`; confirm no Google Analytics request occurs before consent, then verify DebugView after approval.
 - [ ] Keep `VITE_ADSENSE_SERVING_ENABLED=false` until the site is approved and publisher/slot IDs are configured.
 - [ ] Keep AdSense Auto ads disabled so functional, empty, and error routes never receive Google-served ads.
 - [ ] Confirm SPA routes load after refresh: `/`, `/ingredients`, `/import`, `/recipes`, `/login`, `/account`.
@@ -33,6 +34,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] In Cloudflare AI Crawl Control, allow search/answer citation crawlers intentionally and keep training-only crawlers blocked; verify the effective `/robots.txt` because managed rules can be prepended to the repository response.
 - [ ] Add `https://오늘뭐먹지.com` to Google Search Console. Prefer a domain property verified with the DNS TXT record; for URL-prefix verification, set `VITE_GOOGLE_SITE_VERIFICATION` to only the HTML meta tag's `content` value and redeploy.
 - [ ] Submit `https://오늘뭐먹지.com/sitemap.xml`, inspect the home page and a representative recipe URL, then request indexing after the production deployment is stable.
+- [ ] Link the GA4 property to Search Console, mark `activation_completed` and `signup_completed` as key events, and record the first 28-day baseline in `docs/SEO_90_DAY_OPERATIONS.md`.
 - [ ] Record Search Console and Naver Search Advisor baselines after deployment and compare impressions, clicks, indexed pages, and citations after 14 days.
 
 ## Cloudflare Workers API

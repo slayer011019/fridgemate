@@ -6,6 +6,7 @@ import {
   getPublicRecipeDescription,
   getRecipeIngredientLines
 } from '../features/recipes/publicRecipeCatalog';
+import { getIngredientHubsForRecipe } from '../features/recipes/recipeContentHubs';
 
 const NUTRITION_FIELDS = [
   ['열량', 'calories', 'kcal'],
@@ -23,6 +24,7 @@ function PublicRecipePage() {
 
   const ingredientLines = getRecipeIngredientLines(recipe);
   const imageUrl = recipe.imageLargeUrl || recipe.imageSmallUrl;
+  const relatedHubs = getIngredientHubsForRecipe(recipe);
 
   return (
     <article className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
@@ -137,6 +139,22 @@ function PublicRecipePage() {
           에서 제공받았습니다. 표시값은 원본 데이터 기준이며 식품 안전, 영양 또는 의료 조언을 대신하지 않습니다.
         </p>
       </section>
+
+      {relatedHubs.length ? (
+        <section className="card space-y-3">
+          <div>
+            <p className="kicker">비슷한 재료로 더 찾기</p>
+            <h2 className="mt-1.5 text-xl font-semibold text-slate-900">관련 재료별 레시피</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {relatedHubs.map((hub) => (
+              <Link key={hub.slug} to={hub.path} className="btn-secondary">
+                {hub.name} 레시피 {hub.recipes.length}개
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </article>
   );
 }
