@@ -197,4 +197,34 @@ Source-level aggregate checks confirmed that the 20-row increase is intentional 
 
 The curated rows were created on 2026-08-28. No recipe names, ingredient contents, vectors, or user data were queried or printed during this source check.
 
-All staged backfill and final-completion counts must use `1,166` as the current source of truth unless a later read-only verifier run reports another catalog change. A successful 25-row missing backfill from this baseline should produce `embeddings=1,028`, `current=45`, `missing=138`, and `stale=983`.
+All staged backfill and final-completion counts must use `1,166` as the current source of truth unless a later read-only verifier run reports another catalog change.
+
+## First 25-Row Missing Backfill
+
+After explicit approval, the guarded full-catalog runner was executed once with `--backfill-missing --all --max-writes=25`. The command detected all `1,166` recipes dynamically and stopped exactly at the approved write cap.
+
+- Processed before stop: `1,028`
+- Generated/written: `25`
+- Failed: `0`
+- API inputs: `25`
+- API requests: `6`
+- Retries: `0`
+- Estimated input tokens: `619`
+- Effective write cap: `25`
+- Write limit reached: `true`
+
+Missing rows were spread across multiple UUID-keyset pages, so the 25 inputs were sent in six bounded requests rather than one request. The total API input and successful write counts remained exactly within the approved 25-row boundary.
+
+The immediate read-only verifier passed with:
+
+- Recipes: `1,166`
+- Embeddings: `1,028`
+- Current/missing/stale: `45 / 138 / 983`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Verification API requests: `0`
+- Verification production writes: `0`
+
+The resume state is `paused` at the last successfully committed recipe UUID and contains operation metadata only. It contains no secret, recipe text, user data, or vector. No additional missing or stale rows are authorized by this record; the next capped batch requires separate approval.
