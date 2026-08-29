@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "profile": "korean-home-meal-realistic-pantry-v1",
+  "selection": "Twenty public catalog recipes balanced across soup, stew, rice, noodles, side dishes, meat, seafood, quick meals, and plant-forward meals. Queries use only three to five plausible pantry ingredients instead of every target ingredient.",
+  "gate": {
+    "minimumHitAt5Rate": 0.7
+  },
+  "recipes": [
+    {
+      "externalId": "28",
+      "name": "새우 두부 계란찜",
+      "category": "quick-side",
+      "availableIngredients": ["새우", "연두부", "계란"],
+      "expiringIngredients": ["연두부"]
+    },
+    {
+      "externalId": "37",
+      "name": "된장국",
+      "category": "soup",
+      "availableIngredients": ["감자", "두부", "버섯", "파"],
+      "expiringIngredients": ["감자"]
+    },
+    {
+      "externalId": "137",
+      "name": "된장 두부찌개",
+      "category": "stew",
+      "availableIngredients": ["두부", "돼지고기", "김치", "대파"],
+      "expiringIngredients": ["김치"]
+    },
+    {
+      "externalId": "271",
+      "name": "닭고기김치찌개",
+      "category": "stew",
+      "availableIngredients": ["닭가슴살", "김치", "두부", "파"],
+      "expiringIngredients": ["두부"]
+    },
+    {
+      "externalId": "280",
+      "name": "들깨순두부찌개",
+      "category": "stew",
+      "availableIngredients": ["순두부", "버섯", "굴", "들깨가루"],
+      "expiringIngredients": ["순두부"]
+    },
+    {
+      "externalId": "395",
+      "name": "새우아욱죽",
+      "category": "rice-porridge",
+      "availableIngredients": ["밥", "아욱", "건새우"],
+      "expiringIngredients": ["아욱"]
+    },
+    {
+      "externalId": "397",
+      "name": "호박죽",
+      "category": "rice-porridge",
+      "availableIngredients": ["단호박", "찹쌀가루", "양파"],
+      "expiringIngredients": ["단호박"]
+    },
+    {
+      "externalId": "666",
+      "name": "오이냉국을 곁들인 오색쌈밥",
+      "category": "rice",
+      "availableIngredients": ["쌀", "돼지고기", "오이", "달걀"],
+      "expiringIngredients": ["오이"]
+    },
+    {
+      "externalId": "673",
+      "name": "찬밥이용닭죽",
+      "category": "rice-quick-meal",
+      "availableIngredients": ["찬밥", "닭고기", "감자", "양파"],
+      "expiringIngredients": ["찬밥"]
+    },
+    {
+      "externalId": "644",
+      "name": "검은콩국수",
+      "category": "noodle",
+      "availableIngredients": ["검은콩", "메밀면", "오이"],
+      "expiringIngredients": ["오이"]
+    },
+    {
+      "externalId": "510",
+      "name": "냉토마토파스타",
+      "category": "noodle",
+      "availableIngredients": ["토마토", "파스타면", "브로콜리", "양파"],
+      "expiringIngredients": ["토마토"]
+    },
+    {
+      "externalId": "663",
+      "name": "시금치브로컬리 파스타",
+      "category": "noodle",
+      "availableIngredients": ["새우", "스파게티면", "시금치", "브로콜리"],
+      "expiringIngredients": ["시금치"]
+    },
+    {
+      "externalId": "181",
+      "name": "양배추감자전",
+      "category": "side",
+      "availableIngredients": ["감자", "양배추", "당근", "계란"],
+      "expiringIngredients": ["양배추"]
+    },
+    {
+      "externalId": "387",
+      "name": "오징어구이",
+      "category": "seafood-side",
+      "availableIngredients": ["오징어", "파프리카", "양파", "고추장"],
+      "expiringIngredients": ["오징어"]
+    },
+    {
+      "externalId": "391",
+      "name": "토마토소고기장조림",
+      "category": "meat-side",
+      "availableIngredients": ["소고기", "메추리알", "토마토", "꽈리고추"],
+      "expiringIngredients": ["소고기"]
+    },
+    {
+      "externalId": "394",
+      "name": "삼겹살꼬치구이",
+      "category": "meat-side",
+      "availableIngredients": ["삼겹살", "대파", "마늘", "꽈리고추"],
+      "expiringIngredients": ["삼겹살"]
+    },
+    {
+      "externalId": "503",
+      "name": "코코넛밀크카레",
+      "category": "quick-meal",
+      "availableIngredients": ["두부", "돼지고기", "감자", "카레가루", "당근"],
+      "expiringIngredients": ["두부"]
+    },
+    {
+      "externalId": "511",
+      "name": "닭고기또띠아",
+      "category": "quick-meal",
+      "availableIngredients": ["닭고기", "또띠아", "오이", "양파"],
+      "expiringIngredients": ["닭고기"]
+    },
+    {
+      "externalId": "674",
+      "name": "감자느타리버섯국",
+      "category": "soup-plant-forward",
+      "availableIngredients": ["감자", "느타리버섯", "두부", "파"],
+      "expiringIngredients": ["느타리버섯"]
+    },
+    {
+      "externalId": "300",
+      "name": "콩고기샐러드",
+      "category": "plant-forward",
+      "availableIngredients": ["콩고기", "아보카도", "방울토마토", "가지"],
+      "expiringIngredients": ["아보카도"]
+    }
+  ]
+}

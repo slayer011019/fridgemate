@@ -30,6 +30,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     resume: argv.includes('--resume'),
     resumeFrom: '',
     stateFile: DEFAULT_STATE_FILE,
+    fixture: '',
     output: '',
     limit: 25,
     batchSize: 25,
@@ -74,6 +75,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
 
     if (arg.startsWith('--resume-from=')) options.resumeFrom = arg.slice('--resume-from='.length).trim();
     if (arg.startsWith('--state-file=')) options.stateFile = arg.slice('--state-file='.length).trim();
+    if (arg.startsWith('--fixture=')) options.fixture = arg.slice('--fixture='.length).trim();
     if (arg.startsWith('--output=')) options.output = arg.slice('--output='.length).trim();
   });
 
@@ -679,6 +681,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         dryRun: !options.executeEvaluation,
         storedVectors: options.storedVectors,
         limit: options.limit,
+        fixture: options.fixture,
         output: options.output
       }).then((report) => console.log(JSON.stringify(report, null, 2)))
     : embedRecipes(options);

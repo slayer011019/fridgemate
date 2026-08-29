@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { evaluateRecipeSearch } from '../evaluate-recipe-search.js';
 
 const ID_A = '11111111-1111-4111-8111-111111111111';
 const ID_B = '22222222-2222-4222-8222-222222222222';
+const HOME_MEAL_FIXTURE = JSON.parse(
+  readFileSync('scripts/fixtures/recipe-search-home-meal-evaluation.json', 'utf8')
+);
 
 function createPrismaClient() {
   return {
@@ -40,6 +44,22 @@ function createPrismaClient() {
 }
 
 describe('recipe search evaluation', () => {
+  it('keeps a balanced realistic fixture separate from the UUID regression fixture', () => {
+    expect(HOME_MEAL_FIXTURE.recipes).toHaveLength(20);
+    expect(new Set(HOME_MEAL_FIXTURE.recipes.map((recipe) => recipe.category)).size).toBeGreaterThanOrEqual(8);
+    HOME_MEAL_FIXTURE.recipes.forEach((recipe) => {
+      expect(recipe.externalId).toBeTruthy();
+      expect(recipe.availableIngredients.length).toBeGreaterThanOrEqual(3);
+      expect(recipe.availableIngredients.length).toBeLessThanOrEqual(6);
+      expect(recipe.expiringIngredients.length).toBeGreaterThanOrEqual(1);
+    });
+    const allIngredients = HOME_MEAL_FIXTURE.recipes.flatMap((recipe) => recipe.availableIngredients);
+    expect(allIngredients).toContain('계란');
+    expect(allIngredients).toContain('달걀');
+    expect(allIngredients).toContain('파');
+    expect(allIngredients).toContain('대파');
+  });
+
   it('replays a fixed fixture in memory without database writes', async () => {
     const prismaClient = createPrismaClient();
     const generateBatch = vi.fn(async () => [
@@ -66,7 +86,9 @@ describe('recipe search evaluation', () => {
     expect(report.metrics).toMatchObject({
       hitAt1: '2/2',
       hitAt5: '2/2',
-      fullBackfillGate: 'No-Go'
+      hitAt5Rate: 1,
+      minimumHitAt5Rate: 0.7,
+      fullBackfillGate: 'Go'
     });
     expect(report.preflight.productionWrites).toBe(0);
     expect(report.results.map((result) => result.id)).toEqual([ID_A, ID_B]);
@@ -130,9 +152,21 @@ describe('recipe search evaluation', () => {
       prismaClient,
       generateBatch,
       fixture: {
+        version: 2,
+        profile: 'realistic-home-meal-test',
         recipes: [
-          { id: ID_A, name: '감자볶음' },
-          { id: ID_B, name: '계란찜' }
+          {
+            externalId: 'a',
+            name: '감자볶음',
+            availableIngredients: ['감자', '양파'],
+            expiringIngredients: ['감자']
+          },
+          {
+            externalId: 'b',
+            name: '계란찜',
+            availableIngredients: ['달걀', '대파'],
+            expiringIngredients: ['달걀']
+          }
         ]
       }
     });
@@ -149,6 +183,12 @@ describe('recipe search evaluation', () => {
       apiRequestCount: 1,
       unavailableTargetCount: 0
     });
+    expect(report.results[0]).toMatchObject({
+      externalId: 'a',
+      availableIngredients: ['감자', '양파'],
+      expiringIngredients: ['감자']
+    });
+    expect(report.results[0].top5[0]).toMatchObject({ ownedIngredientRatio: expect.any(Number) });
     expect(generateBatch).toHaveBeenCalledTimes(1);
   });
 });

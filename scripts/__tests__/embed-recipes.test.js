@@ -138,14 +138,23 @@ describe('embed-recipes script', () => {
   });
 
   it('parses stored-vector evaluation without enabling a backfill', () => {
-    expect(parseArgs(['--evaluate', '--execute', '--stored-vectors', '--limit=1146'])).toMatchObject({
+    expect(
+      parseArgs([
+        '--evaluate',
+        '--execute',
+        '--stored-vectors',
+        '--limit=1146',
+        '--fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json'
+      ])
+    ).toMatchObject({
       dryRun: true,
       evaluate: true,
       executeEvaluation: true,
       storedVectors: true,
       backfillMissing: false,
       backfillStale: false,
-      limit: 1146
+      limit: 1146,
+      fixture: 'scripts/fixtures/recipe-search-home-meal-evaluation.json'
     });
   });
 

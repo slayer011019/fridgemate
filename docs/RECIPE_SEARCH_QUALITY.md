@@ -4,6 +4,8 @@
 
 This check evaluates semantic recipe candidate retrieval without writing production rows. The fixed fixture is `scripts/fixtures/recipe-search-evaluation.json`; the in-memory report is `docs/recipe-search-quality-report.json`, and the stored-production-vector report is `docs/recipe-search-stored-vector-report.json`. No embedding vectors are stored in either report.
 
+A separate realistic fixture lives at `scripts/fixtures/recipe-search-home-meal-evaluation.json`. It keeps the UUID regression fixture intact and adds 20 source-backed recipes across soup, stew, rice, noodles, quick meals, side dishes, meat, seafood, and plant-forward meals. Each query uses only three to five plausible available ingredients, marks at least one expiring ingredient, and includes alias coverage such as `계란`/`달걀` and `파`/`대파`.
+
 ## Baseline and Result
 
 | Metric | Old production vectors | Classification-aware in-memory vectors | Stored production vectors after limited refresh |
@@ -71,6 +73,15 @@ npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1146
 npm run recipes:embed -- --evaluate --execute --stored-vectors --limit=1146 --output=docs/recipe-search-stored-vector-report.json
 ```
 
+Realistic home-meal fixture preflight and evaluation:
+
+```bash
+npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1146 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
+npm run recipes:embed -- --evaluate --execute --stored-vectors --limit=1146 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json --output=docs/recipe-search-home-meal-report.json
+```
+
+This profile resolves targets by stable catalog `externalId`, reports Hit@5 rate, owned core-ingredient ratio, missing core/seasoning counts, and expiring ingredient matches, and uses a 70% Hit@5 gate. Its production score remains unmeasured until the catalog backfill stage receives separate DB/API approval.
+
 The stored-vector mode embeds only the ten fixture queries, evaluates them against matching model/dimension rows in `recipe_embeddings`, and runs inside a read-only transaction. The production run used ten inputs, one API request, about 135 estimated input tokens, and zero database writes.
 
 The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 API requests, and an estimated 38,125 input tokens. Cost is calculated as `estimated input tokens / 1,000,000 * the provider's current per-million-token embedding price`.
@@ -93,5 +104,5 @@ The in-memory, limited missing-row, limited stale-row, integrity, and stored-vec
 
 - Fix parser artifacts still visible in names such as `버터 1½작은술` and merged section text.
 - Add broader canonical aliases for meat cuts, dried herbs such as `바질마른것`/`오레가노마른것`/`타임 마른것`, and section-prefixed names.
-- Replace UUID-order smoke coverage with a reviewed category-balanced Korean home-meal set while preserving the original fixture for regression comparison.
+- Review and run the new category-balanced Korean home-meal fixture against complete stored vectors while preserving the original UUID fixture for regression comparison.
 - Evaluate candidate retrieval plus the existing structured reranker separately; several vector misses had much worse ingredient overlap than the target recipe.

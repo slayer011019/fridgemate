@@ -26,6 +26,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     dryRun: argv.includes('--dry-run') || !argv.includes('--execute'),
     storedVectors: argv.includes('--stored-vectors'),
     limit: DEFAULT_CANDIDATE_LIMIT,
+    fixture: '',
     output: ''
   };
 
@@ -34,6 +35,7 @@ function parseArgs(argv = process.argv.slice(2)) {
       options.limit = Math.max(10, Math.min(MAX_CANDIDATE_LIMIT, Number.parseInt(arg.split('=')[1], 10) || options.limit));
     }
     if (arg.startsWith('--output=')) options.output = arg.slice('--output='.length).trim();
+    if (arg.startsWith('--fixture=')) options.fixture = arg.slice('--fixture='.length).trim();
   });
 
   return options;
@@ -87,8 +89,18 @@ async function generateInBatches(texts, config, generateBatch) {
   return { vectors, requestCount };
 }
 
-async function loadFixture() {
-  return JSON.parse(await readFile(FIXTURE_PATH, 'utf8'));
+function assertWorkspacePath(filePath, label) {
+  const resolved = path.resolve(process.cwd(), filePath);
+  const relative = path.relative(process.cwd(), resolved);
+  if (!filePath || relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`${label} must stay inside the project workspace.`);
+  }
+  return resolved;
+}
+
+async function loadFixture(filePath = '') {
+  const resolved = filePath ? assertWorkspacePath(filePath, '--fixture') : FIXTURE_PATH;
+  return JSON.parse(await readFile(resolved, 'utf8'));
 }
 
 async function loadCandidates(prisma, fixture, limit) {
@@ -172,7 +184,12 @@ async function loadCandidates(prisma, fixture, limit) {
     ingredients: dedupeRecipeIngredients(recipe.ingredients)
   }));
   const loadedIds = new Set(recipes.map((recipe) => recipe.id));
-  if (fixture.recipes.some((recipe) => !loadedIds.has(recipe.id))) {
+  const loadedExternalIds = new Set(recipes.map((recipe) => recipe.externalId).filter(Boolean));
+  if (
+    fixture.recipes.some((recipe) =>
+      recipe.id ? !loadedIds.has(recipe.id) : !loadedExternalIds.has(String(recipe.externalId || ''))
+    )
+  ) {
     throw new Error('Evaluation limit does not include every fixed fixture recipe.');
   }
   return recipes;
@@ -212,6 +229,30 @@ function assertOutputPath(output) {
   return resolved;
 }
 
+function resolveFixtureEntries(fixture, candidates) {
+  const byId = new Map(candidates.map((recipe) => [recipe.id, recipe]));
+  const byExternalId = new Map(
+    candidates.filter((recipe) => recipe.externalId).map((recipe) => [recipe.externalId, recipe])
+  );
+  return fixture.recipes.map((specification) => ({
+    specification,
+    target: specification.id
+      ? byId.get(String(specification.id))
+      : byExternalId.get(String(specification.externalId || ''))
+  }));
+}
+
+function fixtureQueryIngredients(specification, target) {
+  const supplied = [
+    ...(Array.isArray(specification.availableIngredients) ? specification.availableIngredients : []),
+    ...(Array.isArray(specification.expiringIngredients) ? specification.expiringIngredients : [])
+  ];
+  const names = supplied.length
+    ? supplied
+    : target.ingredients.map((ingredient) => ingredient.normalizedName);
+  return [...new Set(names.map((name) => normalizeRecipeIngredientName(name)).filter(Boolean))];
+}
+
 export async function evaluateRecipeSearch(options = {}) {
   if (!options.prismaClient) {
     const prisma = new PrismaClient();
@@ -232,12 +273,15 @@ export async function evaluateRecipeSearch(options = {}) {
     dryRun: true,
     storedVectors: false,
     limit: DEFAULT_CANDIDATE_LIMIT,
+    fixture: '',
     output: '',
     ...options
   };
   settings.limit = Math.max(10, Math.min(MAX_CANDIDATE_LIMIT, Number(settings.limit) || DEFAULT_CANDIDATE_LIMIT));
   const prisma = settings.prismaClient;
-  const fixture = settings.fixture || (await loadFixture());
+  const fixture = typeof settings.fixture === 'object'
+    ? settings.fixture
+    : await loadFixture(settings.fixture);
   const config = {
     apiKey: settings.apiKey ?? process.env.OPENAI_API_KEY ?? '',
     model: settings.model ?? process.env.RECIPE_EMBEDDING_MODEL ?? DEFAULT_MODEL,
@@ -247,13 +291,24 @@ export async function evaluateRecipeSearch(options = {}) {
   try {
     const candidates = await loadCandidates(prisma, fixture, settings.limit);
     const candidateById = new Map(candidates.map((recipe) => [recipe.id, recipe]));
-    const targets = fixture.recipes.map((item) => candidateById.get(item.id)).filter(Boolean);
-    if (targets.length !== fixture.recipes.length) {
+    const fixtureEntries = resolveFixtureEntries(fixture, candidates);
+    if (fixtureEntries.some((entry) => !entry.target)) {
       throw new Error('The fixed recipe search evaluation fixture is incomplete in the current catalog.');
     }
+    if (
+      fixtureEntries.some(
+        ({ specification, target }) => specification.name && specification.name !== target.name
+      )
+    ) {
+      throw new Error('The recipe search fixture name does not match its catalog target.');
+    }
+    const targets = fixtureEntries.map((entry) => entry.target);
 
     const candidateTexts = candidates.map((recipe) => buildProductionRecipeEmbeddingText(recipe, recipe.ingredients));
-    const queryTexts = targets.map((recipe) => buildRecipeVectorQueryText(recipe.ingredients));
+    const queryIngredientNames = fixtureEntries.map(({ specification, target }) =>
+      fixtureQueryIngredients(specification, target)
+    );
+    const queryTexts = queryIngredientNames.map((ingredients) => buildRecipeVectorQueryText(ingredients));
     const plannedEmbeddingInputs = settings.storedVectors
       ? queryTexts
       : [...candidateTexts, ...queryTexts];
@@ -286,6 +341,11 @@ export async function evaluateRecipeSearch(options = {}) {
       dimensions: config.dimensions,
       candidateCount: candidates.length,
       targetCount: targets.length,
+      fixtureVersion: Number(fixture.version || 1),
+      fixtureProfile: String(fixture.profile || fixture.selection || 'fixed-regression'),
+      expiringQueryCount: fixtureEntries.filter(
+        ({ specification }) => specification.expiringIngredients?.length
+      ).length,
       totalEmbeddingInputs: totalInputs,
       expectedApiRequests,
       estimatedInputTokens,
@@ -319,7 +379,9 @@ export async function evaluateRecipeSearch(options = {}) {
 
     const missingCounts = [];
     const seasoningCounts = [];
+    const ownedIngredientRatios = [];
     const results = targets.map((target, targetIndex) => {
+      const specification = fixtureEntries[targetIndex].specification;
       const ranked = settings.storedVectors
         ? storedRankings[targetIndex]
         : candidates
@@ -331,7 +393,12 @@ export async function evaluateRecipeSearch(options = {}) {
       const targetResult = ranked.find((item) => item.recipe.id === target.id);
       const targetRankIndex = ranked.findIndex((item) => item.recipe.id === target.id);
       const originalRank = targetRankIndex >= 0 ? targetRankIndex + 1 : null;
-      const available = target.ingredients.map((ingredient) => ({ name: ingredient.normalizedName }));
+      const available = queryIngredientNames[targetIndex].map((name) => ({ name }));
+      const expiringSet = new Set(
+        (specification.expiringIngredients || [])
+          .map((name) => normalizeRecipeIngredientName(name))
+          .filter(Boolean)
+      );
       const queryIngredientClassifications = available.map((ingredient) => {
         const classification = classifyRecipeIngredient({
           rawName: ingredient.name,
@@ -353,20 +420,35 @@ export async function evaluateRecipeSearch(options = {}) {
       }));
       const top5 = ranked.slice(0, 5).map(({ recipe, similarity }) => {
         const structured = getRecipeMatchScore(available, recipe.ingredients, { recipeId: recipe.id });
+        const coreIngredientCount = structured.matchedMain.length + structured.missingMain.length;
+        const ownedIngredientRatio = coreIngredientCount
+          ? structured.matchedMain.length / coreIngredientCount
+          : 0;
+        const expiringMatchedIngredients = structured.matchedIngredients.filter((name) =>
+          expiringSet.has(normalizeRecipeIngredientName(name))
+        );
         missingCounts.push(structured.missingIngredients.length);
         seasoningCounts.push(structured.missingSeasonings.length);
+        ownedIngredientRatios.push(ownedIngredientRatio);
         return {
           id: recipe.id,
           name: recipe.name,
           similarity: round(similarity, 6),
+          ownedIngredientRatio: round(ownedIngredientRatio, 4),
+          matchedIngredientCount: structured.matchedIngredients.length,
           missingIngredientCount: structured.missingIngredients.length,
-          missingSeasoningCount: structured.missingSeasonings.length
+          missingSeasoningCount: structured.missingSeasonings.length,
+          expiringMatchedIngredients
         };
       });
 
       return {
         id: target.id,
+        externalId: target.externalId,
         name: target.name,
+        fixtureCategory: String(specification.category || target.category || ''),
+        availableIngredients: specification.availableIngredients || queryIngredientNames[targetIndex],
+        expiringIngredients: specification.expiringIngredients || [],
         queryText: queryTexts[targetIndex],
         embeddingText: candidateTexts[candidates.findIndex((candidate) => candidate.id === target.id)],
         targetSimilarity: targetResult ? round(targetResult.similarity, 6) : null,
@@ -381,9 +463,13 @@ export async function evaluateRecipeSearch(options = {}) {
     });
     const hit1Count = results.filter((result) => result.hit1).length;
     const hit5Count = results.filter((result) => result.hit5).length;
+    const hitAt5Rate = targets.length ? hit5Count / targets.length : 0;
+    const minimumHitAt5Rate = Number(fixture.gate?.minimumHitAt5Rate ?? 0.7);
     const metrics = {
       hitAt1: `${hit1Count}/${targets.length}`,
       hitAt5: `${hit5Count}/${targets.length}`,
+      hitAt5Rate: round(hitAt5Rate),
+      minimumHitAt5Rate,
       mrrAt5: round(results.reduce((sum, result) => sum + result.reciprocalRankAt5, 0) / targets.length),
       averageOriginalRank: round(
         results.reduce((sum, result) => sum + (result.originalRank || existingEmbeddingCount + 1), 0) / targets.length
@@ -391,8 +477,9 @@ export async function evaluateRecipeSearch(options = {}) {
       unavailableTargetCount: results.filter((result) => result.originalRank === null).length,
       medianMissingIngredientsTop5: median(missingCounts),
       medianMissingSeasoningsTop5: median(seasoningCounts),
+      medianOwnedIngredientRatioTop5: round(median(ownedIngredientRatios)),
       apiRequestCount: generated.requestCount,
-      fullBackfillGate: hit5Count >= 7 ? 'Go' : 'No-Go'
+      fullBackfillGate: hitAt5Rate >= minimumHitAt5Rate ? 'Go' : 'No-Go'
     };
     const report = { preflight: { ...preflight, mode: 'evaluate' }, metrics, results };
     const outputPath = assertOutputPath(settings.output);

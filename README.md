@@ -276,6 +276,12 @@ npm run recipes:embed -- --evaluate --dry-run --limit=1146
 npm run recipes:embed -- --evaluate --execute --limit=1146 --output=docs/recipe-search-quality-report.json
 ```
 
+실제 보유 재료 3~5개, 임박 재료, `계란`/`달걀`과 `파`/`대파` 동의어를 포함한 20개 한국 가정식 fixture도 별도로 유지합니다.
+
+```bash
+npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1146 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
+```
+
 현재 저장 운영 벡터의 읽기 전용 평가는 Hit@1 `9/10`, Hit@5 `10/10`으로 운영 기준 `7/10`을 통과했습니다. 2026-08-29에 checkpoint 후 missing 10건 생성과 stale 10건 교체를 각각 제한 실행했고, 총 1,003건·중복 0·고아 0·`vector(1536)` 및 교체 벡터 self-retrieval Top 1 `10/10`을 확인했습니다. 평가 후에도 `current=20`, `missing=143`, `stale=983`으로 DB 쓰기가 없었으며, 남은 1,126건은 별도 승인된 단계별 backfill 전까지 보류합니다. semantic 추천 API는 전체 coverage와 최종 무결성·품질 재검증 이후에만 공개합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
 
 ## 추천 이벤트 내보내기
