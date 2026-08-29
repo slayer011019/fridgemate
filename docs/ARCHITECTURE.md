@@ -45,6 +45,8 @@ server/src/app.js
 
 Routes define API boundaries. Controllers handle request and response shape. Services contain validation and persistence logic. Prisma owns database access.
 
+Every API response receives a server-generated `x-request-id`. Failure and slow-request telemetry records only the request ID, method, top-level API group, status, duration, and bounded error name/code; it deliberately excludes query strings, request bodies, user IDs, and raw error messages. Optional AI usage telemetry records provider/model/count/token/duration fields and a cost estimate only when an operator supplies the current per-million-token price. Prompts, recipe text, API keys, and vectors are never telemetry fields.
+
 ## Data Strategy
 
 The active working copy lives in IndexedDB. This keeps the app usable when the backend is not configured or temporarily unavailable.

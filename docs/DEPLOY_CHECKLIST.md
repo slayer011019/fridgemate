@@ -51,6 +51,8 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Cookie-authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests with a missing or untrusted `Origin`/`Referer` return `403`.
 - [ ] `/api/recommendation-events` rejects unknown/oversized fields and returns `429` after 120 requests per user/client address in one minute.
 - [ ] `npm run worker:dry-run` completes before deployment.
+- [ ] `API_SLOW_REQUEST_MS` is intentional, error responses include `x-request-id`, and platform logs contain no query strings, request bodies, user IDs, prompts, or vectors.
+- [ ] If `AI_USAGE_LOGGING_ENABLED=true`, configure the current `RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS` only when cost estimates are desired and verify token/count metrics in private platform telemetry.
 - [ ] Optional v2/lab only: AI and embedding keys.
 
 ## Supabase

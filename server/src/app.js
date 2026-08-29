@@ -11,10 +11,12 @@ import { prismaRequestScope } from './db/prisma.js';
 import { optionalAuth } from './middleware/optionalAuth.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
+import { createRequestTelemetry, markRequestFailure } from './middleware/requestTelemetry.js';
 
 export function createApp() {
   const app = express();
 
+  app.use(createRequestTelemetry());
   app.use(
     cors({
       credentials: true,
@@ -49,28 +51,21 @@ export function createApp() {
   app.use('/api/recipes', requireAuth, recipeRoutes);
   app.use('/api/recommendation-events', optionalAuth, recommendationEventRoutes);
 
-  app.use('/api', (_request, response) => {
+  app.use('/api', (request, response) => {
     response.status(404).json({
-      message: 'API route not found.'
+      message: 'API route not found.',
+      requestId: request.telemetry?.requestId
     });
   });
 
   app.use((error, request, response, _next) => {
     const status = error.status || 500;
     const message = status >= 500 ? 'Internal server error.' : error.message;
-
-    if (status >= 500) {
-      console.error('[server] request failed', {
-        method: request.method,
-        path: request.originalUrl,
-        errorName: error.name || 'Error',
-        errorCode: error.code || null,
-        errorMessage: error.message || 'Unknown server error'
-      });
-    }
+    markRequestFailure(request, error);
 
     response.status(status).json({
-      message
+      message,
+      requestId: request.telemetry?.requestId
     });
   });
 

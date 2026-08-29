@@ -40,6 +40,11 @@ function normalizeSameSite(value) {
   return supportedValue || configuredValue;
 }
 
+function nonNegativeNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 function createServerConfig(runtimeEnv = process.env) {
   const configuredAllowedOrigins = splitEnvList(runtimeValue(runtimeEnv, 'ALLOWED_ORIGINS'));
   const clientOrigin = runtimeValue(runtimeEnv, 'CLIENT_ORIGIN') || 'http://localhost:5173';
@@ -76,6 +81,12 @@ function createServerConfig(runtimeEnv = process.env) {
     openaiApiKey: runtimeValue(runtimeEnv, 'OPENAI_API_KEY') || '',
     recipeEmbeddingModel: runtimeValue(runtimeEnv, 'RECIPE_EMBEDDING_MODEL') || 'text-embedding-3-small',
     recipeEmbeddingDimensions: Number(runtimeValue(runtimeEnv, 'RECIPE_EMBEDDING_DIMENSIONS') || 1536),
+    recipeEmbeddingPricePerMillionTokens: nonNegativeNumber(
+      runtimeValue(runtimeEnv, 'RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS')
+    ),
+    aiUsageLoggingEnabled:
+      String(runtimeValue(runtimeEnv, 'AI_USAGE_LOGGING_ENABLED') || 'false').toLowerCase() === 'true',
+    apiSlowRequestMs: nonNegativeNumber(runtimeValue(runtimeEnv, 'API_SLOW_REQUEST_MS'), 1500),
     embeddingModel: runtimeValue(runtimeEnv, 'EMBEDDING_MODEL') || 'text-embedding-3-small',
     embeddingDimensions: Number(runtimeValue(runtimeEnv, 'EMBEDDING_DIMENSIONS') || 512)
   };

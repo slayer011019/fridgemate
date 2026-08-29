@@ -3,6 +3,7 @@ import { serverConfig } from '../config.js';
 import { seedRecipes } from '../../../src/data/seedRecipes.js';
 import { buildRecipeRecommendations } from '../../../src/utils/recommendations.js';
 import { recommendRecipes as recommendHybridRecipes } from './recipeHybridRecommendationService.js';
+import { recordRecommendationFallback } from '../lib/operationalTelemetry.js';
 
 function buildFallbackAiSuggestions(ingredients = []) {
   return buildRecipeRecommendations(seedRecipes, ingredients)
@@ -118,7 +119,7 @@ export async function getRecipeRecommendations({ userId, ingredients, pantryItem
       return hybridRecommendations;
     }
   } catch (error) {
-    console.warn('[recipeService] Hybrid recipe recommendations failed. Falling back to seed recipes.', error);
+    recordRecommendationFallback('hybrid_recipe_recommendations', error);
   }
 
   return buildRecipeRecommendations(seedRecipes, inputIngredients, { pantryItems });
@@ -136,7 +137,7 @@ export async function getAiRecipeSuggestions(ingredients = []) {
   try {
     return await requestClaudeSuggestions(ingredients);
   } catch (error) {
-    console.warn('[recipeService] Claude suggestion failed. Falling back to rule-based recommendations.', error);
+    recordRecommendationFallback('anthropic_recipe_suggestions', error);
     return buildFallbackAiSuggestions(ingredients);
   }
 }

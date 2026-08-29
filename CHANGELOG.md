@@ -34,6 +34,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added metadata-only API request IDs, failure/latency telemetry, client-side error correlation, and optional embedding token/cost metrics without logging prompts, request bodies, user IDs, or vectors.
 - Added a separate 20-recipe Korean home-meal search fixture with realistic three-to-five-ingredient queries, expiring ingredients, alias coverage, category balance, Hit@5 rate, owned-ingredient ratio, and missing-ingredient metrics.
 - Added 100 source-backed Food Safety Korea recipe detail pages with stable slugs, ingredients, cooking steps, nutrition, images, canonical URLs, sitemap entries, and truthful `Recipe` JSON-LD.
 - Added a safe public-recipe export command that is read-only by default, strips raw source payloads, upgrades image URLs to HTTPS, and writes only with an explicit `--write` flag.

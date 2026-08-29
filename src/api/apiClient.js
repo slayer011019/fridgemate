@@ -6,6 +6,7 @@ export class ApiClientError extends Error {
     this.name = 'ApiClientError';
     this.status = options.status;
     this.path = options.path;
+    this.requestId = options.requestId || null;
     this.cause = options.cause;
   }
 }
@@ -65,7 +66,8 @@ export async function requestJson(
     const errorPayload = await response.json().catch(() => ({}));
     throw new errorClass(errorPayload.message || 'API request failed.', {
       status: response.status,
-      path
+      path,
+      requestId: errorPayload.requestId || response.headers?.get?.('x-request-id') || null
     });
   }
 

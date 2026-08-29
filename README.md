@@ -208,6 +208,8 @@ ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 RECIPE_EMBEDDING_MODEL=text-embedding-3-small
 RECIPE_EMBEDDING_DIMENSIONS=1536
+AI_USAGE_LOGGING_ENABLED=false
+API_SLOW_REQUEST_MS=1500
 ```
 
 주의 사항:
@@ -216,6 +218,7 @@ RECIPE_EMBEDDING_DIMENSIONS=1536
 - 비밀값에 `VITE_` 접두사를 붙이지 않습니다.
 - `RECIPE_EMBEDDING_DIMENSIONS`는 DB의 `recipe_embeddings.embedding` 차원과 같아야 합니다.
 - 핵심 앱 기능은 AI API 키 없이도 동작합니다.
+- API 오류 응답에는 지원 추적용 request ID가 포함되며, 선택형 AI 사용량 로그에는 프롬프트·재료명·벡터 없이 모델, 건수, 토큰, 지연시간과 설정된 경우의 추정 비용만 기록합니다.
 
 ## 데이터베이스
 

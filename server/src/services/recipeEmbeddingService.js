@@ -1,3 +1,5 @@
+import { recordAiUsage } from '../lib/operationalTelemetry.js';
+
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 const DEFAULT_EMBEDDING_DIMENSIONS = 1536;
 
@@ -47,6 +49,23 @@ export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
   }
 
   const { apiKey, model, dimensions, fetchImpl } = getEmbeddingConfig(options);
+  const onUsage = options.onUsage || recordAiUsage;
+  const startedAt = Date.now();
+  const emitUsage = (metrics) => {
+    try {
+      onUsage({
+        provider: 'openai',
+        operation: 'recipe_embedding',
+        model,
+        dimensions,
+        inputCount: inputs.length,
+        durationMs: Date.now() - startedAt,
+        ...metrics
+      });
+    } catch (_error) {
+      // Telemetry must never change the embedding request outcome.
+    }
+  };
 
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY is not configured for recipe embeddings.');
@@ -56,20 +75,28 @@ export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
     throw new Error('fetch is not available for recipe embeddings.');
   }
 
-  const response = await fetchImpl('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model,
-      input: inputs,
-      dimensions
-    })
-  });
+  let response;
+
+  try {
+    response = await fetchImpl('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        input: inputs,
+        dimensions
+      })
+    });
+  } catch (error) {
+    emitUsage({ success: false, status: 0 });
+    throw error;
+  }
 
   if (!response.ok) {
+    emitUsage({ success: false, status: response.status });
     throw new Error(`Recipe embedding request failed with status ${response.status}.`);
   }
 
@@ -89,8 +116,21 @@ export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
         !embedding.every((value) => Number.isFinite(value))
     )
   ) {
+    emitUsage({
+      success: false,
+      status: response.status,
+      promptTokens: payload?.usage?.prompt_tokens,
+      totalTokens: payload?.usage?.total_tokens
+    });
     throw new Error(`Recipe embedding response must include ${inputs.length} vectors with ${dimensions} dimensions.`);
   }
+
+  emitUsage({
+    success: true,
+    status: response.status,
+    promptTokens: payload?.usage?.prompt_tokens,
+    totalTokens: payload?.usage?.total_tokens
+  });
 
   return embeddings;
 }

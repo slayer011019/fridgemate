@@ -19,6 +19,7 @@ Implemented:
 - recommendation training-data export
 - CI, unit tests, and core E2E coverage
 - Node.js 24 GitHub Actions with route-level browser code splitting
+- Metadata-only API request correlation, latency/error telemetry, and optional AI token/cost metrics
 
 ## Near Term
 
