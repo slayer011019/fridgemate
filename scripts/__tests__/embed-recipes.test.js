@@ -50,6 +50,7 @@ describe('embed-recipes script', () => {
       plannedInputs: 1,
       apiInputCount: 0,
       apiRequestCount: 0,
+      maxWrites: null,
       writeLimitReached: false,
       lastProcessedRecipeId: '11111111-1111-1111-1111-111111111111',
       lastSuccessfulRecipeId: '11111111-1111-1111-1111-111111111111'
@@ -104,11 +105,13 @@ describe('embed-recipes script', () => {
       missing: 2,
       apiInputCount: 2,
       apiRequestCount: 1,
+      maxWrites: 2,
       writeLimitReached: true
     });
     expect(createEmbeddings).toHaveBeenCalledTimes(1);
     expect(createEmbeddings.mock.calls[0][0]).toHaveLength(2);
     expect(upsertEmbedding).toHaveBeenCalledTimes(2);
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('maxWrites=2'));
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('writeLimitReached=true'));
 
     consoleSpy.mockRestore();

@@ -41,6 +41,7 @@ npm run recipes:embed -- --backfill-missing --resume --limit=1146 --batch-size=2
 - `.local/recipe-embedding-backfill-state.json` stores only operation metadata and the last successfully committed recipe UUID. It contains no API key, database URL, recipe text, or vector.
 - The state file is updated after each successful upsert. A failed item is never recorded as successful, so `--resume` retries it safely.
 - `--max-writes` remains independent of the catalog scan limit and is never raised automatically.
+- Every summary prints the effective `maxWrites` value so a dry-run can show the complete candidate count while still making the separately approved production write cap explicit.
 - Summaries report API inputs, requests, retries, estimated tokens, optional estimated cost, elapsed time, and throughput without logging secrets or raw vectors.
 - `RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS` is optional and only enables the cost estimate; provider pricing is not hardcoded.
 - Checkpoints are gzip-compressed JSONL with a separate manifest containing row count, model/dimension groups, byte size, and SHA-256. The manifest is vector-free, while the checkpoint itself contains raw vectors and must remain protected.

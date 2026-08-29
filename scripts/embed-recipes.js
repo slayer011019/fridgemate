@@ -435,6 +435,7 @@ export async function embedRecipes(options = parseArgs()) {
     elapsedMs: 0,
     throughputPerSecond: 0,
     resumed: false,
+    maxWrites: Number.isFinite(maxWrites) ? maxWrites : null,
     writeLimitReached: false,
     lastProcessedRecipeId: null,
     lastSuccessfulRecipeId: null
@@ -664,7 +665,7 @@ export async function embedRecipes(options = parseArgs()) {
       : null;
 
     console.log(
-      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} plannedInputs=${summary.plannedInputs} apiInputCount=${summary.apiInputCount} apiRequestCount=${summary.apiRequestCount} retries=${summary.retryCount} estimatedInputTokens=${summary.estimatedInputTokens} estimatedCostUsd=${summary.estimatedCostUsd ?? 'unconfigured'} elapsedMs=${summary.elapsedMs} throughputPerSecond=${summary.throughputPerSecond} resumed=${summary.resumed} writeLimitReached=${summary.writeLimitReached} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'} lastSuccessfulRecipeId=${summary.lastSuccessfulRecipeId || 'none'}`
+      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} plannedInputs=${summary.plannedInputs} apiInputCount=${summary.apiInputCount} apiRequestCount=${summary.apiRequestCount} retries=${summary.retryCount} estimatedInputTokens=${summary.estimatedInputTokens} estimatedCostUsd=${summary.estimatedCostUsd ?? 'unconfigured'} elapsedMs=${summary.elapsedMs} throughputPerSecond=${summary.throughputPerSecond} resumed=${summary.resumed} maxWrites=${summary.maxWrites ?? 'unbounded'} writeLimitReached=${summary.writeLimitReached} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'} lastSuccessfulRecipeId=${summary.lastSuccessfulRecipeId || 'none'}`
     );
     return summary;
   } finally {
