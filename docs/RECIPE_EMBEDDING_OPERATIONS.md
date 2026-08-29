@@ -491,3 +491,39 @@ npm run recipes:embed -- --dry-run --backfill-stale --target-fixture=scripts/fix
 ```
 
 The verified dry-run result was `processed=20`, `current=2`, `missing=0`, `stale=18`, `plannedInputs=18`, `apiInputCount=0`, `apiRequestCount=0`, and `generated=0`. Production use of `--target-fixture` refuses to start without an explicit finite `--max-writes`, validates every fixture target against the catalog, and records the target fixture in resume state. This dry-run does not authorize the 18 writes or another quality-evaluation API call.
+
+## Korean Home-Meal Fixture Stale Replacement
+
+After separate approval, the full 1,166-row production embedding set was checkpointed before any API call or write.
+
+- Checkpoint rows: `1,166`
+- Compressed bytes: `8,001,961`
+- SHA-256: `00c2d4384f0f9b276a9af1de7675ef015b4a2077a4b445ab3ad07e089c47505d`
+- Hash verification: passed
+- Checkpoint production writes: `0`
+
+The fixture-scoped runner then executed once with `--backfill-stale`, `--target-fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json`, and `--max-writes=18`.
+
+- Processed: `18`
+- Generated/written: `18`
+- Skipped: `0`
+- Failed: `0`
+- API inputs: `18`
+- API requests: `1`
+- Retries: `0`
+- Estimated input tokens: `502`
+- Write limit reached: `true`
+
+The immediate full-catalog verifier passed with:
+
+- Recipes: `1,166`
+- Embeddings: `1,166`
+- Current/missing/stale: `226 / 0 / 940`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Verification API requests: `0`
+- Verification production writes: `0`
+
+A second fixture-scoped dry-run resolved all 20 targets as current with `missing=0`, `stale=0`, `plannedInputs=0`, no API calls, and no writes. This approval did not include either stored-vector quality evaluation. Those 30 query inputs remain a separate reviewed operation.
