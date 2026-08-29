@@ -2,6 +2,18 @@ import { SITE_ORIGIN } from './routeMetadata.js';
 import { getRecipeIngredientLines } from '../features/recipes/publicRecipeCatalog.js';
 
 const SITE_NAME = '오늘뭐먹지';
+const SITE_ALTERNATE_NAMES = Object.freeze(['오늘 뭐 먹지', 'FridgeMate']);
+const WEBSITE_ID = `${SITE_ORIGIN}/#website`;
+
+function websiteReference() {
+  return {
+    '@type': 'WebSite',
+    '@id': WEBSITE_ID,
+    name: SITE_NAME,
+    alternateName: SITE_ALTERNATE_NAMES,
+    url: `${SITE_ORIGIN}/`
+  };
+}
 
 function webPageSchema(pathname, metadata, type = 'WebPage') {
   return {
@@ -11,11 +23,7 @@ function webPageSchema(pathname, metadata, type = 'WebPage') {
     description: metadata.description,
     url: metadata.canonical,
     inLanguage: 'ko-KR',
-    isPartOf: {
-      '@type': 'WebSite',
-      name: SITE_NAME,
-      url: SITE_ORIGIN
-    },
+    isPartOf: websiteReference(),
     ...(pathname === '/privacy' ? { dateModified: '2026-08-22' } : {})
   };
 }
@@ -29,10 +37,7 @@ export function getRouteStructuredData(pathname, metadata) {
     return [
       {
         '@context': 'https://schema.org',
-        '@type': 'WebSite',
-        name: SITE_NAME,
-        alternateName: 'FridgeMate',
-        url: SITE_ORIGIN,
+        ...websiteReference(),
         inLanguage: 'ko-KR',
         description: metadata.description
       },
@@ -40,7 +45,7 @@ export function getRouteStructuredData(pathname, metadata) {
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
         name: SITE_NAME,
-        alternateName: 'FridgeMate',
+        alternateName: SITE_ALTERNATE_NAMES,
         applicationCategory: 'LifestyleApplication',
         operatingSystem: 'Web',
         url: metadata.canonical,
@@ -72,6 +77,7 @@ export function getRouteStructuredData(pathname, metadata) {
         description: metadata.description,
         url: metadata.canonical,
         mainEntityOfPage: metadata.canonical,
+        isPartOf: websiteReference(),
         inLanguage: 'ko-KR',
         image: images,
         recipeCategory: recipe.dishType || undefined,

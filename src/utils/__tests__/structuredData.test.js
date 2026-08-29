@@ -8,6 +8,13 @@ describe('structuredData', () => {
     const schemas = getRouteStructuredData('/', getRouteMetadata('/'));
 
     expect(schemas.map((schema) => schema['@type'])).toEqual(['WebSite', 'SoftwareApplication']);
+    expect(schemas[0]).toMatchObject({
+      '@id': 'https://xn--wh1bs8l5xa003adme.com/#website',
+      name: '오늘뭐먹지',
+      alternateName: ['오늘 뭐 먹지', 'FridgeMate'],
+      url: 'https://xn--wh1bs8l5xa003adme.com/'
+    });
+    expect(schemas[1].alternateName).toEqual(['오늘 뭐 먹지', 'FridgeMate']);
     expect(JSON.stringify(schemas)).not.toMatch(/aggregateRating|review/);
   });
 
@@ -21,6 +28,11 @@ describe('structuredData', () => {
 
     expect(schema['@type']).toBe(expectedType);
     expect(schema.url).toBe(`https://xn--wh1bs8l5xa003adme.com${pathname}`);
+    expect(schema.isPartOf).toMatchObject({
+      '@id': 'https://xn--wh1bs8l5xa003adme.com/#website',
+      name: '오늘뭐먹지',
+      alternateName: ['오늘 뭐 먹지', 'FridgeMate']
+    });
   });
 
   it('does not emit structured data for functional or unknown routes', () => {
@@ -41,6 +53,7 @@ describe('structuredData', () => {
     expect(schema.recipeInstructions).toHaveLength(recipe.steps.length);
     expect(schema.author.name).toBe('식품의약품안전처');
     expect(schema.isBasedOn).toBe(recipe.sourceUrl);
+    expect(schema.isPartOf['@id']).toBe('https://xn--wh1bs8l5xa003adme.com/#website');
     expect(schema).not.toHaveProperty('aggregateRating');
   });
 });

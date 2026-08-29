@@ -48,4 +48,13 @@ assert(appShell.includes('<div id="root"></div>'), 'Functional app shell must no
 assert(!appShell.includes('rel="canonical"'), 'Functional app shell must not emit a shared canonical URL');
 assert(!appShell.includes('application/ld+json'), 'Functional app shell must not emit public structured data');
 
+const searchConsoleVerification = process.env.VITE_GOOGLE_SITE_VERIFICATION?.trim();
+if (searchConsoleVerification) {
+  const homeHtml = await readFile(resolve(outputDirectory, 'index.html'), 'utf8');
+  assert(
+    homeHtml.includes(`name="google-site-verification" content="${searchConsoleVerification}"`),
+    'Search Console verification meta tag is missing from the built home page'
+  );
+}
+
 console.log(`Verified SEO output for ${PUBLIC_ROUTES.length} public routes, sitemap.xml, and the noindex app shell.`);

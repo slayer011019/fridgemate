@@ -31,6 +31,8 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] `/ingredients`, `/ingredients/*`, `/import`, `/login`, `/signup`, and `/account` return `X-Robots-Tag: noindex, nofollow, noarchive`.
 - [ ] `/robots.txt`, `/sitemap.xml`, and `/llms.txt` return `200`; the sitemap contains the five static public routes plus the exported public recipe routes and no private routes.
 - [ ] In Cloudflare AI Crawl Control, allow search/answer citation crawlers intentionally and keep training-only crawlers blocked; verify the effective `/robots.txt` because managed rules can be prepended to the repository response.
+- [ ] Add `https://오늘뭐먹지.com` to Google Search Console. Prefer a domain property verified with the DNS TXT record; for URL-prefix verification, set `VITE_GOOGLE_SITE_VERIFICATION` to only the HTML meta tag's `content` value and redeploy.
+- [ ] Submit `https://오늘뭐먹지.com/sitemap.xml`, inspect the home page and a representative recipe URL, then request indexing after the production deployment is stable.
 - [ ] Record Search Console and Naver Search Advisor baselines after deployment and compare impressions, clicks, indexed pages, and citations after 14 days.
 
 ## Cloudflare Workers API
