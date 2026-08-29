@@ -83,6 +83,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+
+- Moved GitHub Actions CI and its official checkout, Node setup, and artifact upload actions to the Node.js 24 generation.
 - Replaced destructive whole-snapshot ingredient backup with newest-`updatedAt` record changes; manual backup and pull now merge without overwriting newer pending local work.
 - Simplified recommendation cards so matching, owned ingredients, and missing items are easier to scan.
 - Strengthened typography hierarchy, text contrast, card borders, and restrained accent colors across core app screens.

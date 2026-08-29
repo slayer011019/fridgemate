@@ -50,6 +50,7 @@ Implemented:
 - Expand ingredient normalization examples
 - Improve OCR parser regression coverage
 - Explore model-assisted recipe search and personalization
+- Keep GitHub Actions on the Node.js 24 runtime and current Node 24-based official actions
 
 ## Non-Goals for Now
 
