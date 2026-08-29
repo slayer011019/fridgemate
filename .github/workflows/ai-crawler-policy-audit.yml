@@ -78,6 +78,13 @@ jobs:
                 preview="$(tr '\n\r' '  ' <"$body" | sed 's/[[:space:]]\+/ /g' | cut -c1-120)"
                 printf 'probe=curl crawler=%q path=%q status=%q final_url=%q content_type=%q bytes=%q server=%q cf_ray=%q body_sha256=%q preview=%q\n' \
                   "$label" "$path" "$status" "$final_url" "$content_type" "$size_download" "$server" "$cf_ray" "$body_sha" "$preview"
+
+                if [[ "$path" == "/robots.txt" ]]; then
+                  echo "::group::robots.txt crawler=${label}"
+                  cat "$body"
+                  echo
+                  echo "::endgroup::"
+                fi
               else
                 exit_code=$?
                 printf 'probe=curl crawler=%q path=%q curl_exit=%q\n' "$label" "$path" "$exit_code"
@@ -89,6 +96,7 @@ jobs:
 
   chromium-audit:
     name: Chromium User-Agent audit
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
