@@ -26,6 +26,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     storedVectors: argv.includes('--stored-vectors'),
     backfillMissing,
     backfillStale,
+    all: argv.includes('--all'),
     quiet: argv.includes('--quiet'),
     resume: argv.includes('--resume'),
     resumeFrom: '',
@@ -281,6 +282,11 @@ async function fetchRecipeBatch(prisma, { limit, resumeFrom = '' }) {
   );
 }
 
+async function fetchRecipeCount(prisma) {
+  const [row] = await prisma.$queryRawUnsafe('SELECT count(*)::int AS count FROM recipes');
+  return Math.max(0, Number(row?.count || 0));
+}
+
 async function fetchIngredientsForRecipes(prisma, recipeIds = []) {
   if (!recipeIds.length) {
     return new Map();
@@ -410,6 +416,7 @@ export async function embedRecipes(options = parseArgs()) {
   const upsertEmbeddingForRecipe = options.upsertEmbedding || upsertEmbedding;
   const readState = options.loadState || loadBackfillState;
   const writeState = options.saveState || saveBackfillState;
+  const readRecipeCount = options.loadRecipeCount || fetchRecipeCount;
   const maxWrites = Number.isFinite(settings.maxWrites)
     ? Math.max(1, Math.floor(settings.maxWrites))
     : Number.POSITIVE_INFINITY;
@@ -418,6 +425,12 @@ export async function embedRecipes(options = parseArgs()) {
     ...options.embeddingConfig
   };
   const operation = getBackfillOperation(settings);
+  if (!settings.dryRun && settings.all && !Number.isFinite(maxWrites)) {
+    throw new Error('--all production backfills require an explicit --max-writes safety cap.');
+  }
+  const scanLimit = settings.all
+    ? await readRecipeCount(prisma)
+    : Math.max(1, Number(settings.limit) || 25);
   const summary = {
     processed: 0,
     generated: 0,
@@ -435,6 +448,8 @@ export async function embedRecipes(options = parseArgs()) {
     elapsedMs: 0,
     throughputPerSecond: 0,
     resumed: false,
+    catalogMode: settings.all ? 'all' : 'limited',
+    catalogLimit: scanLimit,
     maxWrites: Number.isFinite(maxWrites) ? maxWrites : null,
     writeLimitReached: false,
     lastProcessedRecipeId: null,
@@ -491,8 +506,8 @@ export async function embedRecipes(options = parseArgs()) {
   };
 
   try {
-    while (summary.processed < settings.limit && !stopRequested) {
-      const take = Math.min(settings.batchSize, settings.limit - summary.processed);
+    while (summary.processed < scanLimit && !stopRequested) {
+      const take = Math.min(settings.batchSize, scanLimit - summary.processed);
       const recipes = await fetchRecipeBatch(prisma, { limit: take, resumeFrom: cursor });
 
       if (!recipes.length) {
@@ -665,7 +680,7 @@ export async function embedRecipes(options = parseArgs()) {
       : null;
 
     console.log(
-      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} plannedInputs=${summary.plannedInputs} apiInputCount=${summary.apiInputCount} apiRequestCount=${summary.apiRequestCount} retries=${summary.retryCount} estimatedInputTokens=${summary.estimatedInputTokens} estimatedCostUsd=${summary.estimatedCostUsd ?? 'unconfigured'} elapsedMs=${summary.elapsedMs} throughputPerSecond=${summary.throughputPerSecond} resumed=${summary.resumed} maxWrites=${summary.maxWrites ?? 'unbounded'} writeLimitReached=${summary.writeLimitReached} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'} lastSuccessfulRecipeId=${summary.lastSuccessfulRecipeId || 'none'}`
+      `Summary: processed=${summary.processed} generated=${summary.generated} skipped=${summary.skipped} failed=${summary.failed} current=${summary.current} missing=${summary.missing} stale=${summary.stale} plannedInputs=${summary.plannedInputs} apiInputCount=${summary.apiInputCount} apiRequestCount=${summary.apiRequestCount} retries=${summary.retryCount} estimatedInputTokens=${summary.estimatedInputTokens} estimatedCostUsd=${summary.estimatedCostUsd ?? 'unconfigured'} elapsedMs=${summary.elapsedMs} throughputPerSecond=${summary.throughputPerSecond} resumed=${summary.resumed} catalogMode=${summary.catalogMode} catalogLimit=${summary.catalogLimit} maxWrites=${summary.maxWrites ?? 'unbounded'} writeLimitReached=${summary.writeLimitReached} lastProcessedRecipeId=${summary.lastProcessedRecipeId || 'none'} lastSuccessfulRecipeId=${summary.lastSuccessfulRecipeId || 'none'}`
     );
     return summary;
   } finally {

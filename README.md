@@ -260,15 +260,15 @@ npm run prisma:deploy
 npm run recipes:embed -- --dry-run --limit=10
 ```
 
-제한적 운영 backfill은 조회 범위와 실제 쓰기 상한을 분리합니다. 예를 들어 현재 1,166개 전체 카탈로그에서 missing 항목을 찾되 최대 10개만 쓰려면 `--limit=1166 --max-writes=10`을 함께 사용합니다.
+제한적 운영 backfill은 조회 범위와 실제 쓰기 상한을 분리합니다. `--all`은 실행 시점의 전체 카탈로그 수를 자동으로 읽으며, 실제 쓰기에서는 유한한 `--max-writes`가 없으면 실행 자체를 거부합니다.
 
 대량 작업 전에는 checkpoint를 만들고, API batch·재시도·재개 상태를 사용하는 명령으로 실행합니다. checkpoint 파일에는 원시 벡터가 있으므로 `.local/` 또는 별도의 보호된 로컬 경로에만 보관합니다.
 
 ```bash
 npm run recipes:checkpoint -- --dry-run
 npm run recipes:checkpoint -- --label=before-staged-backfill
-npm run recipes:embed -- --backfill-missing --limit=1166 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
-npm run recipes:embed -- --backfill-missing --resume --limit=1166 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:embed -- --backfill-missing --all --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:embed -- --backfill-missing --all --resume --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
 npm run recipes:verify-embeddings -- --expect-recipes=1166 --expect-embeddings=1028 --expect-current=45 --expect-missing=138 --expect-stale=983
 ```
 

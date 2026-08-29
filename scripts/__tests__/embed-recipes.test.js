@@ -50,6 +50,8 @@ describe('embed-recipes script', () => {
       plannedInputs: 1,
       apiInputCount: 0,
       apiRequestCount: 0,
+      catalogMode: 'limited',
+      catalogLimit: 1,
       maxWrites: null,
       writeLimitReached: false,
       lastProcessedRecipeId: '11111111-1111-1111-1111-111111111111',
@@ -59,6 +61,57 @@ describe('embed-recipes script', () => {
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Summary: processed=1'));
 
     consoleSpy.mockRestore();
+  });
+
+  it('derives the scan limit from the live catalog in all mode', async () => {
+    const recipes = Array.from({ length: 2 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-00000000001${index}`,
+      name: `Recipe ${index}`,
+      dish_type: 'Rice',
+      cooking_method: 'Boil',
+      ingredients_text: '',
+      steps: [],
+      raw: {}
+    }));
+    const prismaClient = {
+      $queryRawUnsafe: vi.fn().mockResolvedValueOnce(recipes).mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+      $disconnect: vi.fn()
+    };
+
+    const summary = await embedRecipes({
+      dryRun: true,
+      all: true,
+      batchSize: 2,
+      quiet: true,
+      prismaClient,
+      loadRecipeCount: vi.fn(async () => 2)
+    });
+
+    expect(summary).toMatchObject({
+      processed: 2,
+      missing: 2,
+      catalogMode: 'all',
+      catalogLimit: 2,
+      apiRequestCount: 0
+    });
+  });
+
+  it('requires an explicit write cap for all-mode production backfills', async () => {
+    const prismaClient = {
+      $queryRawUnsafe: vi.fn(),
+      $disconnect: vi.fn()
+    };
+
+    await expect(
+      embedRecipes({
+        dryRun: false,
+        all: true,
+        backfillMissing: true,
+        prismaClient,
+        loadRecipeCount: vi.fn(async () => 2),
+        embeddingConfig: { apiKey: 'test-key', model: 'test-model', dimensions: 3 }
+      })
+    ).rejects.toThrow('--all production backfills require an explicit --max-writes safety cap.');
   });
 
   it('stops after the configured maximum number of successful writes', async () => {
@@ -121,6 +174,7 @@ describe('embed-recipes script', () => {
     expect(
       parseArgs([
         '--backfill-missing',
+        '--all',
         '--limit=1146',
         '--max-writes=10',
         '--api-batch-size=50',
@@ -131,6 +185,7 @@ describe('embed-recipes script', () => {
     ).toMatchObject({
       dryRun: false,
       backfillMissing: true,
+      all: true,
       limit: 1146,
       maxWrites: 10,
       apiBatchSize: 50,

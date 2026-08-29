@@ -31,9 +31,9 @@ The repository now provides a repeatable checkpoint command and a resumable back
 ```bash
 npm run recipes:checkpoint -- --dry-run
 npm run recipes:checkpoint -- --label=before-staged-backfill
-npm run recipes:embed -- --backfill-missing --limit=1166 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:embed -- --backfill-missing --all --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
 npm run recipes:verify-embeddings -- --expect-recipes=1166 --expect-embeddings=1028 --expect-current=45 --expect-missing=138 --expect-stale=983
-npm run recipes:embed -- --backfill-missing --resume --limit=1166 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:embed -- --backfill-missing --all --resume --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
 ```
 
 - The embedding API receives multiple public catalog texts per request, capped at 100 inputs and defaulting to 25.
@@ -43,6 +43,7 @@ npm run recipes:embed -- --backfill-missing --resume --limit=1166 --batch-size=2
 - The state file is updated after each successful upsert. A failed item is never recorded as successful, so `--resume` retries it safely.
 - `--max-writes` remains independent of the catalog scan limit and is never raised automatically.
 - Every summary prints the effective `maxWrites` value so a dry-run can show the complete candidate count while still making the separately approved production write cap explicit.
+- `--all` reads the live recipe count instead of relying on a hardcoded catalog size. A non-dry-run `--all` operation is rejected unless an explicit finite `--max-writes` cap is present.
 - Summaries report API inputs, requests, retries, estimated tokens, optional estimated cost, elapsed time, and throughput without logging secrets or raw vectors.
 - `RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS` is optional and only enables the cost estimate; provider pricing is not hardcoded.
 - Checkpoints are gzip-compressed JSONL with a separate manifest containing row count, model/dimension groups, byte size, and SHA-256. The manifest is vector-free, while the checkpoint itself contains raw vectors and must remain protected.
