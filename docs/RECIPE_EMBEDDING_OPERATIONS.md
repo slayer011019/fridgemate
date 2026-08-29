@@ -115,4 +115,21 @@ Post-run verification:
 - Column type: `vector(1536)`
 - Refreshed-vector self retrieval: Top 1 `10/10`, Top 5 `10/10`, self similarity `1.0`
 
-No additional query-embedding API call was made after the approved ten-row stale replacement. Before replacing more stale rows, run the fixed ten-query fixture against stored production vectors under a separate API-cost approval and compare it with the 9/10 Hit@5 in-memory baseline.
+No additional query-embedding API call was made as part of the ten-row stale replacement itself.
+
+## Stored-Vector Quality Gate
+
+After separate approval, the fixed fixture was evaluated against stored production vectors. The evaluator ran in a read-only transaction, embedded only ten public catalog ingredient queries in one API request, and performed no database writes.
+
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Query inputs/API requests: `10 / 1`
+- Estimated input tokens: `135`
+- Hit@1: `9/10`
+- Hit@5: `10/10`
+- MRR@5: `0.95`
+- Average target rank: `1.1`
+- Unavailable fixture targets: `0`
+- Production writes: `0`
+- Post-evaluation state: `current=20`, `missing=143`, `stale=983`
+
+The stored-vector gate exceeds both the agreed 7/10 release threshold and the 9/10 in-memory comparison baseline. This is a **Go** for a separately approved, checkpointed, staged backfill. It is not approval to remove write caps or publish the semantic API before full coverage and final verification.

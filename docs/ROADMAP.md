@@ -40,9 +40,9 @@ Implemented:
 ## AI and Data Roadmap
 
 - Analyze recommendation impression/click exports
-- Keep the ingredient-first embedding text at or above the current 9/10 Hit@5 result while expanding the fixture beyond UUID-order smoke coverage
-- Evaluate the fixed ten-query fixture against stored production vectors after the successful missing 10-row and stale 10-row gates; remaining state is `missing=143`, `stale=983`, and full replacement stays blocked
-- Keep semantic API publication separate from the backfill and require stored-vector quality verification first
+- Keep the ingredient-first embedding text at or above the stored-vector Hit@5 `10/10` result while expanding the fixture beyond UUID-order smoke coverage
+- Run a separately approved, checkpointed, capped backfill for the remaining `missing=143` and `stale=983` rows; the fixed ten-query stored-vector gate passed with Hit@1 `9/10`, Hit@5 `10/10`, and zero production writes
+- Keep semantic API publication separate from the backfill and require complete coverage, integrity verification, and a final stored-vector quality rerun first
 - Normalize recommendation event keys into `local:<seed-id>` and `catalog:<uuid>` with a nullable catalog recipe FK
 - Add canonical dishes, aliases, and source-attributed popularity signals after catalog recipe IDs are stable
 - Prototype ranking improvements from collected feature snapshots

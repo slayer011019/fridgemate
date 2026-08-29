@@ -1,0 +1,1460 @@
+{
+  "preflight": {
+    "mode": "evaluate",
+    "evaluationSource": "stored-production-vectors",
+    "model": "text-embedding-3-small",
+    "dimensions": 1536,
+    "candidateCount": 1146,
+    "targetCount": 10,
+    "totalEmbeddingInputs": 10,
+    "expectedApiRequests": 1,
+    "estimatedInputTokens": 135,
+    "productionWrites": 0,
+    "classificationRate": 0.7892,
+    "unknownRate": 0.2108,
+    "embeddingMissingRate": 0.1248
+  },
+  "metrics": {
+    "hitAt1": "9/10",
+    "hitAt5": "10/10",
+    "mrrAt5": 0.95,
+    "averageOriginalRank": 1.1,
+    "unavailableTargetCount": 0,
+    "medianMissingIngredientsTop5": 2,
+    "medianMissingSeasoningsTop5": 1,
+    "apiRequestCount": 1,
+    "fullBackfillGate": "Go"
+  },
+  "results": [
+    {
+      "id": "0018e2ea-05d0-4beb-9d92-7e3c8c43475c",
+      "name": "초코타르트",
+      "queryText": "검색재료: 귀리, 땅콩버터, 무가당 코코아가루, 아몬드가루, 아몬드우유, 요거트\n양념: 소금, 알룰로스, 코코넛오일",
+      "embeddingText": "검색재료: 귀리, 땅콩버터, 무가당 코코아가루, 아몬드가루, 아몬드우유\n핵심재료: 귀리, 땅콩버터, 무가당 코코아가루, 아몬드가루, 아몬드우유\n양념: 소금, 알룰로스, 코코넛오일\n선택/고명: 요거트\n메뉴: 초코타르트\n분류: 후식\n조리방식: 기타",
+      "targetSimilarity": 0.868737,
+      "queryIngredientClassifications": [
+        {
+          "name": "귀리",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "땅콩버터",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "무가당 코코아가루",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "소금",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "아몬드가루",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "아몬드우유",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "알룰로스",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "요거트",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "코코넛오일",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "귀리",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "땅콩버터",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "무가당 코코아가루",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "소금",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "아몬드가루",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "아몬드우유",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "알룰로스",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "요거트",
+          "type": "garnish",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "코코넛오일",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "0018e2ea-05d0-4beb-9d92-7e3c8c43475c",
+          "name": "초코타르트",
+          "similarity": 0.868737,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+          "name": "포니언 스프",
+          "similarity": 0.648537,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 3
+        },
+        {
+          "id": "026dac3d-d4a1-4d68-a0c4-bcbaa5259419",
+          "name": "블루베리양갱",
+          "similarity": 0.615382,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "028cd65f-ff79-4ca6-943e-686b081a6fd6",
+          "name": "완두콩과 당근을 넣은 감자요거트 샐러드",
+          "similarity": 0.604521,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "01c22ab7-882c-4468-969b-bac7c402cdab",
+          "name": "시금치 리조또",
+          "similarity": 0.604136,
+          "missingIngredientCount": 4,
+          "missingSeasoningCount": 1
+        }
+      ]
+    },
+    {
+      "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+      "name": "포니언 스프",
+      "queryText": "검색재료: 감자, 버터, 시판 크루통, 양파, 우유\n양념: 소금, 파슬리가루, 후춧가루",
+      "embeddingText": "검색재료: 감자, 시판 크루통, 양파, 우유\n핵심재료: 감자, 양파, 우유\n양념: 버터, 소금, 파슬리가루, 후춧가루\n메뉴: 포니언 스프\n분류: 일품\n조리방식: 끓이기",
+      "targetSimilarity": 0.887543,
+      "queryIngredientClassifications": [
+        {
+          "name": "감자",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "버터",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "소금",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "시판 크루통",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "양파",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "우유",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "파슬리가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "후춧가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "감자",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "버터",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "소금",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "시판 크루통",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "양파",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "우유",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "파슬리가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "후춧가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+          "name": "포니언 스프",
+          "similarity": 0.887543,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "028cd65f-ff79-4ca6-943e-686b081a6fd6",
+          "name": "완두콩과 당근을 넣은 감자요거트 샐러드",
+          "similarity": 0.772629,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "2159ef43-3db0-4759-93ab-dc6eaf1b72a1",
+          "name": "장조림",
+          "similarity": 0.68128,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "026dac3d-d4a1-4d68-a0c4-bcbaa5259419",
+          "name": "블루베리양갱",
+          "similarity": 0.672216,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "01c22ab7-882c-4468-969b-bac7c402cdab",
+          "name": "시금치 리조또",
+          "similarity": 0.668044,
+          "missingIngredientCount": 4,
+          "missingSeasoningCount": 0
+        }
+      ]
+    },
+    {
+      "id": "0102b7de-0f16-4942-adec-3c55e6581f95",
+      "name": "단호박약식",
+      "queryText": "검색재료: 대추, 미니 단호박, 밤, 찹쌀, 크린베리\n양념: 계피가루, 맛간장, 참기름",
+      "embeddingText": "검색재료: 대추, 미니 단호박, 밤, 찹쌀, 크린베리\n핵심재료: 대추, 미니 단호박, 밤, 찹쌀, 크린베리\n양념: 계피가루, 맛간장, 참기름\n메뉴: 단호박약식\n분류: 밥\n조리방식: 찌기",
+      "targetSimilarity": 0.866674,
+      "queryIngredientClassifications": [
+        {
+          "name": "계피가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "대추",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "맛간장",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "미니 단호박",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "밤",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "참기름",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "찹쌀",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "크린베리",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "계피가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "대추",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "맛간장",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "미니 단호박",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "밤",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "참기름",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "찹쌀",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "크린베리",
+          "type": "main",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "0102b7de-0f16-4942-adec-3c55e6581f95",
+          "name": "단호박약식",
+          "similarity": 0.866674,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "01c22ab7-882c-4468-969b-bac7c402cdab",
+          "name": "시금치 리조또",
+          "similarity": 0.668256,
+          "missingIngredientCount": 4,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+          "name": "포니언 스프",
+          "similarity": 0.646546,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "01f2e55d-73fd-4024-9f23-241de3346cd4",
+          "name": "떡갈비콩나물밥",
+          "similarity": 0.642262,
+          "missingIngredientCount": 10,
+          "missingSeasoningCount": 5
+        },
+        {
+          "id": "026fb3ff-6e79-4e1f-89bd-f1cbb2af12eb",
+          "name": "호박잎 삼계탕",
+          "similarity": 0.623199,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 2
+        }
+      ]
+    },
+    {
+      "id": "01c22ab7-882c-4468-969b-bac7c402cdab",
+      "name": "시금치 리조또",
+      "queryText": "검색재료: 두유, 마, 밥, 버터 1½작은술, 시금치\n양념: 소금, 후춧가루",
+      "embeddingText": "검색재료: 두유, 마, 밥, 버터 1½작은술, 시금치\n핵심재료: 두유, 마, 밥, 시금치\n양념: 소금, 후춧가루\n메뉴: 시금치 리조또\n분류: 밥\n조리방식: 끓이기",
+      "targetSimilarity": 0.858183,
+      "queryIngredientClassifications": [
+        {
+          "name": "두유",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "마",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "밥",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "버터 1½작은술",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "소금",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "시금치",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "후춧가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "두유",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "마",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "밥",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "버터 1½작은술",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "소금",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "시금치",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "후춧가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "01c22ab7-882c-4468-969b-bac7c402cdab",
+          "name": "시금치 리조또",
+          "similarity": 0.858183,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+          "name": "포니언 스프",
+          "similarity": 0.71898,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "026dac3d-d4a1-4d68-a0c4-bcbaa5259419",
+          "name": "블루베리양갱",
+          "similarity": 0.687744,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "63181106-3b96-456f-8df5-7915b4876849",
+          "name": "시금치나물",
+          "similarity": 0.644329,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+          "name": "죽순콩나물밥",
+          "similarity": 0.638085,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 7
+        }
+      ]
+    },
+    {
+      "id": "01f2e55d-73fd-4024-9f23-241de3346cd4",
+      "name": "떡갈비콩나물밥",
+      "queryText": "검색재료: 김치, 다진 소고기, 대파, 떡, 배, 버섯, 브로컬리, 쌀, 콩나물\n양념: 마늘, 맛술, 설탕, 진간장, 참기름, 통깨, 후춧가루",
+      "embeddingText": "검색재료: 김치, 다진 마늘, 다진 소고기, 대파, 떡, 배, 버섯, 브로컬리, 쌀, 콩나물\n핵심재료: 김치, 다진 마늘, 다진 소고기, 대파, 떡, 배, 버섯, 브로컬리, 쌀, 콩나물\n양념: 맛술, 설탕, 진간장, 참기름, 통깨, 후춧가루\n메뉴: 떡갈비콩나물밥\n분류: 밥\n조리방식: 끓이기",
+      "targetSimilarity": 0.844895,
+      "queryIngredientClassifications": [
+        {
+          "name": "김치",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "다진 마늘",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "다진 소고기",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "대파",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "떡",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "맛술",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "배",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "버섯",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "브로컬리",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "설탕",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "쌀",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "진간장",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "참기름",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "콩나물",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "통깨",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "후춧가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "김치",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "다진 마늘",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "다진 소고기",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "대파",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "떡",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "맛술",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "배",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "버섯",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "브로컬리",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "설탕",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "쌀",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "진간장",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "참기름",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "콩나물",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "통깨",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "후춧가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "01f2e55d-73fd-4024-9f23-241de3346cd4",
+          "name": "떡갈비콩나물밥",
+          "similarity": 0.844895,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "6c8757a9-b3e8-4bc8-9914-f0a6b44e3602",
+          "name": "부대찌개",
+          "similarity": 0.790982,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+          "name": "죽순콩나물밥",
+          "similarity": 0.675493,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "28c36c3b-4ed2-41a3-8b11-eeed4c246de6",
+          "name": "된장찌개",
+          "similarity": 0.674593,
+          "missingIngredientCount": 1,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "2159ef43-3db0-4759-93ab-dc6eaf1b72a1",
+          "name": "장조림",
+          "similarity": 0.64536,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        }
+      ]
+    },
+    {
+      "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+      "name": "죽순콩나물밥",
+      "queryText": "검색재료: 다진 마늘, 다진파, 삶은 죽순, 쌀, 청양고추, 콩나물, 홍고추\n양념: 고춧가루, 깨소금, 맛술, 설탕, 진간장, 참기름",
+      "embeddingText": "검색재료: 다진파, 삶은 죽순, 쌀, 청양고추, 콩나물, 홍고추\n핵심재료: 쌀, 콩나물\n양념: 고춧가루, 깨소금, 마늘, 맛술, 설탕, 진간장, 참기름\n메뉴: 죽순콩나물밥\n분류: 밥\n조리방식: 끓이기",
+      "targetSimilarity": 0.852689,
+      "queryIngredientClassifications": [
+        {
+          "name": "고춧가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "깨소금",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "다진파",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "마늘",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "맛술",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "삶은 죽순",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "설탕",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "쌀",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "진간장",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "참기름",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "청양고추",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "콩나물",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "홍고추",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "고춧가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "깨소금",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "다진파",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "마늘",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "맛술",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "삶은 죽순",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "설탕",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "쌀",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "진간장",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "참기름",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "청양고추",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "콩나물",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "홍고추",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+          "name": "죽순콩나물밥",
+          "similarity": 0.852689,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "7c613a48-4fab-48a2-96c4-d90c06866471",
+          "name": "콩나물무침",
+          "similarity": 0.700057,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "28c36c3b-4ed2-41a3-8b11-eeed4c246de6",
+          "name": "된장찌개",
+          "similarity": 0.676966,
+          "missingIngredientCount": 1,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "63181106-3b96-456f-8df5-7915b4876849",
+          "name": "시금치나물",
+          "similarity": 0.660586,
+          "missingIngredientCount": 1,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "01f2e55d-73fd-4024-9f23-241de3346cd4",
+          "name": "떡갈비콩나물밥",
+          "similarity": 0.657677,
+          "missingIngredientCount": 7,
+          "missingSeasoningCount": 2
+        }
+      ]
+    },
+    {
+      "id": "026dac3d-d4a1-4d68-a0c4-bcbaa5259419",
+      "name": "블루베리양갱",
+      "queryText": "검색재료: 블루베리, 한천, 흰앙금\n양념: 설탕",
+      "embeddingText": "검색재료: 블루베리, 한천, 흰앙금\n핵심재료: 블루베리, 한천, 흰앙금\n양념: 설탕\n액체: 물\n메뉴: 블루베리양갱\n분류: 후식\n조리방식: 끓이기",
+      "targetSimilarity": 0.835997,
+      "queryIngredientClassifications": [
+        {
+          "name": "물",
+          "type": "liquid",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "블루베리",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "설탕",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "한천",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "흰앙금",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "물",
+          "type": "liquid",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "블루베리",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "설탕",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "한천",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "흰앙금",
+          "type": "main",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "026dac3d-d4a1-4d68-a0c4-bcbaa5259419",
+          "name": "블루베리양갱",
+          "similarity": 0.835997,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+          "name": "포니언 스프",
+          "similarity": 0.614582,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "2159ef43-3db0-4759-93ab-dc6eaf1b72a1",
+          "name": "장조림",
+          "similarity": 0.578216,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 1
+        },
+        {
+          "id": "01c22ab7-882c-4468-969b-bac7c402cdab",
+          "name": "시금치 리조또",
+          "similarity": 0.571245,
+          "missingIngredientCount": 4,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "0227002c-6273-4ba2-88cb-e2fb7fb3c5af",
+          "name": "고등어구이",
+          "similarity": 0.565081,
+          "missingIngredientCount": 1,
+          "missingSeasoningCount": 2
+        }
+      ]
+    },
+    {
+      "id": "026fb3ff-6e79-4e1f-89bd-f1cbb2af12eb",
+      "name": "호박잎 삼계탕",
+      "queryText": "검색재료: 닭고기, 닭고기 가슴살, 대추, 미나리, 인삼, 찹쌀, 호박잎\n양념: 소금, 후춧가루",
+      "embeddingText": "검색재료: 닭고기, 닭고기 가슴살, 대추, 미나리, 인삼, 찹쌀, 호박잎\n핵심재료: 닭고기 가슴살, 대추, 미나리, 찹쌀, 호박잎\n양념: 소금, 후춧가루\n메뉴: 호박잎 삼계탕\n분류: 일품\n조리방식: 끓이기",
+      "targetSimilarity": 0.854724,
+      "queryIngredientClassifications": [
+        {
+          "name": "닭고기",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "닭고기 가슴살",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "대추",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "미나리",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "소금",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "인삼",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "찹쌀",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "호박잎",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "후춧가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "닭고기",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "닭고기 가슴살",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "대추",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "미나리",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "소금",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "인삼",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "찹쌀",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "호박잎",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "후춧가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "026fb3ff-6e79-4e1f-89bd-f1cbb2af12eb",
+          "name": "호박잎 삼계탕",
+          "similarity": 0.854724,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "02a13f08-f8c9-44ad-91bb-5adf84c45bd4",
+          "name": "케이준 스타일 닭고기 요리",
+          "similarity": 0.756399,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 5
+        },
+        {
+          "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+          "name": "죽순콩나물밥",
+          "similarity": 0.700864,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 7
+        },
+        {
+          "id": "01f2e55d-73fd-4024-9f23-241de3346cd4",
+          "name": "떡갈비콩나물밥",
+          "similarity": 0.691076,
+          "missingIngredientCount": 10,
+          "missingSeasoningCount": 5
+        },
+        {
+          "id": "28c36c3b-4ed2-41a3-8b11-eeed4c246de6",
+          "name": "된장찌개",
+          "similarity": 0.666463,
+          "missingIngredientCount": 1,
+          "missingSeasoningCount": 0
+        }
+      ]
+    },
+    {
+      "id": "028cd65f-ff79-4ca6-943e-686b081a6fd6",
+      "name": "완두콩과 당근을 넣은 감자요거트 샐러드",
+      "queryText": "검색재료: 감자, 당근, 완두콩, 요거트",
+      "embeddingText": "검색재료: 감자, 당근, 완두콩, 요거트\n핵심재료: 감자, 당근, 완두콩, 요거트\n메뉴: 완두콩과 당근을 넣은 감자요거트 샐러드\n분류: 기타\n조리방식: 기타",
+      "targetSimilarity": 0.855412,
+      "queryIngredientClassifications": [
+        {
+          "name": "감자",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "당근",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "완두콩",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "요거트",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "감자",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "당근",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "완두콩",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "요거트",
+          "type": "main",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 1,
+      "hit1": true,
+      "hit5": true,
+      "reciprocalRankAt5": 1,
+      "top5": [
+        {
+          "id": "028cd65f-ff79-4ca6-943e-686b081a6fd6",
+          "name": "완두콩과 당근을 넣은 감자요거트 샐러드",
+          "similarity": 0.855412,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+          "name": "포니언 스프",
+          "similarity": 0.764925,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "28c36c3b-4ed2-41a3-8b11-eeed4c246de6",
+          "name": "된장찌개",
+          "similarity": 0.622601,
+          "missingIngredientCount": 1,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+          "name": "죽순콩나물밥",
+          "similarity": 0.605228,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 7
+        },
+        {
+          "id": "026fb3ff-6e79-4e1f-89bd-f1cbb2af12eb",
+          "name": "호박잎 삼계탕",
+          "similarity": 0.590909,
+          "missingIngredientCount": 5,
+          "missingSeasoningCount": 2
+        }
+      ]
+    },
+    {
+      "id": "02a13f08-f8c9-44ad-91bb-5adf84c45bd4",
+      "name": "케이준 스타일 닭고기 요리",
+      "queryText": "검색재료: 닭고기, 바질마른것, 양파가루, 오레가노마른것, 키엔페퍼, 타임 마른것\n양념: 마늘가루, 식용유, 파프리카가루, 황설탕, 후추, 흰후춧가루",
+      "embeddingText": "검색재료: 닭고기, 바질마른것, 양파가루, 오레가노마른것, 키엔페퍼, 타임 마른것\n핵심재료: 닭고기\n양념: 마늘가루, 식용유, 파프리카가루, 후추, 흰후춧가루\n선택/고명: 황설탕\n메뉴: 케이준 스타일 닭고기 요리\n분류: 반찬\n조리방식: 굽기",
+      "targetSimilarity": 0.734241,
+      "queryIngredientClassifications": [
+        {
+          "name": "닭고기",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "마늘가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "바질마른것",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "식용유",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "양파가루",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "오레가노마른것",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "키엔페퍼",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "타임 마른것",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "파프리카가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "황설탕",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "후추",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        },
+        {
+          "name": "흰후춧가루",
+          "type": "seasoning",
+          "reason": "normalized-name-dictionary"
+        }
+      ],
+      "candidateIngredientClassifications": [
+        {
+          "name": "닭고기",
+          "type": "main",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "마늘가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "바질마른것",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "식용유",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "양파가루",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "오레가노마른것",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "키엔페퍼",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "타임 마른것",
+          "type": "unknown",
+          "reason": "insufficient-evidence"
+        },
+        {
+          "name": "파프리카가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "황설탕",
+          "type": "optional",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "후추",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        },
+        {
+          "name": "흰후춧가루",
+          "type": "seasoning",
+          "reason": "explicit-category"
+        }
+      ],
+      "originalRank": 2,
+      "hit1": false,
+      "hit5": true,
+      "reciprocalRankAt5": 0.5,
+      "top5": [
+        {
+          "id": "026fb3ff-6e79-4e1f-89bd-f1cbb2af12eb",
+          "name": "호박잎 삼계탕",
+          "similarity": 0.77172,
+          "missingIngredientCount": 5,
+          "missingSeasoningCount": 2
+        },
+        {
+          "id": "02a13f08-f8c9-44ad-91bb-5adf84c45bd4",
+          "name": "케이준 스타일 닭고기 요리",
+          "similarity": 0.734241,
+          "missingIngredientCount": 0,
+          "missingSeasoningCount": 0
+        },
+        {
+          "id": "008b30c1-95b1-4197-9f1f-c1c40dfcb3bc",
+          "name": "포니언 스프",
+          "similarity": 0.695856,
+          "missingIngredientCount": 3,
+          "missingSeasoningCount": 4
+        },
+        {
+          "id": "01f2e55d-73fd-4024-9f23-241de3346cd4",
+          "name": "떡갈비콩나물밥",
+          "similarity": 0.689721,
+          "missingIngredientCount": 10,
+          "missingSeasoningCount": 6
+        },
+        {
+          "id": "026d995e-e4f4-4395-8134-d566ea73f7c4",
+          "name": "죽순콩나물밥",
+          "similarity": 0.688877,
+          "missingIngredientCount": 2,
+          "missingSeasoningCount": 7
+        }
+      ]
+    }
+  ]
+}

@@ -78,4 +78,77 @@ describe('recipe search evaluation', () => {
     expect(generateBatch).toHaveBeenCalledTimes(1);
     expect(prismaClient.$executeRawUnsafe).toBeUndefined();
   });
+
+  it('embeds only fixture queries when evaluating stored vectors', async () => {
+    const prismaClient = createPrismaClient();
+    prismaClient.$queryRawUnsafe.mockImplementation(async (sql, vectorLiteral) => {
+      if (sql.includes('WITH selected_recipes')) {
+        return [
+          {
+            recipe_id: ID_A,
+            external_id: 'a',
+            name: '감자볶음',
+            dish_type: '반찬',
+            cooking_method: '볶기',
+            ingredient_id: 'ia',
+            raw_text: '감자 1개',
+            raw_name: '감자',
+            normalized_name: '감자'
+          },
+          {
+            recipe_id: ID_B,
+            external_id: 'b',
+            name: '계란찜',
+            dish_type: '반찬',
+            cooking_method: '찌기',
+            ingredient_id: 'ib',
+            raw_text: '계란 2개',
+            raw_name: '계란',
+            normalized_name: '계란'
+          }
+        ];
+      }
+      if (sql.includes('ORDER BY re.embedding')) {
+        return vectorLiteral === '[1,0,0]'
+          ? [{ id: ID_A, similarity: 1 }, { id: ID_B, similarity: 0 }]
+          : [{ id: ID_B, similarity: 1 }, { id: ID_A, similarity: 0 }];
+      }
+      if (sql.includes('FROM recipe_embeddings')) return [{ count: 2 }];
+      return [];
+    });
+    const generateBatch = vi.fn(async (texts) => {
+      expect(texts).toHaveLength(2);
+      return [[1, 0, 0], [0, 1, 0]];
+    });
+
+    const report = await evaluateRecipeSearch({
+      dryRun: false,
+      storedVectors: true,
+      limit: 10,
+      dimensions: 3,
+      apiKey: 'test-key',
+      prismaClient,
+      generateBatch,
+      fixture: {
+        recipes: [
+          { id: ID_A, name: '감자볶음' },
+          { id: ID_B, name: '계란찜' }
+        ]
+      }
+    });
+
+    expect(report.preflight).toMatchObject({
+      evaluationSource: 'stored-production-vectors',
+      totalEmbeddingInputs: 2,
+      expectedApiRequests: 1,
+      productionWrites: 0
+    });
+    expect(report.metrics).toMatchObject({
+      hitAt1: '2/2',
+      hitAt5: '2/2',
+      apiRequestCount: 1,
+      unavailableTargetCount: 0
+    });
+    expect(generateBatch).toHaveBeenCalledTimes(1);
+  });
 });

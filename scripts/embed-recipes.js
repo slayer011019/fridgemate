@@ -15,6 +15,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     dryRun: argv.includes('--dry-run') || (!backfillMissing && !backfillStale),
     evaluate: argv.includes('--evaluate'),
     executeEvaluation: argv.includes('--execute'),
+    storedVectors: argv.includes('--stored-vectors'),
     backfillMissing,
     backfillStale,
     quiet: argv.includes('--quiet'),
@@ -307,8 +308,9 @@ export async function embedRecipes(options = parseArgs()) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const options = parseArgs();
   const operation = options.evaluate
-    ? evaluateRecipeSearch({
+      ? evaluateRecipeSearch({
         dryRun: !options.executeEvaluation,
+        storedVectors: options.storedVectors,
         limit: options.limit,
         output: options.output
       }).then((report) => console.log(JSON.stringify(report, null, 2)))

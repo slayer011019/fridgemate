@@ -24,6 +24,7 @@ const FIXTURE_PATH = new URL('./fixtures/recipe-search-evaluation.json', import.
 function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     dryRun: argv.includes('--dry-run') || !argv.includes('--execute'),
+    storedVectors: argv.includes('--stored-vectors'),
     limit: DEFAULT_CANDIDATE_LIMIT,
     output: ''
   };
@@ -55,6 +56,14 @@ function cosineSimilarity(left, right) {
   }
 
   return leftMagnitude && rightMagnitude ? dot / (Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude)) : 0;
+}
+
+function vectorToSqlLiteral(vector = []) {
+  if (!Array.isArray(vector) || !vector.every((value) => Number.isFinite(value))) {
+    throw new Error('Stored-vector evaluation requires a numeric query embedding.');
+  }
+
+  return `[${vector.join(',')}]`;
 }
 
 function median(values = []) {
@@ -169,6 +178,30 @@ async function loadCandidates(prisma, fixture, limit) {
   return recipes;
 }
 
+async function loadStoredVectorRanking(prisma, vector, config, candidateIds) {
+  const vectorLiteral = vectorToSqlLiteral(vector);
+  const safeLimit = Math.max(10, Math.min(MAX_CANDIDATE_LIMIT, candidateIds.length));
+  const rows = await prisma.$queryRawUnsafe(
+    `
+      SELECT
+        re.recipe_id AS id,
+        1 - (re.embedding <=> $1::vector) AS similarity
+      FROM recipe_embeddings re
+      WHERE re.embedding_model = $2
+        AND re.embedding_dimensions = $3
+        AND re.recipe_id = ANY($4::uuid[])
+      ORDER BY re.embedding <=> $1::vector
+      LIMIT ${safeLimit}
+    `,
+    vectorLiteral,
+    config.model,
+    config.dimensions,
+    candidateIds
+  );
+
+  return rows.map((row) => ({ id: String(row.id), similarity: Number(row.similarity || 0) }));
+}
+
 function assertOutputPath(output) {
   if (!output) return '';
   const resolved = path.resolve(process.cwd(), output);
@@ -195,7 +228,13 @@ export async function evaluateRecipeSearch(options = {}) {
     }
   }
 
-  const settings = { dryRun: true, limit: DEFAULT_CANDIDATE_LIMIT, output: '', ...options };
+  const settings = {
+    dryRun: true,
+    storedVectors: false,
+    limit: DEFAULT_CANDIDATE_LIMIT,
+    output: '',
+    ...options
+  };
   settings.limit = Math.max(10, Math.min(MAX_CANDIDATE_LIMIT, Number(settings.limit) || DEFAULT_CANDIDATE_LIMIT));
   const prisma = settings.prismaClient;
   const fixture = settings.fixture || (await loadFixture());
@@ -215,9 +254,14 @@ export async function evaluateRecipeSearch(options = {}) {
 
     const candidateTexts = candidates.map((recipe) => buildProductionRecipeEmbeddingText(recipe, recipe.ingredients));
     const queryTexts = targets.map((recipe) => buildRecipeVectorQueryText(recipe.ingredients));
-    const totalInputs = candidateTexts.length + queryTexts.length;
+    const plannedEmbeddingInputs = settings.storedVectors
+      ? queryTexts
+      : [...candidateTexts, ...queryTexts];
+    const totalInputs = plannedEmbeddingInputs.length;
     const expectedApiRequests = Math.ceil(totalInputs / EMBEDDING_BATCH_SIZE);
-    const estimatedInputTokens = Math.ceil([...candidateTexts, ...queryTexts].reduce((sum, text) => sum + text.length, 0) / 4);
+    const estimatedInputTokens = Math.ceil(
+      plannedEmbeddingInputs.reduce((sum, text) => sum + text.length, 0) / 4
+    );
     const classifiedIngredients = candidates.flatMap((recipe) =>
       classifyRecipeIngredientsForEmbedding(recipe, recipe.ingredients)
     );
@@ -237,6 +281,7 @@ export async function evaluateRecipeSearch(options = {}) {
     const existingEmbeddingCount = Number(existingRows[0]?.count || 0);
     const preflight = {
       mode: settings.dryRun ? 'dry-run' : 'evaluate',
+      evaluationSource: settings.storedVectors ? 'stored-production-vectors' : 'in-memory-reembedding',
       model: config.model,
       dimensions: config.dimensions,
       candidateCount: candidates.length,
@@ -254,20 +299,38 @@ export async function evaluateRecipeSearch(options = {}) {
     if (!config.apiKey) throw new Error('OPENAI_API_KEY is required for --evaluate --execute.');
 
     const generateBatch = settings.generateBatch || generateRecipeEmbeddings;
-    const generated = await generateInBatches([...candidateTexts, ...queryTexts], config, generateBatch);
-    const candidateVectors = generated.vectors.slice(0, candidates.length);
-    const queryVectors = generated.vectors.slice(candidates.length);
+    const embeddingInputs = settings.storedVectors ? queryTexts : [...candidateTexts, ...queryTexts];
+    const generated = await generateInBatches(embeddingInputs, config, generateBatch);
+    const candidateVectors = settings.storedVectors ? [] : generated.vectors.slice(0, candidates.length);
+    const queryVectors = settings.storedVectors ? generated.vectors : generated.vectors.slice(candidates.length);
+    const candidateIds = candidates.map((candidate) => candidate.id);
+    const storedRankings = [];
+
+    if (settings.storedVectors) {
+      for (const queryVector of queryVectors) {
+        const rankingRows = await loadStoredVectorRanking(prisma, queryVector, config, candidateIds);
+        storedRankings.push(
+          rankingRows
+            .map((row) => ({ recipe: candidateById.get(row.id), similarity: row.similarity }))
+            .filter((item) => item.recipe)
+        );
+      }
+    }
+
     const missingCounts = [];
     const seasoningCounts = [];
     const results = targets.map((target, targetIndex) => {
-      const ranked = candidates
-        .map((candidate, candidateIndex) => ({
-          recipe: candidate,
-          similarity: cosineSimilarity(queryVectors[targetIndex], candidateVectors[candidateIndex])
-        }))
-        .sort((left, right) => right.similarity - left.similarity || left.recipe.id.localeCompare(right.recipe.id));
+      const ranked = settings.storedVectors
+        ? storedRankings[targetIndex]
+        : candidates
+            .map((candidate, candidateIndex) => ({
+              recipe: candidate,
+              similarity: cosineSimilarity(queryVectors[targetIndex], candidateVectors[candidateIndex])
+            }))
+            .sort((left, right) => right.similarity - left.similarity || left.recipe.id.localeCompare(right.recipe.id));
       const targetResult = ranked.find((item) => item.recipe.id === target.id);
-      const originalRank = ranked.findIndex((item) => item.recipe.id === target.id) + 1;
+      const targetRankIndex = ranked.findIndex((item) => item.recipe.id === target.id);
+      const originalRank = targetRankIndex >= 0 ? targetRankIndex + 1 : null;
       const available = target.ingredients.map((ingredient) => ({ name: ingredient.normalizedName }));
       const queryIngredientClassifications = available.map((ingredient) => {
         const classification = classifyRecipeIngredient({
@@ -306,13 +369,13 @@ export async function evaluateRecipeSearch(options = {}) {
         name: target.name,
         queryText: queryTexts[targetIndex],
         embeddingText: candidateTexts[candidates.findIndex((candidate) => candidate.id === target.id)],
-        targetSimilarity: round(targetResult?.similarity, 6),
+        targetSimilarity: targetResult ? round(targetResult.similarity, 6) : null,
         queryIngredientClassifications,
         candidateIngredientClassifications,
         originalRank,
         hit1: originalRank === 1,
-        hit5: originalRank <= 5,
-        reciprocalRankAt5: originalRank <= 5 ? 1 / originalRank : 0,
+        hit5: originalRank !== null && originalRank <= 5,
+        reciprocalRankAt5: originalRank !== null && originalRank <= 5 ? 1 / originalRank : 0,
         top5
       };
     });
@@ -322,7 +385,10 @@ export async function evaluateRecipeSearch(options = {}) {
       hitAt1: `${hit1Count}/${targets.length}`,
       hitAt5: `${hit5Count}/${targets.length}`,
       mrrAt5: round(results.reduce((sum, result) => sum + result.reciprocalRankAt5, 0) / targets.length),
-      averageOriginalRank: round(results.reduce((sum, result) => sum + result.originalRank, 0) / targets.length),
+      averageOriginalRank: round(
+        results.reduce((sum, result) => sum + (result.originalRank || existingEmbeddingCount + 1), 0) / targets.length
+      ),
+      unavailableTargetCount: results.filter((result) => result.originalRank === null).length,
       medianMissingIngredientsTop5: median(missingCounts),
       medianMissingSeasoningsTop5: median(seasoningCounts),
       apiRequestCount: generated.requestCount,

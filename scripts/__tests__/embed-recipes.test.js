@@ -109,4 +109,16 @@ describe('embed-recipes script', () => {
       maxWrites: 10
     });
   });
+
+  it('parses stored-vector evaluation without enabling a backfill', () => {
+    expect(parseArgs(['--evaluate', '--execute', '--stored-vectors', '--limit=1146'])).toMatchObject({
+      dryRun: true,
+      evaluate: true,
+      executeEvaluation: true,
+      storedVectors: true,
+      backfillMissing: false,
+      backfillStale: false,
+      limit: 1146
+    });
+  });
 });

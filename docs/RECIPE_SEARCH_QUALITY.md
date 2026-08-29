@@ -2,23 +2,23 @@
 
 ## Scope
 
-This check evaluates semantic recipe candidate retrieval without writing production rows. The fixed fixture is `scripts/fixtures/recipe-search-evaluation.json`; the generated aggregate and per-recipe report is `docs/recipe-search-quality-report.json`. No embedding vectors are stored in either file.
+This check evaluates semantic recipe candidate retrieval without writing production rows. The fixed fixture is `scripts/fixtures/recipe-search-evaluation.json`; the in-memory report is `docs/recipe-search-quality-report.json`, and the stored-production-vector report is `docs/recipe-search-stored-vector-report.json`. No embedding vectors are stored in either report.
 
 ## Baseline and Result
 
-| Metric | Old production vectors | Classification-aware in-memory vectors |
-| --- | ---: | ---: |
-| Hit@1 | not recorded | 9/10 |
-| Hit@5 | historical 2/10; fixed fixture replay 3/10 | 9/10 |
-| MRR@5 | not recorded | 0.9 |
-| Average original rank | not recorded | 30.4 |
-| Classification rate | 0% from the empty DB category column | 79.35% |
-| Unknown rate | not represented | 20.65% |
-| Median core missing count in evaluated Top 5 | observed range about 9-14 | 3.5 |
-| Median missing seasoning count in evaluated Top 5 | not recorded | 1 |
-| Existing embedding missing rate | 13.35% | 13.35% |
+| Metric | Old production vectors | Classification-aware in-memory vectors | Stored production vectors after limited refresh |
+| --- | ---: | ---: | ---: |
+| Hit@1 | not recorded | 9/10 | 9/10 |
+| Hit@5 | historical 2/10; fixed fixture replay 3/10 | 9/10 | 10/10 |
+| MRR@5 | not recorded | 0.9 | 0.95 |
+| Average original rank | not recorded | 30.4 | 1.1 |
+| Classification rate | 0% from the empty DB category column | 79.35% | 78.92% |
+| Unknown rate | not represented | 20.65% | 21.08% |
+| Median core missing count in evaluated Top 5 | observed range about 9-14 | 3.5 | 2 |
+| Median missing seasoning count in evaluated Top 5 | not recorded | 1 | 1 |
+| Existing embedding missing rate | 13.35% | 13.35% | 12.48% |
 
-The agreed release gate is Hit@5 at least 7/10. The current result is **Go** for a separately reviewed, limited production backfill. No production vectors were written by this evaluation.
+The agreed release gate is Hit@5 at least 7/10. The stored-vector result is **Go** for a separately approved, staged production backfill. The evaluation embedded ten fixture queries in one API request, read existing production vectors, and wrote no production rows. Semantic API publication remains a separate gate after catalog coverage and integrity verification.
 
 ## Failure Diagnosis and Minimal Fix
 
@@ -64,6 +64,15 @@ In-memory evaluation using the configured embedding API:
 npm run recipes:embed -- --evaluate --execute --limit=1146 --output=docs/recipe-search-quality-report.json
 ```
 
+Stored-production-vector preflight and evaluation:
+
+```bash
+npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1146
+npm run recipes:embed -- --evaluate --execute --stored-vectors --limit=1146 --output=docs/recipe-search-stored-vector-report.json
+```
+
+The stored-vector mode embeds only the ten fixture queries, evaluates them against matching model/dimension rows in `recipe_embeddings`, and runs inside a read-only transaction. The production run used ten inputs, one API request, about 135 estimated input tokens, and zero database writes.
+
 The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 API requests, and an estimated 38,125 input tokens. Cost is calculated as `estimated input tokens / 1,000,000 * the provider's current per-million-token embedding price`.
 
 ## Backfill Plan After Go
@@ -72,12 +81,13 @@ The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 
 2. Completed preflight: `missing=153`, `stale=993`, `current=0`.
 3. Completed limited missing backfill: `generated=10`, `failed=0`, and `writeLimitReached=true` with `--backfill-missing --limit=1146 --batch-size=25 --max-writes=10`.
 4. Completed integrity and stored-vector smoke checks: total 1,003, `text-embedding-3-small`/1,536 count 1,003, duplicates 0, orphans 0, and relevant Top 3 results for the egg-rice query. The post-run state is `missing=143`, `stale=993`, `current=10`.
-5. Completed limited stale replacement: `generated=10`, `failed=0`, `writeLimitReached=true`, post-run `current=20`, `missing=143`, `stale=983`, and refreshed-vector self retrieval Top 1/Top 5 `10/10`. Do not remove or raise the write cap until the fixed ten-query fixture is evaluated against stored vectors.
-6. During stale replacement, old and new content hashes coexist temporarily under the same model/dimension filter. Run during a controlled window, monitor search quality, and pause on regression.
-7. Re-run the fixed quality report against stored vectors, then verify total count 1,146, dimensions 1,536, duplicate keys 0, and orphans 0.
-8. Roll back by restoring the protected `recipe_embeddings` snapshot if stored-vector quality differs from the approved in-memory report.
+5. Completed limited stale replacement: `generated=10`, `failed=0`, `writeLimitReached=true`, post-run `current=20`, `missing=143`, `stale=983`, and refreshed-vector self retrieval Top 1/Top 5 `10/10`.
+6. Completed the fixed ten-query stored-vector gate: Hit@1 `9/10`, Hit@5 `10/10`, MRR@5 `0.95`, unavailable targets `0`, API inputs `10`, requests `1`, and production writes `0`.
+7. Before further writes, create or reverify a protected checkpoint and approve a staged cap for the remaining `missing=143` and `stale=983` rows. Old and new hashes will coexist during staged replacement, so monitor after each batch and pause on regression.
+8. After completion, verify total count 1,146, dimensions 1,536, duplicate keys 0, orphans 0, and re-run the stored-vector quality report.
+9. Roll back by restoring the protected `recipe_embeddings` snapshot if stored-vector quality regresses.
 
-The in-memory gate, initial missing-row gate, and limited stale-row integrity gate are satisfied. The next separately reviewed operation is the fixed ten-query fixture against stored production vectors, including alias-normalized reranking checks. Full replacement and semantic API release remain blocked. See `docs/RECIPE_EMBEDDING_OPERATIONS.md` for the production record.
+The in-memory, limited missing-row, limited stale-row, integrity, and stored-vector quality gates are satisfied. The next separately reviewed operation is a checkpointed, capped backfill of the remaining 1,126 missing/stale rows. Full replacement is not yet executed, and semantic API release remains blocked until complete coverage, integrity checks, and a final stored-vector rerun pass. See `docs/RECIPE_EMBEDDING_OPERATIONS.md` for the production record.
 
 ## Next Improvement Candidates
 
