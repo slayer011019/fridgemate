@@ -30,6 +30,8 @@ src/pages
 
 Pages own screen-level workflows. Hooks coordinate app state, IndexedDB, network status, auth, and recommendations. API clients isolate backend requests. Utilities keep date logic, import parsing, recommendation scoring, and sync decisions testable.
 
+The browser entry renders route components through `React.lazy`, so OCR, public recipe catalog, recommendation, and account code load only when their routes are visited. The initial production JavaScript chunk is about 160 KB minified instead of the previous 623 KB monolith. SEO generation uses the separate synchronous `AppServer` entry, preserving complete static markup for all public routes without forcing those page modules into the initial browser bundle.
+
 ## Backend Layers
 
 ```text

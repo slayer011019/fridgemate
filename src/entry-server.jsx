@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StaticRouter } from 'react-router';
-import App from './App';
+import AppServer from './AppServer';
 import { AnalyticsProvider } from './hooks/useAnalytics';
 import { AuthProvider } from './hooks/useAuth';
 import { IngredientsProvider } from './hooks/useIngredients';
@@ -13,7 +13,7 @@ export function render(pathname) {
         <AnalyticsProvider>
           <PantryStaplesProvider>
             <IngredientsProvider>
-              <App />
+              <AppServer />
             </IngredientsProvider>
           </PantryStaplesProvider>
         </AnalyticsProvider>

@@ -1,51 +1,46 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
-import ProtectedRoute from './components/auth/ProtectedRoute';
+import { lazy, Suspense } from 'react';
 import AppShell from './components/AppShell';
+import AppRoutes from './components/AppRoutes';
 import RouteMetadata from './components/RouteMetadata';
-import HomePage from './pages/HomePage';
-import IngredientsPage from './pages/IngredientsPage';
-import IngredientFormPage from './pages/IngredientFormPage';
-import ImportPage from './pages/ImportPage';
-import RecipesPage from './pages/RecipesPage';
-import PublicRecipePage from './pages/PublicRecipePage';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
-import AccountPage from './pages/AccountPage';
-import PrivacyPage from './pages/PrivacyPage';
-import AboutPage from './pages/AboutPage';
-import ContactPage from './pages/ContactPage';
-import NotFoundPage from './pages/NotFoundPage';
 import { isOcrEnabled } from './utils/backendConfig';
 
-function App() {
-  const ocrEnabled = isOcrEnabled();
+const pages = {
+  AboutPage: lazy(() => import('./pages/AboutPage')),
+  AccountPage: lazy(() => import('./pages/AccountPage')),
+  ContactPage: lazy(() => import('./pages/ContactPage')),
+  HomePage: lazy(() => import('./pages/HomePage')),
+  ImportPage: lazy(() => import('./pages/ImportPage')),
+  IngredientFormPage: lazy(() => import('./pages/IngredientFormPage')),
+  IngredientsPage: lazy(() => import('./pages/IngredientsPage')),
+  LoginPage: lazy(() => import('./pages/LoginPage')),
+  NotFoundPage: lazy(() => import('./pages/NotFoundPage')),
+  PrivacyPage: lazy(() => import('./pages/PrivacyPage')),
+  PublicRecipePage: lazy(() => import('./pages/PublicRecipePage')),
+  RecipesPage: lazy(() => import('./pages/RecipesPage')),
+  SignupPage: lazy(() => import('./pages/SignupPage'))
+};
 
+function PageLoadingFallback() {
+  return (
+    <div
+      className="section-shell mx-auto min-h-[40vh] w-full max-w-4xl px-4 sm:px-6 lg:px-10"
+      aria-busy="true"
+      aria-label="페이지 불러오는 중"
+    >
+      <div className="h-5 w-24 animate-pulse rounded bg-slate-200" />
+      <div className="mt-4 h-9 w-full max-w-xl animate-pulse rounded bg-slate-200" />
+      <div className="mt-8 h-40 animate-pulse rounded-lg bg-slate-100" />
+    </div>
+  );
+}
+
+function App() {
   return (
     <AppShell>
       <RouteMetadata />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/ingredients" element={<IngredientsPage />} />
-        <Route path="/ingredients/new" element={<IngredientFormPage />} />
-        <Route path="/ingredients/:ingredientId/edit" element={<IngredientFormPage />} />
-        <Route path="/import" element={ocrEnabled ? <ImportPage /> : <Navigate to="/" replace />} />
-        <Route path="/recipes" element={<RecipesPage />} />
-        <Route path="/recipes/:recipeSlug" element={<PublicRecipePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route
-          path="/account"
-          element={
-            <ProtectedRoute>
-              <AccountPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      <Suspense fallback={<PageLoadingFallback />}>
+        <AppRoutes pages={pages} ocrEnabled={isOcrEnabled()} />
+      </Suspense>
     </AppShell>
   );
 }
