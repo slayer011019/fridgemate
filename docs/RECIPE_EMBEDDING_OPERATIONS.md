@@ -154,3 +154,17 @@ After separate approval, the fixed fixture was evaluated against stored producti
 - Post-evaluation state: `current=20`, `missing=143`, `stale=983`
 
 The stored-vector gate exceeds both the agreed 7/10 release threshold and the 9/10 in-memory comparison baseline. This is a **Go** for a separately approved, checkpointed, staged backfill. It is not approval to remove write caps or publish the semantic API before full coverage and final verification.
+
+## Latest Pre-Missing Checkpoint
+
+Immediately before the next staged missing-row operation, production was checked again through the checkpoint command's read-only transaction and a fresh protected checkpoint was created under `$HOME/.codex/backups/FridgeMate/`.
+
+- Rows: `1,003`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Compressed bytes: `6,961,640`
+- SHA-256: `4b260d87d05278c605406248c9541ed8b4256fa57cc9060ae15fc75f8cb2b7db`
+- Checkpoint verification: passed
+- Production writes: `0`
+- Embedding API requests: `0`
+
+This checkpoint reflects the stored vectors after the ten-row stale replacement. It is the rollback reference for the separately approved, maximum-25-row missing backfill. The checkpoint contains raw vectors and must remain outside the repository and public logs.
