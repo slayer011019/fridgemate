@@ -57,27 +57,27 @@ The builder emits deterministic Korean sections with ingredient-bearing sections
 API-free preflight:
 
 ```bash
-npm run recipes:embed -- --evaluate --dry-run --limit=1146
+npm run recipes:embed -- --evaluate --dry-run --limit=1166
 ```
 
 In-memory evaluation using the configured embedding API:
 
 ```bash
-npm run recipes:embed -- --evaluate --execute --limit=1146 --output=docs/recipe-search-quality-report.json
+npm run recipes:embed -- --evaluate --execute --limit=1166 --output=docs/recipe-search-quality-report.json
 ```
 
 Stored-production-vector preflight and evaluation:
 
 ```bash
-npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1146
-npm run recipes:embed -- --evaluate --execute --stored-vectors --limit=1146 --output=docs/recipe-search-stored-vector-report.json
+npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1166
+npm run recipes:embed -- --evaluate --execute --stored-vectors --limit=1166 --output=docs/recipe-search-stored-vector-report.json
 ```
 
 Realistic home-meal fixture preflight and evaluation:
 
 ```bash
-npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1146 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
-npm run recipes:embed -- --evaluate --execute --stored-vectors --limit=1146 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json --output=docs/recipe-search-home-meal-report.json
+npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1166 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
+npm run recipes:embed -- --evaluate --execute --stored-vectors --limit=1166 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json --output=docs/recipe-search-home-meal-report.json
 ```
 
 This profile resolves targets by stable catalog `externalId`, reports Hit@5 rate, owned core-ingredient ratio, missing core/seasoning counts, and expiring ingredient matches, and uses a 70% Hit@5 gate. Its production score remains unmeasured until the catalog backfill stage receives separate DB/API approval.
@@ -94,8 +94,8 @@ The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 
 4. Completed integrity and stored-vector smoke checks: total 1,003, `text-embedding-3-small`/1,536 count 1,003, duplicates 0, orphans 0, and relevant Top 3 results for the egg-rice query. The post-run state is `missing=143`, `stale=993`, `current=10`.
 5. Completed limited stale replacement: `generated=10`, `failed=0`, `writeLimitReached=true`, post-run `current=20`, `missing=143`, `stale=983`, and refreshed-vector self retrieval Top 1/Top 5 `10/10`.
 6. Completed the fixed ten-query stored-vector gate: Hit@1 `9/10`, Hit@5 `10/10`, MRR@5 `0.95`, unavailable targets `0`, API inputs `10`, requests `1`, and production writes `0`.
-7. Completed 2026-08-29: reverified `1,003` production rows through a read-only transaction and created a fresh protected post-stale-replacement checkpoint with SHA-256 `4b260d87d05278c605406248c9541ed8b4256fa57cc9060ae15fc75f8cb2b7db`. The next operation still requires a separately approved maximum-25-row cap for the remaining `missing=143` rows. Old and new hashes will coexist during later stale replacement, so monitor after each batch and pause on regression.
-8. After completion, verify total count 1,146, dimensions 1,536, duplicate keys 0, orphans 0, and re-run the stored-vector quality report.
+7. Completed 2026-08-29: reverified `1,003` production rows through a read-only transaction and created a fresh protected post-stale-replacement checkpoint with SHA-256 `4b260d87d05278c605406248c9541ed8b4256fa57cc9060ae15fc75f8cb2b7db`. A later full-catalog verifier found 20 additional production recipes, so the authoritative baseline is now `recipes=1,166`, `current=20`, `missing=163`, and `stale=983`. The next operation still requires a separately approved maximum-25-row cap.
+8. After completion, verify total count 1,166, dimensions 1,536, duplicate keys 0, orphans 0, and re-run both stored-vector quality fixtures.
 9. Roll back by restoring the protected `recipe_embeddings` snapshot if stored-vector quality regresses.
 
 The in-memory, limited missing-row, limited stale-row, integrity, and stored-vector quality gates are satisfied. The next separately reviewed operation is a checkpointed, capped backfill of the remaining 1,126 missing/stale rows. Full replacement is not yet executed, and semantic API release remains blocked until complete coverage, integrity checks, and a final stored-vector rerun pass. See `docs/RECIPE_EMBEDDING_OPERATIONS.md` for the production record.

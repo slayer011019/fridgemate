@@ -32,6 +32,7 @@
     "parse:recipe-ingredients": "node --env-file=.env scripts/parse-recipe-ingredients.js",
     "recipes:embed": "node --env-file=.env scripts/embed-recipes.js",
     "recipes:checkpoint": "node --env-file=.env scripts/checkpoint-recipe-embeddings.js",
+    "recipes:verify-embeddings": "node --env-file=.env scripts/verify-recipe-embeddings.js",
     "export:recipe-parser-training": "node --env-file=.env scripts/export-recipe-parser-training.js",
     "export:recommendation-training": "node --env-file=.env scripts/export-recommendation-training.js",
     "label:recipe-parser-training": "node scripts/label-review.js"

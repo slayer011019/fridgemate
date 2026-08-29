@@ -31,8 +31,9 @@ The repository now provides a repeatable checkpoint command and a resumable back
 ```bash
 npm run recipes:checkpoint -- --dry-run
 npm run recipes:checkpoint -- --label=before-staged-backfill
-npm run recipes:embed -- --backfill-missing --limit=1146 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
-npm run recipes:embed -- --backfill-missing --resume --limit=1146 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:embed -- --backfill-missing --limit=1166 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:verify-embeddings -- --expect-recipes=1166 --expect-embeddings=1028 --expect-current=45 --expect-missing=138 --expect-stale=983
+npm run recipes:embed -- --backfill-missing --resume --limit=1166 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
 ```
 
 - The embedding API receives multiple public catalog texts per request, capped at 100 inputs and defaulting to 25.
@@ -45,6 +46,8 @@ npm run recipes:embed -- --backfill-missing --resume --limit=1146 --batch-size=2
 - Summaries report API inputs, requests, retries, estimated tokens, optional estimated cost, elapsed time, and throughput without logging secrets or raw vectors.
 - `RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS` is optional and only enables the cost estimate; provider pricing is not hardcoded.
 - Checkpoints are gzip-compressed JSONL with a separate manifest containing row count, model/dimension groups, byte size, and SHA-256. The manifest is vector-free, while the checkpoint itself contains raw vectors and must remain protected.
+- `recipes:verify-embeddings` runs in a read-only transaction and exits unsuccessfully when expected staged counts, model/dimensions, `vector(1536)`, duplicate, orphan, or full-catalog hash-state checks differ. It makes no embedding API request and prints no recipe rows or vectors.
+- When no `--limit` is provided, the verifier reads the live recipe count first and scans that exact count. This prevents catalog growth from being hidden by an obsolete hardcoded limit.
 
 ## Limited Missing Backfill
 
@@ -169,3 +172,21 @@ Immediately before the next staged missing-row operation, production was checked
 - Embedding API requests: `0`
 
 This checkpoint reflects the stored vectors after the ten-row stale replacement. It is the rollback reference for the separately approved, maximum-25-row missing backfill. The checkpoint contains raw vectors and must remain outside the repository and public logs.
+
+## Catalog Count Drift Preflight
+
+The first full-catalog verifier run after the checkpoint found that production had grown from `1,146` to `1,166` recipes. The older `--limit=1146` command therefore omitted 20 catalog rows from hash-state classification even though embedding integrity remained valid.
+
+The corrected read-only baseline is:
+
+- Recipes: `1,166`
+- Embeddings: `1,003`
+- Current/missing/stale: `20 / 163 / 983`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Embedding API requests: `0`
+- Production writes: `0`
+
+All staged backfill and final-completion counts must use `1,166` as the current source of truth unless a later read-only verifier run reports another catalog change. A successful 25-row missing backfill from this baseline should produce `embeddings=1,028`, `current=45`, `missing=138`, and `stale=983`.

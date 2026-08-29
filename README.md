@@ -260,15 +260,16 @@ npm run prisma:deploy
 npm run recipes:embed -- --dry-run --limit=10
 ```
 
-제한적 운영 backfill은 조회 범위와 실제 쓰기 상한을 분리합니다. 예를 들어 전체 카탈로그에서 missing 항목을 찾되 최대 10개만 쓰려면 `--limit=1146 --max-writes=10`을 함께 사용합니다.
+제한적 운영 backfill은 조회 범위와 실제 쓰기 상한을 분리합니다. 예를 들어 현재 1,166개 전체 카탈로그에서 missing 항목을 찾되 최대 10개만 쓰려면 `--limit=1166 --max-writes=10`을 함께 사용합니다.
 
 대량 작업 전에는 checkpoint를 만들고, API batch·재시도·재개 상태를 사용하는 명령으로 실행합니다. checkpoint 파일에는 원시 벡터가 있으므로 `.local/` 또는 별도의 보호된 로컬 경로에만 보관합니다.
 
 ```bash
 npm run recipes:checkpoint -- --dry-run
 npm run recipes:checkpoint -- --label=before-staged-backfill
-npm run recipes:embed -- --backfill-missing --limit=1146 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
-npm run recipes:embed -- --backfill-missing --resume --limit=1146 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:embed -- --backfill-missing --limit=1166 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:embed -- --backfill-missing --resume --limit=1166 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:verify-embeddings -- --expect-recipes=1166 --expect-embeddings=1028 --expect-current=45 --expect-missing=138 --expect-stale=983
 ```
 
 실제 backfill은 `.local/recipe-embedding-backfill-state.json`에 마지막으로 안전하게 반영된 UUID를 기록합니다. `--resume`은 operation, model, dimension이 일치할 때만 이 위치부터 keyset pagination으로 재개합니다. 429, 5xx, 네트워크 오류는 지수 backoff로 재시도하며 4xx는 즉시 실패합니다. 요약에는 API 입력·요청·재시도·예상 토큰·처리량만 표시되고 비밀값과 원시 벡터는 표시되지 않습니다.
@@ -276,17 +277,17 @@ npm run recipes:embed -- --backfill-missing --resume --limit=1146 --batch-size=2
 고정 fixture를 이용한 읽기 전용 품질 평가:
 
 ```bash
-npm run recipes:embed -- --evaluate --dry-run --limit=1146
-npm run recipes:embed -- --evaluate --execute --limit=1146 --output=docs/recipe-search-quality-report.json
+npm run recipes:embed -- --evaluate --dry-run --limit=1166
+npm run recipes:embed -- --evaluate --execute --limit=1166 --output=docs/recipe-search-quality-report.json
 ```
 
 실제 보유 재료 3~5개, 임박 재료, `계란`/`달걀`과 `파`/`대파` 동의어를 포함한 20개 한국 가정식 fixture도 별도로 유지합니다.
 
 ```bash
-npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1146 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
+npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1166 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
 ```
 
-현재 저장 운영 벡터의 읽기 전용 평가는 Hit@1 `9/10`, Hit@5 `10/10`으로 운영 기준 `7/10`을 통과했습니다. 2026-08-29에 checkpoint 후 missing 10건 생성과 stale 10건 교체를 각각 제한 실행했고, 총 1,003건·중복 0·고아 0·`vector(1536)` 및 교체 벡터 self-retrieval Top 1 `10/10`을 확인했습니다. 평가 후에도 `current=20`, `missing=143`, `stale=983`으로 DB 쓰기가 없었으며, 남은 1,126건은 별도 승인된 단계별 backfill 전까지 보류합니다. semantic 추천 API는 전체 coverage와 최종 무결성·품질 재검증 이후에만 공개합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
+현재 저장 운영 벡터의 읽기 전용 평가는 Hit@1 `9/10`, Hit@5 `10/10`으로 운영 기준 `7/10`을 통과했습니다. 2026-08-29에 checkpoint 후 missing 10건 생성과 stale 10건 교체를 각각 제한 실행했고, 총 1,003건·중복 0·고아 0·`vector(1536)` 및 교체 벡터 self-retrieval Top 1 `10/10`을 확인했습니다. 이후 전체 카탈로그 검증에서 production recipe가 1,166개로 증가한 사실을 확인해 기준점을 `current=20`, `missing=163`, `stale=983`으로 바로잡았습니다. 남은 1,146건은 별도 승인된 단계별 backfill 전까지 보류하며, semantic 추천 API는 전체 coverage와 최종 무결성·품질 재검증 이후에만 공개합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
 
 ## 추천 이벤트 내보내기
 

@@ -148,7 +148,7 @@ async function saveBackfillState(filePath, state) {
   await rename(temporary, resolved);
 }
 
-function getEmbeddingConfig() {
+export function getEmbeddingConfig() {
   return {
     apiKey: process.env.OPENAI_API_KEY || '',
     model: process.env.RECIPE_EMBEDDING_MODEL || DEFAULT_MODEL,

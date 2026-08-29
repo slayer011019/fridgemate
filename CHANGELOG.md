@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Detected that production had grown from 1,146 to 1,166 recipes, removed the verifier's hardcoded catalog limit, and corrected staged backfill expectations so 20 new catalog rows cannot be silently omitted.
 - Made recipe embedding summaries print the effective `maxWrites` cap so full-catalog dry-runs cannot obscure the separately approved production write boundary.
 - Created and checksum-verified a fresh protected checkpoint of all 1,003 stored production recipe embeddings after the limited stale replacement, with zero production writes and zero embedding API calls.
 - Hardened recipe embedding operations with multi-input API batches, bounded retry/backoff, UUID keyset resume state, token/cost/throughput summaries, and a verified gzip checkpoint manifest with SHA-256.
@@ -36,6 +37,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added a read-only recipe embedding verifier that checks staged expected counts, current/missing/stale coverage, model/dimensions, vector type, duplicate keys, and orphan rows without API calls or row-level output.
 - Added metadata-only API request IDs, failure/latency telemetry, client-side error correlation, and optional embedding token/cost metrics without logging prompts, request bodies, user IDs, or vectors.
 - Added a separate 20-recipe Korean home-meal search fixture with realistic three-to-five-ingredient queries, expiring ingredients, alias coverage, category balance, Hit@5 rate, owned-ingredient ratio, and missing-ingredient metrics.
 - Added 100 source-backed Food Safety Korea recipe detail pages with stable slugs, ingredients, cooking steps, nutrition, images, canonical URLs, sitemap entries, and truthful `Recipe` JSON-LD.

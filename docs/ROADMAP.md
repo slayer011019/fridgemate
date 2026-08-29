@@ -43,7 +43,7 @@ Implemented:
 
 - Analyze recommendation impression/click exports
 - Keep the ingredient-first embedding text at or above the stored-vector Hit@5 `10/10` result while expanding the fixture beyond UUID-order smoke coverage
-- Use the hardened batch/retry/resume runner to create a fresh verified checkpoint, then run a separately approved capped backfill for the remaining `missing=143` and `stale=983` rows; the fixed ten-query stored-vector gate passed with Hit@1 `9/10`, Hit@5 `10/10`, and zero production writes
+- Use the hardened batch/retry/resume runner and read-only integrity verifier for the corrected production baseline of `recipes=1,166`, `embeddings=1,003`, `current=20`, `missing=163`, and `stale=983`; the fixed ten-query stored-vector gate passed with Hit@1 `9/10`, Hit@5 `10/10`, and zero production writes
 - Run the separate 20-recipe Korean home-meal fixture after full vector coverage; it uses realistic pantry subsets, expiring ingredients, alias cases, and a 70% Hit@5 gate without replacing the UUID regression fixture
 - Keep semantic API publication separate from the backfill and require complete coverage, integrity verification, and a final stored-vector quality rerun first
 - Normalize recommendation event keys into `local:<seed-id>` and `catalog:<uuid>` with a nullable catalog recipe FK
