@@ -265,7 +265,7 @@ npm run recipes:embed -- --evaluate --dry-run --limit=1146
 npm run recipes:embed -- --evaluate --execute --limit=1146 --output=docs/recipe-search-quality-report.json
 ```
 
-현재 읽기 전용 평가 결과는 Hit@5 `9/10`으로 운영 기준 `7/10`을 통과했습니다. 제한적 임베딩 backfill을 별도 검토할 수 있지만, 전체 교체와 semantic 추천 API 공개는 저장 벡터 무결성 및 smoke test가 끝날 때까지 보류합니다. 상세 기준과 결과는 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md)에 있습니다.
+현재 읽기 전용 평가 결과는 Hit@5 `9/10`으로 운영 기준 `7/10`을 통과했습니다. 2026-08-29에 checkpoint 후 missing embedding 10건만 제한 생성했고, 총 1,003건·중복 0·고아 0·`vector(1536)` 및 저장 벡터 검색 smoke test를 확인했습니다. 남은 missing 143건, stale 993건, 전체 교체와 semantic 추천 API 공개는 별도 검토 전까지 보류합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
 
 ## 추천 이벤트 내보내기
 

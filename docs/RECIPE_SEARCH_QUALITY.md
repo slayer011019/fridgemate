@@ -68,16 +68,16 @@ The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 
 
 ## Backfill Plan After Go
 
-1. Take a Supabase checkpoint and export `recipe_embeddings` IDs, model, dimensions, content hashes, and vectors to protected storage for rollback.
-2. Run `npm run recipes:embed -- --dry-run --limit=1146 --batch-size=100 --quiet`. The current new-builder state is `missing=153`, `stale=993`, `current=0`.
-3. Backfill at most ten missing rows first with `--backfill-missing --limit=1146 --batch-size=25 --max-writes=10`. Verify the reported `writeLimitReached=true`, then resume later with the reported `--resume-from=<lastProcessedRecipeId>` cursor.
-4. Verify model/dimension counts, duplicate composite keys, orphans, failures, and a limited production query smoke test.
+1. Completed 2026-08-29: exported 993 `recipe_embeddings` rows, including vectors, to protected local storage and verified the compressed backup checksum.
+2. Completed preflight: `missing=153`, `stale=993`, `current=0`.
+3. Completed limited missing backfill: `generated=10`, `failed=0`, and `writeLimitReached=true` with `--backfill-missing --limit=1146 --batch-size=25 --max-writes=10`.
+4. Completed integrity and stored-vector smoke checks: total 1,003, `text-embedding-3-small`/1,536 count 1,003, duplicates 0, orphans 0, and relevant Top 3 results for the egg-rice query. The post-run state is `missing=143`, `stale=993`, `current=10`.
 5. Replace at most ten stale rows with `--backfill-stale --limit=1146 --batch-size=25 --max-writes=10`; retry only failed batches with the last safe cursor. API 429 and 5xx errors retain the old row and remain retryable. Remove or raise the write cap only after the limited stored-vector smoke test passes.
 6. During stale replacement, old and new content hashes coexist temporarily under the same model/dimension filter. Run during a controlled window, monitor search quality, and pause on regression.
 7. Re-run the fixed quality report against stored vectors, then verify total count 1,146, dimensions 1,536, duplicate keys 0, and orphans 0.
 8. Roll back by restoring the protected `recipe_embeddings` snapshot if stored-vector quality differs from the approved in-memory report.
 
-The in-memory gate is now satisfied. Run the backup, dry-run, limited backfill, integrity checks, and stored-vector smoke test as a separate reviewed operation before any full replacement or semantic API release.
+The in-memory gate and initial missing-row production gate are satisfied. The next separately reviewed operation is a maximum ten-row stale replacement followed by the stored-vector fixture and alias-normalized reranking checks. Full replacement and semantic API release remain blocked. See `docs/RECIPE_EMBEDDING_OPERATIONS.md` for the production record.
 
 ## Next Improvement Candidates
 

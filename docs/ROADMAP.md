@@ -23,7 +23,7 @@ Implemented:
 
 - Deploy frontend and backend to stable public environments
 - Keep lint, tests, build, and core E2E green in CI
-- Recover and reconcile the three production-only Prisma migrations before applying the pending ingredient tombstone migration
+- Review the two recovered migration checksum differences before applying the pending ingredient tombstone migration
 - Harden auth recovery when sessions expire
 - Polish guest import and manual sync messaging
 - Improve documentation for first-time contributors
@@ -41,7 +41,7 @@ Implemented:
 
 - Analyze recommendation impression/click exports
 - Keep the ingredient-first embedding text at or above the current 9/10 Hit@5 result while expanding the fixture beyond UUID-order smoke coverage
-- Review and execute the checkpointed limited `recipe_embeddings` backfill now that the in-memory 7/10 release gate is satisfied; full replacement remains blocked on stored-vector integrity and smoke checks
+- Continue from the successful checkpointed 10-row missing backfill only after reviewing the remaining `missing=143` and `stale=993`; full replacement remains blocked on a limited stale-row quality gate
 - Keep semantic API publication separate from the backfill and require stored-vector quality verification first
 - Normalize recommendation event keys into `local:<seed-id>` and `catalog:<uuid>` with a nullable catalog recipe FK
 - Add canonical dishes, aliases, and source-attributed popularity signals after catalog recipe IDs are stable

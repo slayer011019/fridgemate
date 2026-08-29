@@ -1,0 +1,83 @@
+# Recipe Embedding Production Operations
+
+This record captures the reviewed production migration-history recovery and limited recipe embedding run performed on 2026-08-29. It does not authorize a full backfill or semantic API release.
+
+## Migration History Recovery
+
+Production contained three migration names that were absent from the repository:
+
+- `20260828090000_add_home_priority_fields`
+- `20260828100000_align_recipe_catalog_pipeline`
+- `20260828110000_secure_recipe_import_tables`
+
+The executed schema statements were recovered from production schema metadata and normalized PostgreSQL statement statistics, then restored under the same names. The home-priority migration matches the production checksum exactly. The catalog-alignment and import-security SQL reproduce the executed statements, but their lost original comments or formatting could not be reconstructed, so their local file checksums differ from the historical production checksums.
+
+No production migration row, checksum, table, or column was changed during recovery. `npx prisma migrate status` now reports only `20260826000000_add_ingredient_sync_tombstones` as pending. Keep that migration unapplied until the two recovered-checksum differences receive an explicit deployment review.
+
+## Protected Checkpoint
+
+Before writing embeddings, 993 `recipe_embeddings` rows were exported with vectors to protected local storage under `$HOME/.codex/backups/FridgeMate/`.
+
+- Rows: `993`
+- Compressed bytes: `6,900,391`
+- SHA-256: `6a63d94518110d4101bcbc8de0043bdee12f7e556f6c160e02db5f05c5452ed9`
+
+The backup contains catalog embedding text and raw vectors, so it must not be committed, logged, or shared publicly.
+
+## Limited Missing Backfill
+
+Preflight state:
+
+- `current=0`
+- `missing=153`
+- `stale=993`
+
+Reviewed command:
+
+```bash
+npm run recipes:embed -- --backfill-missing --limit=1146 --batch-size=25 --max-writes=10 --quiet
+```
+
+Result:
+
+- `processed=552`
+- `generated=10`
+- `skipped=542`
+- `failed=0`
+- `writeLimitReached=true`
+
+Post-run integrity:
+
+- Total embeddings: `1,003`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Current/missing/stale: `10 / 143 / 993`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+
+## Stored-Vector Smoke Test
+
+The normalized query was:
+
+```text
+검색재료: 계란, 대파, 밥
+양념: 진간장
+```
+
+The query embedding, pgvector cosine search, recipe join, and semantic reranker all succeeded. The top three vector results were `간장계란밥`, `계란찜`, and `계란말이`; the Top 5 similarity range was `0.6380` to `0.8082`. After canonical ingredient names were supplied, `간장계란밥` remained first with four matched ingredients, expiring `계란`, and a reranked score of `0.4037`.
+
+Raw input aliases such as `달걀` and `간장` must be normalized to catalog names such as `계란` and `진간장` before calling the standalone semantic reranker. The current vector query builder already performs this normalization, but the future semantic endpoint must preserve the same boundary.
+
+## Decision and Next Gate
+
+The limited missing-row operation is a **Go**. The checkpoint, write cap, integrity checks, vector ordering, ingredient join, and reranking smoke test all passed.
+
+The following remain intentionally blocked pending separate review:
+
+- Backfilling the remaining 143 missing rows
+- Replacing the 993 stale rows
+- Removing or increasing `--max-writes`
+- Publishing a semantic recommendation endpoint
+- Applying the ingredient tombstone migration
+
+Before full replacement, run a separately approved ten-row stale replacement, compare the stored-vector fixture against the 9/10 Hit@5 baseline, and confirm alias normalization at the reranker boundary.

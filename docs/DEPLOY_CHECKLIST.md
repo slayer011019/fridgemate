@@ -67,10 +67,11 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 ## Migration History Integrity
 
 - [ ] Run `npx prisma migrate status` before every production migration and stop if production contains migration names that are absent from the repository.
-- [ ] Recover the exact reviewed SQL and matching checksums for production-only migrations; do not create empty placeholders or mark guessed migrations as applied.
-- [ ] Reconcile the currently observed production-only migrations `20260828090000_add_home_priority_fields`, `20260828100000_align_recipe_catalog_pipeline`, and `20260828110000_secure_recipe_import_tables` before applying another Prisma migration.
+- [x] Restore the verified executed SQL for `20260828090000_add_home_priority_fields`, `20260828100000_align_recipe_catalog_pipeline`, and `20260828110000_secure_recipe_import_tables` under their production names.
+- [x] Confirm `npx prisma migrate status` reports only `20260826000000_add_ingredient_sync_tombstones` as pending.
+- [ ] Review the catalog-alignment and import-security checksum caveat in `docs/RECIPE_EMBEDDING_OPERATIONS.md`; their executed SQL is recovered but lost original comments/formatting prevent an exact historical checksum match.
 - [ ] Keep `20260826000000_add_ingredient_sync_tombstones` unapplied until the repository and production migration histories are reconciled.
-- [ ] Do not use `npx prisma migrate deploy` while migration history is divergent; review and apply only an explicitly approved recovery plan.
+- [ ] Do not use `npx prisma migrate deploy` until the recovered-checksum review is explicitly accepted.
 
 ## Authentication
 
