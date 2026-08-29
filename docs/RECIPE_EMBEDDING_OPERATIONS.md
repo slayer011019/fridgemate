@@ -402,4 +402,37 @@ The immediate read-only verifier passed with:
 - Verification API requests: `0`
 - Verification production writes: `0`
 
-The final 13 missing rows remain unauthorized until separately approved.
+## Final 13-Row Missing Backfill
+
+After separate approval, production was reverified at `embeddings=1,153`, `current=170`, `missing=13`, and `stale=983`. The protected checkpoint prepared before this batch was independently hash-verified again before any API call or write.
+
+- Checkpoint rows: `1,153`
+- Compressed bytes: `7,930,860`
+- SHA-256: `3b624a4b37536fb03bfbc0ba0afed9e3833866ce1aa6011d09f54e679de4e933`
+- Hash verification: passed
+- Checkpoint production writes: `0`
+
+The runner resumed after the prior successful UUID and executed once with `--backfill-missing --all --resume --max-writes=13`.
+
+- Processed: `13`
+- Generated/written: `13`
+- Failed: `0`
+- API inputs: `13`
+- API requests: `1`
+- Retries: `0`
+- Estimated input tokens: `325`
+- Write limit reached: `true`
+
+The immediate read-only verifier passed with:
+
+- Recipes: `1,166`
+- Embeddings: `1,166`
+- Current/missing/stale: `183 / 0 / 983`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Verification API requests: `0`
+- Verification production writes: `0`
+
+Every catalog recipe now has a stored embedding. The remaining 983 stale rows require separately approved staged replacement; this batch did not run a quality-evaluation API call or publish the semantic endpoint.

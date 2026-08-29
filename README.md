@@ -289,7 +289,7 @@ npm run recipes:embed -- --evaluate --execute --limit=1166 --output=docs/recipe-
 npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1166 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
 ```
 
-현재 저장 운영 벡터의 읽기 전용 평가는 Hit@1 `9/10`, Hit@5 `10/10`으로 운영 기준 `7/10`을 통과했습니다. 전체 카탈로그는 MFDS 1,146개와 재료 행을 갖춘 `curated_home_v1` 20개를 합친 1,166개입니다. checkpoint 이후 별도로 승인된 25-row missing batch 여섯 번이 실패 없이 완료되어 현재 기준점은 `embeddings=1,153`, `current=170`, `missing=13`, `stale=983`, 중복 0, 고아 0, `vector(1536)`입니다. 남은 996건은 별도 승인된 단계별 backfill 전까지 보류하며, semantic 추천 API는 전체 coverage와 최종 무결성·품질 재검증 이후에만 공개합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
+현재 저장 운영 벡터의 읽기 전용 평가는 Hit@1 `9/10`, Hit@5 `10/10`으로 운영 기준 `7/10`을 통과했습니다. 전체 카탈로그는 MFDS 1,146개와 재료 행을 갖춘 `curated_home_v1` 20개를 합친 1,166개입니다. checkpoint 이후 별도로 승인된 25-row missing batch 여섯 번과 마지막 13-row batch가 실패 없이 완료되어 현재 기준점은 `embeddings=1,166`, `current=183`, `missing=0`, `stale=983`, 중복 0, 고아 0, `vector(1536)`입니다. 남은 983건의 stale embedding은 별도 승인된 단계별 교체 전까지 보류하며, semantic 추천 API는 전체 freshness와 최종 무결성·품질 재검증 이후에만 공개합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
 
 ## 추천 이벤트 내보내기
 
