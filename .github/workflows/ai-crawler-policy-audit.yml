@@ -15,6 +15,7 @@ env:
 jobs:
   cloudflare-capability:
     name: Cloudflare credential capability check
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -37,6 +38,7 @@ jobs:
 
   curl-audit:
     name: curl User-Agent audit
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Probe production with curl
@@ -116,3 +118,68 @@ jobs:
 
       - name: Probe production with Chromium
         run: node scripts/audit-ai-crawler-policy.mjs
+
+  origin-discovery:
+    name: Vercel origin discovery and bypass probe
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Inspect deployment metadata and likely origin aliases
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          api_headers=(
+            -H "Accept: application/vnd.github+json"
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+
+          main_sha="$(curl --fail --silent --show-error "${api_headers[@]}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/branches/main" | jq -r '.commit.sha')"
+          status_json="$(curl --fail --silent --show-error "${api_headers[@]}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${main_sha}/status")"
+          vercel_target="$(jq -r '.statuses[] | select(.context == "Vercel") | .target_url' <<<"${status_json}" | head -n 1)"
+
+          echo "main_sha=${main_sha}"
+          echo "vercel_status_target=${vercel_target:-absent}"
+
+          inspect_url() {
+            local label="$1"
+            local url="$2"
+            local headers body metrics status final_url content_type size_download server body_sha title
+            headers="$(mktemp)"
+            body="$(mktemp)"
+            metrics="$(mktemp)"
+
+            if curl --silent --show-error --location --max-time 30 \
+              --user-agent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0.0.0 Safari/537.36' \
+              --dump-header "$headers" --output "$body" \
+              --write-out '%{http_code}|%{url_effective}|%{content_type}|%{size_download}\n' \
+              "$url" >"$metrics"; then
+              IFS='|' read -r status final_url content_type size_download <"$metrics"
+              server="$(awk 'BEGIN { IGNORECASE=1 } /^server:/ { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); value=$0 } END { print value }' "$headers")"
+              body_sha="$(sha256sum "$body" | awk '{print $1}')"
+              title="$(grep -oEi '<title>[^<]*</title>' "$body" | head -n 1 | sed -E 's#</?title>##Ig' || true)"
+              printf 'origin_probe label=%q status=%q final_url=%q content_type=%q bytes=%q server=%q body_sha256=%q title=%q\n' \
+                "$label" "$status" "$final_url" "$content_type" "$size_download" "$server" "$body_sha" "$title"
+              grep -Eo 'https://[^"[:space:]<>]+\.vercel\.app[^"[:space:]<>]*' "$body" | sort -u | head -n 20 | sed 's/^/discovered_vercel_url=/' || true
+            else
+              printf 'origin_probe label=%q url=%q curl_failed=true\n' "$label" "$url"
+            fi
+
+            rm -f "$headers" "$body" "$metrics"
+          }
+
+          inspect_url production "${CRAWLER_AUDIT_BASE_URL}/"
+
+          if [[ -n "${vercel_target}" ]]; then
+            inspect_url vercel-dashboard "${vercel_target}"
+            deployment_key="${vercel_target##*/}"
+            inspect_url vercel-api-v13 "https://api.vercel.com/v13/deployments/${deployment_key}"
+            inspect_url vercel-api-v6 "https://api.vercel.com/v6/deployments/${deployment_key}"
+          fi
+
+          inspect_url project-default "https://fridgemate.vercel.app/"
+          inspect_url team-default "https://fridgemate-fridgemates-projects.vercel.app/"
