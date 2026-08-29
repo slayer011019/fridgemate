@@ -287,7 +287,7 @@ npm run recipes:embed -- --evaluate --execute --limit=1166 --output=docs/recipe-
 npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1166 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
 ```
 
-현재 저장 운영 벡터의 읽기 전용 평가는 Hit@1 `9/10`, Hit@5 `10/10`으로 운영 기준 `7/10`을 통과했습니다. 2026-08-29에 checkpoint 후 missing 10건 생성과 stale 10건 교체를 각각 제한 실행했고, 총 1,003건·중복 0·고아 0·`vector(1536)` 및 교체 벡터 self-retrieval Top 1 `10/10`을 확인했습니다. 이후 전체 카탈로그 검증에서 production recipe가 1,166개로 증가한 사실을 확인해 기준점을 `current=20`, `missing=163`, `stale=983`으로 바로잡았습니다. 남은 1,146건은 별도 승인된 단계별 backfill 전까지 보류하며, semantic 추천 API는 전체 coverage와 최종 무결성·품질 재검증 이후에만 공개합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
+현재 저장 운영 벡터의 읽기 전용 평가는 Hit@1 `9/10`, Hit@5 `10/10`으로 운영 기준 `7/10`을 통과했습니다. 2026-08-29에 checkpoint 후 missing 10건 생성과 stale 10건 교체를 각각 제한 실행했고, 총 1,003건·중복 0·고아 0·`vector(1536)` 및 교체 벡터 self-retrieval Top 1 `10/10`을 확인했습니다. 이후 전체 카탈로그 검증에서 MFDS 1,146개와 재료 행을 갖춘 `curated_home_v1` 20개가 함께 존재함을 확인해 기준점을 `recipes=1,166`, `current=20`, `missing=163`, `stale=983`으로 바로잡았습니다. 남은 1,146건은 별도 승인된 단계별 backfill 전까지 보류하며, semantic 추천 API는 전체 coverage와 최종 무결성·품질 재검증 이후에만 공개합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
 
 ## 추천 이벤트 내보내기
 

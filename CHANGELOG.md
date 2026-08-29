@@ -10,6 +10,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 ### Fixed
 
 - Detected that production had grown from 1,146 to 1,166 recipes, removed the verifier's hardcoded catalog limit, and corrected staged backfill expectations so 20 new catalog rows cannot be silently omitted.
+- Confirmed through aggregate-only checks that the 20-row increase is the intentional ingredient-complete `curated_home_v1` catalog source, not duplicate or orphaned recipe data.
 - Made recipe embedding summaries print the effective `maxWrites` cap so full-catalog dry-runs cannot obscure the separately approved production write boundary.
 - Created and checksum-verified a fresh protected checkpoint of all 1,003 stored production recipe embeddings after the limited stale replacement, with zero production writes and zero embedding API calls.
 - Hardened recipe embedding operations with multi-input API batches, bounded retry/backoff, UUID keyset resume state, token/cost/throughput summaries, and a verified gzip checkpoint manifest with SHA-256.

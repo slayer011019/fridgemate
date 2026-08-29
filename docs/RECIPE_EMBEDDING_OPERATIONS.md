@@ -189,4 +189,11 @@ The corrected read-only baseline is:
 - Embedding API requests: `0`
 - Production writes: `0`
 
+Source-level aggregate checks confirmed that the 20-row increase is intentional catalog content rather than duplicate import drift:
+
+- `MFDS_COOKRCP01`: recipes `1,146`, recipes with embeddings `993`, recipes with ingredients `1,142`, ingredient rows `12,932`
+- `curated_home_v1`: recipes `20`, recipes with embeddings `10`, recipes with ingredients `20`, ingredient rows `150`
+
+The curated rows were created on 2026-08-28. No recipe names, ingredient contents, vectors, or user data were queried or printed during this source check.
+
 All staged backfill and final-completion counts must use `1,166` as the current source of truth unless a later read-only verifier run reports another catalog change. A successful 25-row missing backfill from this baseline should produce `embeddings=1,028`, `current=45`, `missing=138`, and `stale=983`.
