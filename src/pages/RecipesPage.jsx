@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import PantryStaplesPanel from '../components/PantryStaplesPanel';
 import RecommendationRow from '../components/RecommendationRow';
@@ -7,6 +8,7 @@ import AdSenseSlot from '../components/ads/AdSenseSlot';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useDBRecommendations } from '../hooks/useDBRecommendations';
 import { useRecipesPageModel } from '../hooks/useRecipesPageModel';
+import { getPublicRecipePath, publicRecipeCatalog } from '../features/recipes/publicRecipeCatalog';
 
 function RecipesPage() {
   const { trackEvent } = useAnalytics();
@@ -85,6 +87,36 @@ function RecipesPage() {
           '\uBC14\uB85C \uD560 \uC218 \uC788\uB294 \uAC83, \uD55C \uB450 \uAC1C \uB9CC \uB354 \uD544\uC694\uD55C \uAC83, \uBE68\uB9AC \uCC98\uB9AC\uD558\uBA74 \uC88B\uC740 \uAC83\uC73C\uB85C \uB098\uB220 \uBCF4\uC5EC\uC90D\uB2C8\uB2E4.'
         }
       />
+
+      <section className="card space-y-4">
+        <div>
+          <p className="kicker">공개 레시피</p>
+          <h2 className="mt-1.5 text-xl font-semibold text-slate-900">식약처 조리법부터 둘러보세요</h2>
+          <p className="mt-1.5 text-sm leading-6 muted">
+            식품의약품안전처 공개 데이터에서 재료, 만드는 법, 이미지와 영양 정보가 모두 확인된 레시피입니다.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {publicRecipeCatalog.slice(0, 12).map((recipe) => (
+            <Link key={recipe.externalId} to={getPublicRecipePath(recipe)} className="soft-panel group block">
+              <img
+                src={recipe.imageSmallUrl || recipe.imageLargeUrl}
+                alt=""
+                className="aspect-[16/9] w-full rounded-md bg-slate-100 object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+              <p className="mt-3 font-semibold text-slate-900 group-hover:text-brand-700">{recipe.name}</p>
+              <p className="mt-1 text-xs leading-5 muted">
+                {[recipe.dishType, recipe.cookingMethod, `${recipe.steps.length}단계`].filter(Boolean).join(' · ')}
+              </p>
+            </Link>
+          ))}
+        </div>
+        <p className="text-xs leading-5 text-slate-500">
+          전체 {publicRecipeCatalog.length}개 레시피는 각각 공개 상세 URL로 제공되며 검색엔진용 사이트맵에도 포함됩니다.
+        </p>
+      </section>
 
       <section className="stats-grid">
         <StatCard

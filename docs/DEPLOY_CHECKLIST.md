@@ -27,9 +27,10 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Confirm SPA routes load after refresh: `/`, `/ingredients`, `/import`, `/recipes`, `/login`, `/account`.
 - [ ] Confirm the deployed frontend sends API requests with credentials.
 - [ ] `curl` for `/`, `/recipes`, `/about`, `/contact`, and `/privacy` contains a visible `h1`, route-specific title, canonical URL, and JSON-LD without executing JavaScript.
+- [ ] At least one `/recipes/{id}-{slug}` response contains the recipe name, ingredients, steps, an official source link, canonical URL, and `Recipe` JSON-LD without executing JavaScript.
 - [ ] `/ingredients`, `/ingredients/*`, `/import`, `/login`, `/signup`, and `/account` return `X-Robots-Tag: noindex, nofollow, noarchive`.
-- [ ] `/robots.txt`, `/sitemap.xml`, and `/llms.txt` return `200`; the sitemap contains only public routes.
-- [ ] Review Cloudflare managed crawler/content-signal rules separately because they can be prepended to the repository's `robots.txt` response.
+- [ ] `/robots.txt`, `/sitemap.xml`, and `/llms.txt` return `200`; the sitemap contains the five static public routes plus the exported public recipe routes and no private routes.
+- [ ] In Cloudflare AI Crawl Control, allow search/answer citation crawlers intentionally and keep training-only crawlers blocked; verify the effective `/robots.txt` because managed rules can be prepended to the repository response.
 - [ ] Record Search Console and Naver Search Advisor baselines after deployment and compare impressions, clicks, indexed pages, and citations after 14 days.
 
 ## Cloudflare Workers API

@@ -29,6 +29,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added 100 source-backed Food Safety Korea recipe detail pages with stable slugs, ingredients, cooking steps, nutrition, images, canonical URLs, sitemap entries, and truthful `Recipe` JSON-LD.
+- Added a safe public-recipe export command that is read-only by default, strips raw source payloads, upgrades image URLs to HTTPS, and writes only with an explicit `--write` flag.
 - Added truthful page-level JSON-LD, `llms.txt`, private-route crawler exclusions, and a post-build SEO output verification gate.
 - Added a fixed ten-recipe semantic retrieval fixture, an all-catalog read-only evaluation command, Hit@1/Hit@5/MRR metrics, and a vector-free JSON quality report.
 - Added first-pass conflict-aware manual ingredient sync with stable `clientId` matching, persisted pending create/update/delete states, and server deletion tombstones.

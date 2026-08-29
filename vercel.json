@@ -29,6 +29,7 @@
   ],
   "rewrites": [
     { "source": "/recipes", "destination": "/_seo/recipes.html" },
+    { "source": "/recipes/:recipeSlug", "destination": "/_seo/recipes/:recipeSlug.html" },
     { "source": "/about", "destination": "/_seo/about.html" },
     { "source": "/contact", "destination": "/_seo/contact.html" },
     { "source": "/privacy", "destination": "/_seo/privacy.html" },

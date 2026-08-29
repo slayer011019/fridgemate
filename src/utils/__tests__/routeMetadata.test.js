@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getRouteMetadata } from '../routeMetadata';
+import { getPublicRecipePath, publicRecipeCatalog } from '../../features/recipes/publicRecipeCatalog';
 
 describe('routeMetadata', () => {
   it('gives each public content page its own canonical URL', () => {
@@ -27,5 +28,18 @@ describe('routeMetadata', () => {
 
     expect(metadata.indexable).toBe(false);
     expect(metadata.notFound).toBe(true);
+  });
+
+  it('makes only known public recipe details indexable', () => {
+    const recipe = publicRecipeCatalog[0];
+    const path = getPublicRecipePath(recipe);
+    const metadata = getRouteMetadata(path);
+
+    expect(metadata.indexable).toBe(true);
+    expect(metadata.recipe).toEqual(recipe);
+    expect(metadata.title).toContain(recipe.name);
+    expect(metadata.canonical).toBe(new URL(path, 'https://오늘뭐먹지.com').href);
+
+    expect(getRouteMetadata('/recipes/not-a-real-recipe').indexable).toBe(false);
   });
 });

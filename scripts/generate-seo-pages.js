@@ -13,6 +13,12 @@ const routeOutputFiles = {
   '/privacy': '_seo/privacy.html'
 };
 
+function getRouteOutputFile(pathname) {
+  if (routeOutputFiles[pathname]) return routeOutputFiles[pathname];
+  if (pathname.startsWith('/recipes/')) return `_seo${pathname}.html`;
+  return '';
+}
+
 function escapeAttribute(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -85,6 +91,22 @@ function structuredDataTags(schemas) {
     .join('\n');
 }
 
+function escapeXml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function buildSitemap(routes, getRouteMetadata) {
+  const urls = routes
+    .map((pathname) => `  <url>\n    <loc>${escapeXml(getRouteMetadata(pathname).canonical)}</loc>\n  </url>`)
+    .join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+}
+
 function renderPublicDocument(template, markup, metadata, schemas) {
   let html = applyMetadata(template, metadata);
   html = html.replace(
@@ -127,7 +149,7 @@ try {
   const { getRouteStructuredData } = structuredDataModule;
 
   for (const pathname of PUBLIC_ROUTES) {
-    const outputFile = routeOutputFiles[pathname];
+    const outputFile = getRouteOutputFile(pathname);
 
     if (!outputFile) {
       throw new Error(`No prerender output is configured for public route: ${pathname}`);
@@ -147,6 +169,12 @@ try {
     await writeFile(outputPath, document, 'utf8');
   }
 
+  await writeFile(
+    resolve(outputDirectory, 'sitemap.xml'),
+    buildSitemap(PUBLIC_ROUTES, getRouteMetadata),
+    'utf8'
+  );
+
   const functionalMetadata = getRouteMetadata('/account');
   await writeFile(
     resolve(outputDirectory, '_seo/app.html'),
@@ -154,7 +182,9 @@ try {
     'utf8'
   );
 
-  console.log(`Prerendered ${PUBLIC_ROUTES.length} public routes and generated the noindex app shell.`);
+  console.log(
+    `Prerendered ${PUBLIC_ROUTES.length} public routes, generated sitemap.xml, and generated the noindex app shell.`
+  );
 } finally {
   await vite.close();
 }

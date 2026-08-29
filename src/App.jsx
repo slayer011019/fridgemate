@@ -7,6 +7,7 @@ import IngredientsPage from './pages/IngredientsPage';
 import IngredientFormPage from './pages/IngredientFormPage';
 import ImportPage from './pages/ImportPage';
 import RecipesPage from './pages/RecipesPage';
+import PublicRecipePage from './pages/PublicRecipePage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import AccountPage from './pages/AccountPage';
@@ -29,6 +30,7 @@ function App() {
         <Route path="/ingredients/:ingredientId/edit" element={<IngredientFormPage />} />
         <Route path="/import" element={ocrEnabled ? <ImportPage /> : <Navigate to="/" replace />} />
         <Route path="/recipes" element={<RecipesPage />} />
+        <Route path="/recipes/:recipeSlug" element={<PublicRecipePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />

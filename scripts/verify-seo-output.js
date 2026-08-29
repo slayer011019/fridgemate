@@ -11,6 +11,12 @@ const routeOutputFiles = {
   '/privacy': '_seo/privacy.html'
 };
 
+function getRouteOutputFile(pathname) {
+  if (routeOutputFiles[pathname]) return routeOutputFiles[pathname];
+  if (pathname.startsWith('/recipes/')) return `_seo${pathname}.html`;
+  return '';
+}
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -19,7 +25,7 @@ function assert(condition, message) {
 
 for (const pathname of PUBLIC_ROUTES) {
   const metadata = getRouteMetadata(pathname);
-  const outputFile = routeOutputFiles[pathname];
+  const outputFile = getRouteOutputFile(pathname);
   const html = await readFile(resolve(outputDirectory, outputFile), 'utf8');
 
   assert(html.includes(`<title>${metadata.title}</title>`), `${pathname} is missing its route title`);
@@ -30,10 +36,16 @@ for (const pathname of PUBLIC_ROUTES) {
   assert(html.includes('application/ld+json'), `${pathname} has no structured data`);
 }
 
+const sitemap = await readFile(resolve(outputDirectory, 'sitemap.xml'), 'utf8');
+for (const pathname of PUBLIC_ROUTES) {
+  const canonical = getRouteMetadata(pathname).canonical.replaceAll('&', '&amp;');
+  assert(sitemap.includes(`<loc>${canonical}</loc>`), `${pathname} is missing from sitemap.xml`);
+}
+
 const appShell = await readFile(resolve(outputDirectory, '_seo/app.html'), 'utf8');
 assert(appShell.includes('content="noindex,nofollow,noarchive"'), 'Functional app shell is indexable');
 assert(appShell.includes('<div id="root"></div>'), 'Functional app shell must not contain public page content');
 assert(!appShell.includes('rel="canonical"'), 'Functional app shell must not emit a shared canonical URL');
 assert(!appShell.includes('application/ld+json'), 'Functional app shell must not emit public structured data');
 
-console.log(`Verified SEO output for ${PUBLIC_ROUTES.length} public routes and the noindex app shell.`);
+console.log(`Verified SEO output for ${PUBLIC_ROUTES.length} public routes, sitemap.xml, and the noindex app shell.`);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getRouteMetadata } from '../routeMetadata';
 import { getRouteStructuredData } from '../structuredData';
+import { getPublicRecipePath, publicRecipeCatalog } from '../../features/recipes/publicRecipeCatalog';
 
 describe('structuredData', () => {
   it('describes the public home page without inventing ratings or reviews', () => {
@@ -25,5 +26,21 @@ describe('structuredData', () => {
   it('does not emit structured data for functional or unknown routes', () => {
     expect(getRouteStructuredData('/account', getRouteMetadata('/account'))).toEqual([]);
     expect(getRouteStructuredData('/missing', getRouteMetadata('/missing'))).toEqual([]);
+  });
+
+  it('emits source-backed Recipe markup with real ingredients and steps', () => {
+    const recipe = publicRecipeCatalog[0];
+    const pathname = getPublicRecipePath(recipe);
+    const metadata = getRouteMetadata(pathname);
+    const [schema] = getRouteStructuredData(pathname, metadata);
+
+    expect(schema['@type']).toBe('Recipe');
+    expect(schema.name).toBe(recipe.name);
+    expect(schema.image.length).toBeGreaterThan(0);
+    expect(schema.recipeIngredient.length).toBeGreaterThan(0);
+    expect(schema.recipeInstructions).toHaveLength(recipe.steps.length);
+    expect(schema.author.name).toBe('식품의약품안전처');
+    expect(schema.isBasedOn).toBe(recipe.sourceUrl);
+    expect(schema).not.toHaveProperty('aggregateRating');
   });
 });
