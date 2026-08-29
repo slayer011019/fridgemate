@@ -81,3 +81,38 @@ The following remain intentionally blocked pending separate review:
 - Applying the ingredient tombstone migration
 
 Before full replacement, run a separately approved ten-row stale replacement, compare the stored-vector fixture against the 9/10 Hit@5 baseline, and confirm alias normalization at the reranker boundary.
+
+## Limited Stale Replacement
+
+After commit `0e0198d` passed lint, unit tests, build, and E2E in GitHub Actions, a second protected checkpoint was created before replacing stale rows.
+
+- Checkpoint rows: `1,003`
+- Compressed bytes: `6,967,142`
+- SHA-256: `a6762d8dc350800df039ac07f06ff4584a86b2ee33b35b6d671496fc8959bbe3`
+
+Reviewed command:
+
+```bash
+npm run recipes:embed -- --backfill-stale --limit=1146 --batch-size=25 --max-writes=10 --quiet
+```
+
+Result:
+
+- `processed=11`
+- `generated=10`
+- `skipped=1`
+- `failed=0`
+- `writeLimitReached=true`
+
+Post-run verification:
+
+- Total embeddings: `1,003`
+- Updated since checkpoint: `10`
+- Current/missing/stale: `20 / 143 / 983`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+- Refreshed-vector self retrieval: Top 1 `10/10`, Top 5 `10/10`, self similarity `1.0`
+
+No additional query-embedding API call was made after the approved ten-row stale replacement. Before replacing more stale rows, run the fixed ten-query fixture against stored production vectors under a separate API-cost approval and compare it with the 9/10 Hit@5 in-memory baseline.

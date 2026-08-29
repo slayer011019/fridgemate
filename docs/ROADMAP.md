@@ -41,7 +41,7 @@ Implemented:
 
 - Analyze recommendation impression/click exports
 - Keep the ingredient-first embedding text at or above the current 9/10 Hit@5 result while expanding the fixture beyond UUID-order smoke coverage
-- Continue from the successful checkpointed 10-row missing backfill only after reviewing the remaining `missing=143` and `stale=993`; full replacement remains blocked on a limited stale-row quality gate
+- Evaluate the fixed ten-query fixture against stored production vectors after the successful missing 10-row and stale 10-row gates; remaining state is `missing=143`, `stale=983`, and full replacement stays blocked
 - Keep semantic API publication separate from the backfill and require stored-vector quality verification first
 - Normalize recommendation event keys into `local:<seed-id>` and `catalog:<uuid>` with a nullable catalog recipe FK
 - Add canonical dishes, aliases, and source-attributed popularity signals after catalog recipe IDs are stable
