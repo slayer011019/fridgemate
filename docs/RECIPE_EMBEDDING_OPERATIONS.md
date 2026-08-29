@@ -24,6 +24,27 @@ Before writing embeddings, 993 `recipe_embeddings` rows were exported with vecto
 
 The backup contains catalog embedding text and raw vectors, so it must not be committed, logged, or shared publicly.
 
+## Backfill Runner Safety Contract
+
+The repository now provides a repeatable checkpoint command and a resumable backfill runner. Neither command authorizes production execution by itself.
+
+```bash
+npm run recipes:checkpoint -- --dry-run
+npm run recipes:checkpoint -- --label=before-staged-backfill
+npm run recipes:embed -- --backfill-missing --limit=1146 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+npm run recipes:embed -- --backfill-missing --resume --limit=1146 --batch-size=25 --api-batch-size=25 --max-writes=25 --quiet
+```
+
+- The embedding API receives multiple public catalog texts per request, capped at 100 inputs and defaulting to 25.
+- HTTP 429, 5xx, and network failures retry with bounded exponential backoff; other 4xx responses fail immediately.
+- UUID keyset pagination replaces offset pagination, so a resumed run cannot skip the next catalog page.
+- `.local/recipe-embedding-backfill-state.json` stores only operation metadata and the last successfully committed recipe UUID. It contains no API key, database URL, recipe text, or vector.
+- The state file is updated after each successful upsert. A failed item is never recorded as successful, so `--resume` retries it safely.
+- `--max-writes` remains independent of the catalog scan limit and is never raised automatically.
+- Summaries report API inputs, requests, retries, estimated tokens, optional estimated cost, elapsed time, and throughput without logging secrets or raw vectors.
+- `RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS` is optional and only enables the cost estimate; provider pricing is not hardcoded.
+- Checkpoints are gzip-compressed JSONL with a separate manifest containing row count, model/dimension groups, byte size, and SHA-256. The manifest is vector-free, while the checkpoint itself contains raw vectors and must remain protected.
+
 ## Limited Missing Backfill
 
 Preflight state:

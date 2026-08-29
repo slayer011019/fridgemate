@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Hardened recipe embedding operations with multi-input API batches, bounded retry/backoff, UUID keyset resume state, token/cost/throughput summaries, and a verified gzip checkpoint manifest with SHA-256.
 - Restored the three production-only recipe catalog migration files from verified schema statements, realigned Prisma migration-name history without running a deployment, and documented the two unrecoverable original-format checksum differences.
 - Completed a checkpointed ten-row missing recipe embedding backfill and verified the write cap, `vector(1536)` integrity, duplicate/orphan counts, stored-vector ordering, ingredient joins, and canonicalized semantic reranking.
 - Completed a separately checkpointed ten-row stale embedding replacement with no failures, exact write-bound verification, and 10/10 stored-vector self retrieval without spending additional query-embedding API calls.

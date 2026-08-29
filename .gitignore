@@ -33,6 +33,7 @@ Thumbs.db
 
 # Local-only files
 *.local
+.local/
 
 # Vercel
 .vercel
