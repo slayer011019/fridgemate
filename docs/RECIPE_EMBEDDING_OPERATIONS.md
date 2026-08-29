@@ -333,3 +333,38 @@ The immediate read-only verifier passed with:
 - Verification production writes: `0`
 
 The next missing or stale write batch remains unauthorized until separately approved.
+
+## Fifth 25-Row Missing Backfill
+
+After separate approval, production was reverified at `embeddings=1,103`, `current=120`, `missing=63`, and `stale=983`. A new protected checkpoint was created and independently hash-verified before any API call or write.
+
+- Checkpoint rows: `1,103`
+- Compressed bytes: `7,608,159`
+- SHA-256: `5a18b4f90f33897d2ff0c1e139979daa95e26bdf2a6a6abdb4b656c0428a68b5`
+- Hash verification: passed
+- Checkpoint production writes: `0`
+
+The runner resumed after the prior successful UUID and executed once with `--backfill-missing --all --resume --max-writes=25`.
+
+- Processed: `25`
+- Generated/written: `25`
+- Failed: `0`
+- API inputs: `25`
+- API requests: `1`
+- Retries: `0`
+- Estimated input tokens: `685`
+- Write limit reached: `true`
+
+The immediate read-only verifier passed with:
+
+- Recipes: `1,166`
+- Embeddings: `1,128`
+- Current/missing/stale: `145 / 38 / 983`
+- Duplicate composite keys: `0`
+- Orphan embeddings: `0`
+- Column type: `vector(1536)`
+- Model/dimensions: `text-embedding-3-small` / `1536`
+- Verification API requests: `0`
+- Verification production writes: `0`
+
+The next missing or stale write batch remains unauthorized until separately approved.
