@@ -56,6 +56,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added weekly Dependabot updates, pinned-action CodeQL analysis, production dependency audits, and full-history Gitleaks scanning for pushes, pull requests, and scheduled security checks.
 - Added a rate-limited, authenticated `/api/recipes/recommendations/semantic` endpoint behind `SEMANTIC_RECIPE_API_ENABLED`, with bounded inputs, rule fallback, and the existing impression/click event path.
 - Added candidate-pool recall and production-equivalent 70/30 reranking metrics to the recipe search evaluator without changing the retrieval model or vector dimensions.
 - Added optional Naver Search Advisor and Bing Webmaster Tools ownership-verification meta tags with token validation, build-time assertions, and deployment checklists alongside the existing Google Search Console support.
