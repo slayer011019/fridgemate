@@ -44,6 +44,14 @@ Open the source project in **Supabase Dashboard → Database → Backups** and r
 
 If using the Management API, use a personal access token stored outside the repository and call the backup-list endpoint. Never use `SUPABASE_SERVICE_ROLE_KEY` for this operation and never paste a token into an issue, terminal transcript, or committed file.
 
+For a Free-plan logical backup, prepare an existing, empty, encrypted directory outside the repository and run:
+
+```bash
+npm run backup:preflight -- --output-dir=ABSOLUTE_ENCRYPTED_DIRECTORY --confirm-database-host=EXACT_DB_HOST --confirm-encrypted-storage
+```
+
+The preflight accepts only `BACKUP_DATABASE_URL` or `DIRECT_URL`, requires its project ref to match `SUPABASE_URL`, rejects transaction-pooler port 6543, and verifies that Supabase CLI plus a running Docker engine are already present. It does not create a dump, install software, prove encryption, or transmit data. The encryption flag is an explicit operator assertion and must not be supplied for an unencrypted location.
+
 ## 2. Pre-drill safety gate
 
 Before starting a restore:

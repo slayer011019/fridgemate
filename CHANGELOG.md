@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added a read-only Free-plan backup preflight that validates the exact Supabase project and session/direct host, requires an empty encrypted output directory outside the repository, detects missing CLI/Docker prerequisites, and never prints the database URL or password.
 - Added a local-first daily menu decision loop with Korean calendar dates, one menu per user/day, explicit completion and cancellation, guest import, IndexedDB persistence, and retryable server writes.
 - Added authenticated pantry ownership and lightweight preference storage, structured preference-aware recommendation reasons, and bounded idempotent product-event ingestion.
 - Extended recommendation events with select, dismiss, external-open, and completion actions, client-generated idempotency keys, safe catalog recipe links, and aggregate funnel/join auditing in the training export.
