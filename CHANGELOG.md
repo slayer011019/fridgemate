@@ -7,6 +7,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+### Added
+
+- Added a cost-controlled daily production database backup workflow that validates the pinned Supabase owner/TLS target, verifies a custom-format dump, encrypts it to an offline recovery key, uploads only ciphertext with a checksum, and expires GitHub artifacts after 14 days.
+
 ### Fixed
 
 - Added weighted, shared user and client limits to both import-correction embedding endpoints so one 30-item request consumes 30 units and alternating suggestion/save calls cannot bypass the budget.

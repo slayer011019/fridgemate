@@ -1,0 +1,99 @@
+name: Encrypted production database backup
+
+on:
+  schedule:
+    # 02:30 Asia/Seoul. GitHub schedules use UTC.
+    - cron: '30 17 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Logical backup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      EXPECTED_SUPABASE_PROJECT_REF: zninmnfyanyqjaipbyzx
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require and validate backup target
+        run: node scripts/validateBackupTarget.js
+
+      - name: Install backup tools
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends age postgresql-client
+          age --version
+          pg_dump --version
+
+      - name: Create and encrypt backup
+        id: backup
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          umask 077
+
+          backup_directory="${RUNNER_TEMP}/fridgemate-backup"
+          backup_timestamp="$(date -u +'%Y%m%dT%H%M%SZ')"
+          backup_name="fridgemate-${backup_timestamp}.dump"
+          encrypted_name="${backup_name}.age"
+          mkdir -p "${backup_directory}"
+
+          pg_dump \
+            --dbname="${BACKUP_DATABASE_URL}" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --file="${backup_directory}/${backup_name}"
+
+          pg_restore --list "${backup_directory}/${backup_name}" > /dev/null
+          age \
+            --recipients-file .github/backup-recipients.txt \
+            --output "${backup_directory}/${encrypted_name}" \
+            "${backup_directory}/${backup_name}"
+          rm -f -- "${backup_directory}/${backup_name}"
+
+          test -s "${backup_directory}/${encrypted_name}"
+          (
+            cd "${backup_directory}"
+            sha256sum "${encrypted_name}" > "${encrypted_name}.sha256"
+          )
+
+          echo "artifact_name=fridgemate-db-backup-${backup_timestamp}" >> "${GITHUB_OUTPUT}"
+          echo "backup_directory=${backup_directory}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.backup.outputs.artifact_name }}
+          path: |
+            ${{ steps.backup.outputs.backup_directory }}/*.age
+            ${{ steps.backup.outputs.backup_directory }}/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Remove runner backup files
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          backup_directory="${RUNNER_TEMP}/fridgemate-backup"
+          if [[ -d "${backup_directory}" && "${backup_directory}" == "${RUNNER_TEMP}/fridgemate-backup" ]]; then
+            find "${backup_directory}" -maxdepth 1 -type f -delete
+            rmdir "${backup_directory}" 2>/dev/null || true
+          fi
