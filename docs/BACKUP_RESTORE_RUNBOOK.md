@@ -8,10 +8,13 @@ As of 2026-08-30:
 
 - Production database connectivity and all Prisma migrations are healthy.
 - The runtime Worker uses the non-owner `fridgemate_runtime` role through the RLS Hyperdrive configuration.
-- Supabase Dashboard backup retention and PITR status are **not yet verified**. Database credentials and the service-role key cannot read the Management API backup configuration.
+- Supabase Dashboard was verified directly for project `zninmnfyanyqjaipbyzx` (`FridgeMate`) in AWS `ap-northeast-1` (Tokyo) on the Free plan.
+- The project has **no scheduled backups**. The Dashboard explicitly reports that Free Plan projects do not include project backups; therefore there is no current backup retention window or recovery point.
+- PITR is **not enabled**. The Dashboard describes it as a Pro Plan add-on starting at USD 100/month.
+- **Restore to a New Project** is unavailable on the current plan. The Dashboard requires Pro Plan and physical backups for this operation.
 - No restore drill is complete until a backup has been restored into a separate project and the checks in this document pass.
 
-Do not describe backups or PITR as enabled until the Dashboard or Management API provides direct evidence.
+This is an operational gap for a production service that stores personal data: a database-loss or destructive-migration incident currently has no Supabase-managed recovery point. Do not describe backups or PITR as enabled until the plan changes and the Dashboard or Management API provides direct evidence.
 
 ## Recovery targets
 
@@ -21,7 +24,7 @@ Record the agreed targets before changing the Supabase plan or enabling a paid a
 | ------------------------------ | --------------------------------------------------- | --------------- |
 | Recovery point objective (RPO) | No more than 24 hours for daily backups             | Not confirmed   |
 | Recovery time objective (RTO)  | Restore and application verification within 4 hours | Not confirmed   |
-| Backup retention               | At least 7 days                                     | Not confirmed   |
+| Backup retention               | At least 7 days                                     | 0 days (gap)    |
 | Restore drill frequency        | Quarterly and before a high-risk migration          | Not confirmed   |
 
 PITR is preferred if losing up to one day of user writes is unacceptable. Enabling PITR or creating a restore project can incur charges and requires explicit operator approval.
