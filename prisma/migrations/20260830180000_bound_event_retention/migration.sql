@@ -1,9 +1,6 @@
--- Retention cleanup walks server-created timestamps and a stable id tie-breaker.
--- Row deletion remains an explicit, bounded operations task rather than a schema-migration side effect.
-DROP INDEX IF EXISTS "RecommendationEvent_createdAt_idx";
-
-CREATE INDEX "RecommendationEvent_createdAt_id_idx"
+-- Keep this migration to one statement. Prisma sends a multi-statement PostgreSQL
+-- migration as one implicit transaction, while CREATE INDEX CONCURRENTLY must run
+-- outside a transaction block. Retention cleanup itself remains a separate,
+-- explicitly bounded operations task.
+CREATE INDEX CONCURRENTLY "RecommendationEvent_createdAt_id_idx"
   ON "RecommendationEvent"("createdAt", "id");
-
-CREATE INDEX "ProductEvent_createdAt_id_idx"
-  ON "ProductEvent"("createdAt", "id");

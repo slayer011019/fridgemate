@@ -334,7 +334,7 @@ npm run events:prune-retention -- --apply --confirm-database-host=DB_HOST
 
 ## 기존 재료 tombstone payload 정리
 
-`20260830190000_prepare_ingredient_tombstone_scrubbing`은 payload 컬럼을 nullable로 확장하고 활성 레코드의 필수값 CHECK만 검증합니다. 이 자동 migration은 기존 삭제 행을 변경하지 않습니다. 새 서버를 먼저 배포하고 구 서버 인스턴스가 모두 종료된 것을 확인한 다음, 새 프런트엔드를 배포해야 합니다. 그 뒤에만 기존 full tombstone을 제한된 수동 작업으로 정리합니다.
+`20260830190000`~`20260830192000` 세 migration은 활성 레코드 CHECK 추가, 일반 DML을 막지 않는 제약 검증, 짧은 payload 컬럼 nullable 전환을 순서대로 수행합니다. 기존 삭제 행은 변경하지 않습니다. 세 migration을 모두 적용한 뒤 scrub-aware 서버를 배포하고 구 서버 인스턴스가 모두 종료된 것을 확인한 다음, 새 프런트엔드를 배포해야 합니다. 그 뒤에만 기존 full tombstone을 제한된 수동 작업으로 정리합니다.
 
 ```bash
 # DIRECT_URL 또는 별도 INGREDIENT_TOMBSTONE_SCRUB_DATABASE_URL을 사용하는 읽기 전용 미리보기

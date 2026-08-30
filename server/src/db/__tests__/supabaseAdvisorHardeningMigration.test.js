@@ -18,6 +18,7 @@ describe('Supabase Security Advisor function hardening migration', () => {
 
     expect(sql).toContain("target_proc.proname = 'set_recipes_updated_at'");
     expect(sql).toContain("pg_catalog.pg_has_role(current_user, function_owner, 'USAGE')");
+    expect(sql).toMatch(/RAISE\s+EXCEPTION\s+'public\.set_recipes_updated_at/iu);
     expect(sql).toContain('SECURITY INVOKER');
     expect(sql).toContain('SET search_path = pg_catalog');
     expect(sql).toContain('NEW.updated_at = pg_catalog.now()');
@@ -36,6 +37,7 @@ describe('Supabase Security Advisor function hardening migration', () => {
     expect(sql).toContain(
       'REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC'
     );
+    expect(sql).toMatch(/RAISE\s+EXCEPTION\s+'public\.rls_auto_enable/iu);
     expect(sql).not.toContain('CREATE OR REPLACE FUNCTION public.rls_auto_enable');
     expect(sql).not.toContain('ALTER FUNCTION public.rls_auto_enable');
   });

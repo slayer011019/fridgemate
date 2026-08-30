@@ -20,7 +20,7 @@ BEGIN
   IF function_owner IS NULL THEN
     RAISE NOTICE 'public.set_recipes_updated_at() is absent; skipping repository trigger hardening';
   ELSIF NOT pg_catalog.pg_has_role(current_user, function_owner, 'USAGE') THEN
-    RAISE NOTICE 'public.set_recipes_updated_at() is owned by %, not the migration role; skipping repository trigger hardening',
+    RAISE EXCEPTION 'public.set_recipes_updated_at() is owned by %, and the migration role cannot harden it',
       pg_catalog.pg_get_userbyid(function_owner);
   ELSE
     EXECUTE $function_sql$
@@ -79,7 +79,7 @@ BEGIN
   IF function_owner IS NULL THEN
     RAISE NOTICE 'Expected SECURITY DEFINER event-trigger function public.rls_auto_enable() is absent; skipping managed-function grants';
   ELSIF NOT pg_catalog.pg_has_role(current_user, function_owner, 'USAGE') THEN
-    RAISE NOTICE 'public.rls_auto_enable() is owned by %, not the migration role; verify its EXECUTE grants manually',
+    RAISE EXCEPTION 'public.rls_auto_enable() is owned by %, and the migration role cannot harden it',
       pg_catalog.pg_get_userbyid(function_owner);
   ELSE
     EXECUTE 'REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC';

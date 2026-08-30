@@ -143,10 +143,10 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Confirm network/5xx keeps menu state pending and a 4xx response never appears clean.
 - [ ] Confirm repeated recommendation/product `clientEventId` values do not create duplicate events.
 - [ ] Confirm account export includes the new data and account deletion removes server rows plus account-scoped local caches.
-- [ ] Review and apply `20260830180000_bound_event_retention`; confirm both event tables have `(createdAt, id)` indexes and that the migration itself deletes no rows.
+- [ ] Review and apply `20260830180000` through `20260830182000`; confirm each index migration is a single `CREATE/DROP INDEX CONCURRENTLY` statement, both event tables have `(createdAt, id)` indexes, the legacy prefix index is gone, and no migration deletes rows.
 - [ ] Run `npm run events:prune-retention` with the trusted maintenance URL and review only aggregate counts. Until a separately reviewed least-privilege scheduler exists, record each explicitly host-confirmed manual `--apply` run; do not treat the script itself as recurring enforcement.
 - [ ] Confirm each retention run stays within its configured batch, maximum-delete, and runtime limits, and that no IDs, routes, properties, recipe names, or session values appear in its logs.
-- [ ] Review and apply only `20260830190000_prepare_ingredient_tombstone_scrubbing`; confirm it makes payload columns nullable, validates the active-row CHECK, and performs no tombstone update or delete.
+- [ ] Review and apply `20260830190000` through `20260830192000` in order: add the active-row CHECK as `NOT VALID`, validate it under bounded timeouts, then perform the short nullable-column ALTER. Confirm no step updates or deletes a tombstone.
 - [ ] Deploy the scrub-aware server after the prepare migration, wait until all old server/Worker instances have drained, and only then deploy the frontend that sends minimal tombstones.
 - [ ] After the new server is stable, run `npm run ingredients:scrub-tombstones` with `DIRECT_URL` or `INGREDIENT_TOMBSTONE_SCRUB_DATABASE_URL` and review the aggregate-only dry-run.
 - [ ] Apply the scrub with the exact `--confirm-database-host`, confirm every batch/max-update/runtime bound, and rerun while `mayHaveMore` is true or `remainingEligibleCount` is nonzero. This is a manual backfill, not recurring enforcement.
