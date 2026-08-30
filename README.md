@@ -81,7 +81,7 @@
 - `llms.txt`는 공개 정보와 사용자별 비공개 영역의 경계를 설명하며, 개인정보나 개인화 추천 데이터는 인용 대상으로 제공하지 않습니다.
 - 공개 레시피 상세 페이지의 `Recipe` JSON-LD에는 실제 원문에 있는 재료·조리 단계·이미지·영양·출처만 넣고 평점이나 조리 시간은 추정하지 않습니다.
 
-공개 레시피 카탈로그는 식품안전나라 `COOKRCP01` 원문을 곧바로 소스 파일에 쓰지 않습니다. 먼저 `npm run recipes:export-public -- --limit=100 --print-review > public-recipes.review.json`으로 검토 파일을 만들고 내용을 확인한 뒤, `npm run recipes:export-public -- --write-from=public-recipes.review.json`으로 갱신합니다. 공개 조건을 충족하지 못한 항목은 제외합니다.
+공개 레시피 카탈로그는 식품안전나라 `COOKRCP01` 원문을 곧바로 소스 파일에 쓰지 않습니다. 먼저 `npm run recipes:export-public -- --limit=100 --print-review > public-recipes.review.json`으로 검토 파일을 만들고 내용을 확인한 뒤, `npm run recipes:export-public -- --write-from=public-recipes.review.json`으로 갱신합니다. 검토 파일과 저장소의 기존 출력 파일은 심볼릭 링크나 하드 링크가 아닌 일반 파일이어야 하며, 스크립트는 검증한 파일 핸들에만 읽고 씁니다. 공개 조건을 충족하지 못한 항목은 제외합니다.
 
 운영용 MFDS seed와 재료 parser도 기본값은 dry run입니다. 실제 Supabase 쓰기는 `--execute`와 현재 `SUPABASE_URL`의 정확한 `--confirm-project-ref`를 함께 지정해야 하며, 자세한 절차는 [레시피 데이터 가져오기](docs/recipe-seeding.md)에 정리되어 있습니다.
 

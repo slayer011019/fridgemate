@@ -37,17 +37,14 @@ function createResponse() {
 describe('protected API shared rate limits', () => {
   afterEach(() => resetAuthSecurityStoreForTests());
 
-  it('mounts user and client guards after authentication on every protected API router', () => {
+  it('mounts a client guard before auth and a user guard before every protected API router', () => {
     for (const path of PROTECTED_API_PATHS) {
       const matchingLayers = createApp().router.stack.filter((layer) => layer.match(path));
       const requireAuthIndex = matchingLayers.findIndex((layer) => layer.name === 'requireAuth');
 
-      expect(matchingLayers.slice(requireAuthIndex, requireAuthIndex + 4).map((layer) => layer.name)).toEqual([
-        'requireAuth',
-        'rateLimit',
-        'rateLimit',
-        'router'
-      ]);
+      expect(
+        matchingLayers.slice(requireAuthIndex - 1, requireAuthIndex + 3).map((layer) => layer.name)
+      ).toEqual(['rateLimit', 'requireAuth', 'rateLimit', 'router']);
     }
   });
 
@@ -123,5 +120,21 @@ describe('protected API shared rate limits', () => {
     expect(response.body).toEqual({
       message: 'Too many authenticated API requests. Please try again later.'
     });
+  });
+
+  it('returns 429 from the client guard without requiring an authenticated request', async () => {
+    setAuthSecurityStoreForTests({
+      async consumeRateLimit() {
+        return { allowed: false, retryAfterSeconds: 20 };
+      }
+    });
+    const response = createResponse();
+    const next = vi.fn();
+
+    await authenticatedApiRateLimits[1]({ ip: '203.0.113.10' }, response, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(response.statusCode).toBe(429);
+    expect(response.headers['Retry-After']).toBe('20');
   });
 });

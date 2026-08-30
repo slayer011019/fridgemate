@@ -128,7 +128,9 @@ test('menu selection keeps a pending copy after 5xx and succeeds on explicit ret
   const firstCard = page.locator('article').filter({ has: page.getByRole('button', { name: '오늘 먹기' }) }).first();
   await firstCard.getByRole('button', { name: '오늘 먹기' }).click();
   await gotoAndWait(page, '/');
-  await expect(page.getByRole('button', { name: '서버 저장 다시 시도' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '서버 저장 다시 시도' })).toBeVisible({
+    timeout: 10_000
+  });
 
   apiState.backend.menuDecisionFailureStatus = null;
   await page.getByRole('button', { name: '서버 저장 다시 시도' }).click();

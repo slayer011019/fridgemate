@@ -183,6 +183,55 @@ describe('authController', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('does not let an invalid bearer token suppress revocation of a valid access cookie', async () => {
+    const request = createRequest();
+    request.headers.authorization = 'Bearer attacker-controlled-invalid-token';
+    const response = createResponse();
+    const next = vi.fn();
+    const { logoutHandler } = await import('../authController.js');
+
+    await logoutHandler(request, response, next);
+
+    expect(serviceMocks.logoutUser).toHaveBeenCalledWith('refresh-token-1');
+    expect(revocationMocks.revokeToken).toHaveBeenCalledTimes(1);
+    expect(revocationMocks.revokeToken).toHaveBeenCalledWith(
+      'access-token-1',
+      expect.any(Number)
+    );
+    expect(response.status).toHaveBeenCalledWith(204);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('revokes each distinct verified access token presented during logout', async () => {
+    const request = createRequest();
+    request.headers.authorization = `Bearer ${createAccessToken(
+      { sub: 'user-1', jti: 'bearer-access-2' },
+      {
+        secret: TEST_JWT_SECRET,
+        expiresIn: '15m',
+        issuer: 'fridgemate-api',
+        audience: 'fridgemate-client'
+      }
+    )}`;
+    const response = createResponse();
+    const next = vi.fn();
+    const { logoutHandler } = await import('../authController.js');
+
+    await logoutHandler(request, response, next);
+
+    expect(revocationMocks.revokeToken).toHaveBeenCalledTimes(2);
+    expect(revocationMocks.revokeToken).toHaveBeenCalledWith(
+      'access-token-1',
+      expect.any(Number)
+    );
+    expect(revocationMocks.revokeToken).toHaveBeenCalledWith(
+      'bearer-access-2',
+      expect.any(Number)
+    );
+    expect(response.status).toHaveBeenCalledWith(204);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('revokes the bearer access token used for logout', async () => {
     const accessToken = createAccessToken(
       { sub: 'user-1', email: 'user@example.com', jti: 'bearer-access-1' },

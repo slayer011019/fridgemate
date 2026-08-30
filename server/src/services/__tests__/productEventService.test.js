@@ -57,6 +57,18 @@ describe('productEventService', () => {
     ).toThrow('properties.device_type is invalid.');
   });
 
+  it.each(['__proto__', 'constructor', 'toString'])(
+    'rejects prototype property name %s without modifying object prototypes',
+    (propertyName) => {
+      const properties = JSON.parse(`{"${propertyName}":{"polluted":true}}`);
+
+      expect(() => normalizeProductEvent({ ...validPayload, properties })).toThrow(
+        'properties contains an unsupported key.'
+      );
+      expect({}.polluted).toBeUndefined();
+    }
+  );
+
   it('replaces dynamic and unknown routes with non-identifying templates', () => {
     expect(normalizeProductEventRoute('/ingredients/private-record-id/edit?from=home')).toBe(
       '/ingredients/:id/edit'

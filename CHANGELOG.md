@@ -20,6 +20,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Moved shared client rate limits ahead of access-token and revocation checks, then kept per-user limits after authentication so forged or anonymous requests cannot trigger unbounded security-store work.
+- Made logout verify and revoke both cookie and Bearer access tokens independently so an invalid Bearer value cannot hide a valid cookie token, and hardened product-event property normalization against inherited or attacker-selected object keys.
+- Pinned reviewed recipe input and the fixed public-catalog output to verified regular-file handles, rejecting symlinked directories and hard links so path swaps cannot redirect reads or writes.
 - Normalized the Cloudflare training-crawler WAF rule with `lower(http.user_agent)` for GPTBot, CCBot, and Google-Extended, closing lowercase and mixed-case User-Agent bypasses while preserving search-crawler access.
 - Replaced attacker-controlled unknown URL segments in request telemetry with fixed `/api/unknown` or `/unknown` groups so 404 probes cannot inject personal data or unbounded labels into platform logs.
 - Removed per-request reads and deletes of legacy raw Redis auth keys so login email, client addresses, and token IDs never re-enter Redis commands after opaque-key migration.

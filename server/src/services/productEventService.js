@@ -185,15 +185,17 @@ function normalizeProperties(value, eventName) {
     throw createHttpError(400, 'properties must be a bounded object.');
   }
   const eventRules = PRODUCT_EVENT_PROPERTIES[eventName];
-  const properties = {};
+  const properties = new Map();
   for (const [key, item] of Object.entries(value)) {
-    const rule = COMMON_PROPERTY_RULES[key] || eventRules[key];
+    const rule =
+      (Object.hasOwn(COMMON_PROPERTY_RULES, key) && COMMON_PROPERTY_RULES[key]) ||
+      (Object.hasOwn(eventRules, key) && eventRules[key]);
     if (!rule) {
       throw createHttpError(400, 'properties contains an unsupported key.');
     }
-    properties[key] = normalizeProperty(key, item, rule);
+    properties.set(key, normalizeProperty(key, item, rule));
   }
-  return Object.keys(properties).length ? properties : null;
+  return properties.size ? Object.fromEntries(properties) : null;
 }
 
 export function normalizeProductEvent(body = {}) {

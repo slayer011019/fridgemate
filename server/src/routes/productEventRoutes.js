@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { serverConfig } from '../config.js';
 import { createProductEventHandler } from '../controllers/productEventController.js';
 import { createHttpError } from '../lib/httpError.js';
+import { authenticatedApiClientRateLimit } from '../middleware/authenticatedApiRateLimit.js';
+import { optionalAuth } from '../middleware/optionalAuth.js';
 import { createRateLimit, getClientAddress } from '../middleware/rateLimit.js';
 
 export const productEventRoutes = Router();
@@ -38,10 +40,7 @@ const productEventRateLimit = createRateLimit({
   message: 'Too many product events. Please try again later.'
 });
 
-productEventRoutes.post(
-  '/',
-  enforceProductEventCollectionPolicy,
-  productEventRateLimit,
-  requireProductEventAuthentication,
-  createProductEventHandler
-);
+// The disabled policy remains a zero-work 204. On the enabled path, a shared client
+// budget runs before optional token/revocation checks, followed by the event budget.
+// codeql[js/missing-rate-limiting]
+productEventRoutes.post('/', enforceProductEventCollectionPolicy, authenticatedApiClientRateLimit, optionalAuth, productEventRateLimit, requireProductEventAuthentication, createProductEventHandler);

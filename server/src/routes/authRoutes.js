@@ -125,41 +125,22 @@ const currentUserClientRateLimit = createAuthRateLimit({
   key: getClientAddress
 });
 
-authRoutes.post(
-  '/signup',
-  enforcePublicSignupPolicy,
-  signupIpRateLimit,
-  signupEmailRateLimit,
-  signupHandler
-);
-authRoutes.post(
-  '/login',
-  // These source-scoped guards run before the expensive password check. The
-  // distributed account bucket is consumed only after a failed check.
-  loginIpRateLimit,
-  loginEmailRateLimit,
-  loginHandler
-);
+// Every route below uses FridgeMate's distributed auth limiter before its expensive handler.
+// CodeQL models selected rate-limit packages, not this custom middleware; the complete order
+// is asserted in authRoutes.test.js before these targeted suppressions are applied.
+// codeql[js/missing-rate-limiting]
+authRoutes.post('/signup', enforcePublicSignupPolicy, signupIpRateLimit, signupEmailRateLimit, signupHandler);
+// The source-scoped login guards run before password verification. The account bucket is
+// consumed separately only after a failed password check.
+// codeql[js/missing-rate-limiting]
+authRoutes.post('/login', loginIpRateLimit, loginEmailRateLimit, loginHandler);
+// codeql[js/missing-rate-limiting]
 authRoutes.post('/refresh', refreshIpBurstRateLimit, refreshIpHourlyRateLimit, refreshSessionHandler);
-authRoutes.get(
-  '/me',
-  requireAuth,
-  currentUserRateLimit,
-  currentUserClientRateLimit,
-  getCurrentUserHandler
-);
-authRoutes.post(
-  '/data-export',
-  requireAuth,
-  dataExportIpRateLimit,
-  dataExportUserRateLimit,
-  exportUserDataHandler
-);
-authRoutes.delete(
-  '/account',
-  requireAuth,
-  accountDeletionIpRateLimit,
-  accountDeletionUserRateLimit,
-  deleteUserAccountHandler
-);
+// codeql[js/missing-rate-limiting]
+authRoutes.get('/me', currentUserClientRateLimit, requireAuth, currentUserRateLimit, getCurrentUserHandler);
+// codeql[js/missing-rate-limiting]
+authRoutes.post('/data-export', dataExportIpRateLimit, requireAuth, dataExportUserRateLimit, exportUserDataHandler);
+// codeql[js/missing-rate-limiting]
+authRoutes.delete('/account', accountDeletionIpRateLimit, requireAuth, accountDeletionUserRateLimit, deleteUserAccountHandler);
+// codeql[js/missing-rate-limiting]
 authRoutes.post('/logout', logoutIpBurstRateLimit, logoutIpHourlyRateLimit, logoutHandler);
