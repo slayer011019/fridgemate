@@ -51,6 +51,8 @@ export async function getCurrentUserHandler(request, response, next) {
 }
 
 export async function logoutHandler(request, response, next) {
+  clearAuthCookies(response);
+
   try {
     const accessToken = getAccessTokenFromRequest(request);
     const accessPayload = accessToken
@@ -61,12 +63,19 @@ export async function logoutHandler(request, response, next) {
         })
       : null;
 
+    const revocationOperations = [logoutUser(getRefreshTokenFromRequest(request))];
+
     if (accessPayload?.jti && accessPayload?.exp) {
-      await revokeToken(accessPayload.jti, accessPayload.exp);
+      revocationOperations.push(revokeToken(accessPayload.jti, accessPayload.exp));
     }
 
-    await logoutUser(getRefreshTokenFromRequest(request));
-    clearAuthCookies(response);
+    const revocationResults = await Promise.allSettled(revocationOperations);
+    const failedRevocation = revocationResults.find((result) => result.status === 'rejected');
+
+    if (failedRevocation) {
+      throw failedRevocation.reason;
+    }
+
     response.status(204).send();
   } catch (error) {
     next(error);

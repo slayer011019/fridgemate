@@ -22,7 +22,7 @@ describe('authSessionService', () => {
     window.localStorage.clear();
   });
 
-  it('refreshes a stored session and replaces the stale user', async () => {
+  it('restores a server-verified session without persisting identity in localStorage', async () => {
     authApiMocks.refreshSession.mockResolvedValue({ user: { id: 'user-1', email: 'fresh@example.com' } });
     window.localStorage.setItem(
       'fridgemate-auth-session',
@@ -50,6 +50,44 @@ describe('authSessionService', () => {
     expect(setLoading).toHaveBeenCalledWith(true);
     expect(setLoading).toHaveBeenLastCalledWith(false);
     expect(setError).toHaveBeenLastCalledWith('');
+    expect(window.localStorage.getItem('fridgemate-auth-session')).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-auth-session-present:v1')).toBe('1');
+  });
+
+  it('does not refresh when no non-PII session hint exists', async () => {
+    const { refreshStoredSession } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+    const setLoading = vi.fn();
+    const setError = vi.fn();
+
+    await expect(
+      refreshStoredSession({ backendEnabled: true, setSession, setLoading, setError })
+    ).resolves.toBeNull();
+
+    expect(authApiMocks.refreshSession).not.toHaveBeenCalled();
+    expect(setSession).toHaveBeenLastCalledWith(null);
+  });
+
+  it('fails closed when the server cannot verify the current session', async () => {
+    authApiMocks.refreshSession.mockRejectedValue(new Error('API request could not reach the server.'));
+    window.localStorage.setItem(
+      'fridgemate-auth-session',
+      JSON.stringify({ user: { id: 'user-1', email: 'stale@example.com' } })
+    );
+
+    const { refreshStoredSession, SESSION_VERIFICATION_FAILED_MESSAGE } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+    const setLoading = vi.fn();
+    const setError = vi.fn();
+
+    await expect(
+      refreshStoredSession({ backendEnabled: true, setSession, setLoading, setError })
+    ).resolves.toBeNull();
+
+    expect(setSession).toHaveBeenLastCalledWith(null);
+    expect(setError).toHaveBeenLastCalledWith(SESSION_VERIFICATION_FAILED_MESSAGE);
+    expect(window.localStorage.getItem('fridgemate-auth-session')).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-auth-session-present:v1')).toBeNull();
   });
 
   it('clears the session on authorization failure', async () => {
@@ -101,5 +139,97 @@ describe('authSessionService', () => {
     expect(result.user.email).toBe('login@example.com');
     expect(setSession).toHaveBeenCalledWith(result);
     expect(setError).toHaveBeenLastCalledWith('');
+    expect(window.localStorage.getItem('fridgemate-auth-session')).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-auth-session-present:v1')).toBe('1');
+  });
+
+  it('locks the local session and leaves a retry fence when server logout fails', async () => {
+    authApiMocks.logout.mockRejectedValue(new Error('network down'));
+
+    const { logoutSession, LOGOUT_PENDING_MESSAGE } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+    const setGuestImportPrompt = vi.fn();
+    const setError = vi.fn();
+    const defaultGuestImportPrompt = { available: false, count: 0, loading: false };
+
+    const result = await logoutSession({
+      backendEnabled: true,
+      setSession,
+      setGuestImportPrompt,
+      setError,
+      defaultGuestImportPrompt
+    });
+
+    expect(result).toEqual({ ok: false, pending: true });
+    expect(setSession).toHaveBeenLastCalledWith(null);
+    expect(setError).toHaveBeenLastCalledWith(LOGOUT_PENDING_MESSAGE);
+    expect(window.localStorage.getItem('fridgemate-auth-logout-pending:v1')).toBe('1');
+  });
+
+  it('retries a fenced logout before any session refresh', async () => {
+    window.localStorage.setItem('fridgemate-auth-logout-pending:v1', '1');
+    authApiMocks.logout.mockResolvedValue(null);
+
+    const { refreshStoredSession } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+    const setLoading = vi.fn();
+    const setError = vi.fn();
+
+    await expect(
+      refreshStoredSession({ backendEnabled: true, setSession, setLoading, setError })
+    ).resolves.toBeNull();
+
+    expect(authApiMocks.logout).toHaveBeenCalledTimes(1);
+    expect(authApiMocks.refreshSession).not.toHaveBeenCalled();
+    expect(setSession).toHaveBeenLastCalledWith(null);
+    expect(window.localStorage.getItem('fridgemate-auth-logout-pending:v1')).toBeNull();
+  });
+
+  it('keeps a failed pending logout fenced and never refreshes the old session', async () => {
+    window.localStorage.setItem('fridgemate-auth-logout-pending:v1', '1');
+    authApiMocks.logout.mockRejectedValue(new Error('network down'));
+
+    const { refreshStoredSession, LOGOUT_PENDING_MESSAGE } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+    const setLoading = vi.fn();
+    const setError = vi.fn();
+
+    await expect(
+      refreshStoredSession({ backendEnabled: true, setSession, setLoading, setError })
+    ).resolves.toBeNull();
+
+    expect(authApiMocks.refreshSession).not.toHaveBeenCalled();
+    expect(setSession).toHaveBeenLastCalledWith(null);
+    expect(setError).toHaveBeenLastCalledWith(LOGOUT_PENDING_MESSAGE);
+    expect(window.localStorage.getItem('fridgemate-auth-logout-pending:v1')).toBe('1');
+  });
+
+  it('locks the local session even when the logout fence cannot be stored', async () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage is unavailable.', 'SecurityError');
+    });
+    authApiMocks.logout.mockRejectedValue(new Error('network down'));
+
+    try {
+      const { logoutSession, LOGOUT_FAILED_MESSAGE } = await import('../authSessionService.js');
+      const setSession = vi.fn();
+      const setGuestImportPrompt = vi.fn();
+      const setError = vi.fn();
+      const defaultGuestImportPrompt = { available: false, count: 0, loading: false };
+
+      const result = await logoutSession({
+        backendEnabled: true,
+        setSession,
+        setGuestImportPrompt,
+        setError,
+        defaultGuestImportPrompt
+      });
+
+      expect(result).toEqual({ ok: false, pending: false });
+      expect(setSession).toHaveBeenLastCalledWith(null);
+      expect(setError).toHaveBeenLastCalledWith(LOGOUT_FAILED_MESSAGE);
+    } finally {
+      setItemSpy.mockRestore();
+    }
   });
 });

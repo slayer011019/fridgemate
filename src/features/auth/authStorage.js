@@ -1,4 +1,6 @@
-const AUTH_SESSION_KEY = 'fridgemate-auth-session';
+const LEGACY_AUTH_SESSION_KEY = 'fridgemate-auth-session';
+const SESSION_PRESENT_KEY = 'fridgemate-auth-session-present:v1';
+const LOGOUT_PENDING_KEY = 'fridgemate-auth-logout-pending:v1';
 const GUEST_IMPORT_DECISION_PREFIX = 'fridgemate-guest-import';
 export const GUEST_STORAGE_SCOPE = 'guest';
 
@@ -10,7 +12,7 @@ function getStorage() {
   return window.localStorage;
 }
 
-function readJson(key, fallbackValue) {
+function readStorageValue(key, fallbackValue = '') {
   const storage = getStorage();
 
   if (!storage) {
@@ -18,49 +20,75 @@ function readJson(key, fallbackValue) {
   }
 
   try {
-    const value = storage.getItem(key);
-    return value ? JSON.parse(value) : fallbackValue;
+    return storage.getItem(key) || fallbackValue;
   } catch {
     return fallbackValue;
   }
 }
 
-function writeJson(key, value) {
+function writeStorageValue(key, value) {
   const storage = getStorage();
 
   if (!storage) {
-    return;
+    return false;
   }
 
-  storage.setItem(key, JSON.stringify(value));
+  try {
+    storage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeStorageValue(key) {
+  const storage = getStorage();
+
+  if (!storage) {
+    return false;
+  }
+
+  try {
+    storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function buildUserStorageScope(userId) {
   return userId ? `user:${userId}` : GUEST_STORAGE_SCOPE;
 }
 
-export function getStoredAuthSession() {
-  const session = readJson(AUTH_SESSION_KEY, null);
-
-  if (!session?.user?.id) {
-    return null;
-  }
-
-  return session;
-}
-
-export function saveStoredAuthSession(session) {
-  writeJson(AUTH_SESSION_KEY, session);
-}
-
 export function clearStoredAuthSession() {
-  const storage = getStorage();
+  return removeStorageValue(LEGACY_AUTH_SESSION_KEY);
+}
 
-  if (!storage) {
-    return;
-  }
+export function hasSessionHint() {
+  return (
+    readStorageValue(SESSION_PRESENT_KEY) === '1' ||
+    Boolean(readStorageValue(LEGACY_AUTH_SESSION_KEY))
+  );
+}
 
-  storage.removeItem(AUTH_SESSION_KEY);
+export function markSessionPresent() {
+  return writeStorageValue(SESSION_PRESENT_KEY, '1');
+}
+
+export function clearSessionHint() {
+  return removeStorageValue(SESSION_PRESENT_KEY);
+}
+
+export function hasPendingLogout() {
+  return readStorageValue(LOGOUT_PENDING_KEY) === '1';
+}
+
+export function markLogoutPending() {
+  return writeStorageValue(LOGOUT_PENDING_KEY, '1');
+}
+
+export function clearPendingLogout() {
+  return removeStorageValue(LOGOUT_PENDING_KEY);
 }
 
 function getGuestImportDecisionKey(userId) {
@@ -72,13 +100,7 @@ export function getGuestImportDecision(userId) {
     return '';
   }
 
-  const storage = getStorage();
-
-  if (!storage) {
-    return '';
-  }
-
-  return storage.getItem(getGuestImportDecisionKey(userId)) || '';
+  return readStorageValue(getGuestImportDecisionKey(userId));
 }
 
 export function setGuestImportDecision(userId, decision) {
@@ -86,11 +108,5 @@ export function setGuestImportDecision(userId, decision) {
     return;
   }
 
-  const storage = getStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  storage.setItem(getGuestImportDecisionKey(userId), decision);
+  writeStorageValue(getGuestImportDecisionKey(userId), decision);
 }

@@ -12,16 +12,25 @@ const TOAST_STYLES = {
 
 function ConnectionStatusToast() {
   const backendEnabled = isBackendEnabled();
-  const { isAuthenticated } = useAuth();
+  const { error: authError, isAuthenticated } = useAuth();
   const { dataSource, error, isSyncing } = useIngredients();
   const { isOnline } = useNetworkStatus();
 
   const notices = useMemo(() => {
-    if (!backendEnabled || !isAuthenticated) {
-      return [];
+    const nextNotices = [];
+
+    if (authError) {
+      nextNotices.push({
+        id: 'auth-error',
+        tone: 'danger',
+        title: '\uC778\uC99D \uC0C1\uD0DC\uB97C \uD655\uC778\uD574\uC8FC\uC138\uC694',
+        description: authError
+      });
     }
 
-    const nextNotices = [];
+    if (!backendEnabled || !isAuthenticated) {
+      return nextNotices;
+    }
 
     if (!isOnline) {
       nextNotices.push({
@@ -29,7 +38,7 @@ function ConnectionStatusToast() {
         tone: 'danger',
         title: '\uC624\uD504\uB77C\uC778 \uC0C1\uD0DC',
         description:
-          'API\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC5B4 \uC7A0\uC2DC \uB85C\uCEEC \uC778\uC99D \uCE90\uC2DC\uB97C \uC0AC\uC6A9\uD558\uACE0 \uC788\uC5B4\uC694.'
+          'API\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC5B4 \uD604\uC7AC \uD655\uC778\uB41C \uACC4\uC815\uC758 \uC774 \uAE30\uAE30 \uB85C\uCEEC \uB370\uC774\uD130\uB9CC \uD45C\uC2DC\uD569\uB2C8\uB2E4.'
       });
     } else if (dataSource === 'indexeddb' && error) {
       nextNotices.push({
@@ -53,12 +62,12 @@ function ConnectionStatusToast() {
         tone: 'info',
         title: '\uB3D9\uAE30\uD654 \uC911',
         description:
-          '\uCD5C\uADFC \uBCC0\uACBD \uC0AC\uD56D\uC744 \uB85C\uCEEC \uC778\uC99D \uCE90\uC2DC\uC5D0\uB3C4 \uD568\uAED8 \uBC18\uC601\uD558\uACE0 \uC788\uC5B4\uC694.'
+          '\uCD5C\uADFC \uBCC0\uACBD \uC0AC\uD56D\uC744 \uC774 \uAE30\uAE30\uC758 \uB85C\uCEEC \uCE90\uC2DC\uC5D0\uB3C4 \uD568\uAED8 \uBC18\uC601\uD558\uACE0 \uC788\uC5B4\uC694.'
       });
     }
 
     return nextNotices;
-  }, [backendEnabled, dataSource, error, isAuthenticated, isOnline, isSyncing]);
+  }, [authError, backendEnabled, dataSource, error, isAuthenticated, isOnline, isSyncing]);
 
   if (!notices.length) {
     return null;

@@ -1,7 +1,6 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   buildUserStorageScope,
-  getStoredAuthSession,
   GUEST_STORAGE_SCOPE,
 } from '../features/auth/authStorage';
 import {
@@ -41,10 +40,11 @@ const defaultAuthContext = {
 };
 
 const AuthContext = createContext(defaultAuthContext);
+const inFlightSessionRefreshes = new WeakMap();
 
 export function AuthProvider({ children }) {
   const backendEnabled = isBackendEnabled();
-  const [session, setSession] = useState(() => (backendEnabled ? getStoredAuthSession() : null));
+  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(() => backendEnabled);
   const [error, setError] = useState('');
   const [guestImportPrompt, setGuestImportPrompt] = useState(defaultGuestImportPrompt);
@@ -54,13 +54,26 @@ export function AuthProvider({ children }) {
   const isAuthenticated = Boolean(user?.id);
   const storageScope = user?.id ? buildUserStorageScope(user.id) : GUEST_STORAGE_SCOPE;
 
-  const refreshSession = useCallback(async () => {
-    return refreshStoredSession({
+  const refreshSession = useCallback(() => {
+    const existingRefresh = inFlightSessionRefreshes.get(setSession);
+
+    if (existingRefresh) {
+      return existingRefresh;
+    }
+
+    const refreshPromise = refreshStoredSession({
       backendEnabled,
       setSession,
       setLoading,
       setError
+    }).finally(() => {
+      if (inFlightSessionRefreshes.get(setSession) === refreshPromise) {
+        inFlightSessionRefreshes.delete(setSession);
+      }
     });
+
+    inFlightSessionRefreshes.set(setSession, refreshPromise);
+    return refreshPromise;
   }, [backendEnabled]);
 
   useEffect(() => {
@@ -116,13 +129,12 @@ export function AuthProvider({ children }) {
     async () =>
       logoutSession({
         backendEnabled,
-        token,
         setSession,
         setGuestImportPrompt,
         setError,
         defaultGuestImportPrompt
       }),
-    [backendEnabled, token]
+    [backendEnabled]
   );
 
   const importGuestIngredients = useCallback(

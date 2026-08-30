@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildUserStorageScope,
+  clearPendingLogout,
+  clearSessionHint,
   clearStoredAuthSession,
   getGuestImportDecision,
-  getStoredAuthSession,
   GUEST_STORAGE_SCOPE,
-  saveStoredAuthSession,
+  hasPendingLogout,
+  hasSessionHint,
+  markLogoutPending,
+  markSessionPresent,
   setGuestImportDecision
 } from '../authStorage.js';
 
@@ -18,30 +22,41 @@ describe('authStorage', () => {
     window.localStorage.clear();
   });
 
-  it('stores and restores an auth session', () => {
-    const session = {
-      user: {
-        id: 'user-1',
-        email: 'hello@example.com'
-      }
-    };
-
-    saveStoredAuthSession(session);
-
-    expect(getStoredAuthSession()).toEqual(session);
-  });
-
-  it('clears an auth session', () => {
-    saveStoredAuthSession({
-      user: {
-        id: 'user-1',
-        email: 'hello@example.com'
-      }
-    });
+  it('removes the legacy persisted server session', () => {
+    window.localStorage.setItem(
+      'fridgemate-auth-session',
+      JSON.stringify({ user: { id: 'user-1', email: 'hello@example.com' } })
+    );
 
     clearStoredAuthSession();
 
-    expect(getStoredAuthSession()).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-auth-session')).toBeNull();
+  });
+
+  it('stores only a versioned non-PII logout fence', () => {
+    expect(markLogoutPending()).toBe(true);
+    expect(hasPendingLogout()).toBe(true);
+    expect(window.localStorage.getItem('fridgemate-auth-logout-pending:v1')).toBe('1');
+
+    clearPendingLogout();
+
+    expect(hasPendingLogout()).toBe(false);
+  });
+
+  it('stores only a versioned non-PII session hint', () => {
+    expect(markSessionPresent()).toBe(true);
+    expect(hasSessionHint()).toBe(true);
+    expect(window.localStorage.getItem('fridgemate-auth-session-present:v1')).toBe('1');
+
+    clearSessionHint();
+
+    expect(hasSessionHint()).toBe(false);
+  });
+
+  it('treats a legacy session as a one-time refresh hint without parsing its identity', () => {
+    window.localStorage.setItem('fridgemate-auth-session', '{not-valid-json');
+
+    expect(hasSessionHint()).toBe(true);
   });
 
   it('tracks guest import decisions per user', () => {

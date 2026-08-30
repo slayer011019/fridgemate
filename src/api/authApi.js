@@ -65,7 +65,7 @@ export function logout() {
       method: 'POST'
     },
     {
-      authMode: 'required',
+      authMode: 'never',
       allowNoContent: true,
       errorClass: AuthApiError
     }

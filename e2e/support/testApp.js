@@ -87,16 +87,8 @@ export async function seedBrowserState(
         database.close();
       }
 
-      window.localStorage.clear();
-      if (nextAnalyticsConsent) {
-        window.localStorage.setItem('fridgemate-analytics-consent', nextAnalyticsConsent);
-      }
       window.__FRIDGEMATE_TEST__ = window.__FRIDGEMATE_TEST__ || {};
       window.__FRIDGEMATE_TEST__.setupComplete = false;
-
-      if (nextSession) {
-        window.localStorage.setItem('fridgemate-auth-session', JSON.stringify(nextSession));
-      }
 
       if (nextOcrResult) {
         window.__FRIDGEMATE_TEST__.extractTextFromImage = async (_file, options = {}) => {
@@ -111,6 +103,15 @@ export async function seedBrowserState(
       if (window.sessionStorage.getItem(seedKey) === 'done') {
         window.__FRIDGEMATE_TEST__.setupComplete = true;
         return;
+      }
+
+      window.localStorage.clear();
+      if (nextAnalyticsConsent) {
+        window.localStorage.setItem('fridgemate-analytics-consent', nextAnalyticsConsent);
+      }
+
+      if (nextSession) {
+        window.localStorage.setItem('fridgemate-auth-session', JSON.stringify(nextSession));
       }
 
       Promise.all([deleteDatabase(getDatabaseName('guest')), deleteDatabase(getDatabaseName('user:user-1'))])

@@ -75,7 +75,7 @@ describe('useAuth', () => {
     window.localStorage.clear();
   });
 
-  it('hydrates a stored session and restores the current user', async () => {
+  it('ignores a legacy stored identity and restores only the server-verified user', async () => {
     window.localStorage.setItem(
       'fridgemate-auth-session',
       JSON.stringify({
@@ -93,9 +93,37 @@ describe('useAuth', () => {
     expect(result.current.isAuthenticated).toBe(true);
     expect(result.current.user.email).toBe('restored@example.com');
     expect(result.current.storageScope).toBe('user:user-1');
+    expect(window.localStorage.getItem('fridgemate-auth-session')).toBeNull();
   });
 
-  it('keeps the stored session when restoring fails because the server is temporarily unavailable', async () => {
+  it('keeps identity and user storage locked while server verification is pending', async () => {
+    let verifySession;
+    authApiMocks.refreshSession.mockReturnValue(
+      new Promise((resolve) => {
+        verifySession = resolve;
+      })
+    );
+    window.localStorage.setItem(
+      'fridgemate-auth-session',
+      JSON.stringify({ user: { id: 'user-1', email: 'stale@example.com' } })
+    );
+
+    const { result } = await renderUseAuth();
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.user).toBeNull();
+    expect(result.current.storageScope).toBe('guest');
+
+    verifySession({ user: { id: 'user-1', email: 'verified@example.com' } });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.user.email).toBe('verified@example.com');
+  });
+
+  it('locks the user scope when restoring fails because the server is temporarily unavailable', async () => {
     authApiMocks.refreshSession.mockRejectedValue(new Error('API request could not reach the server.'));
     window.localStorage.setItem(
       'fridgemate-auth-session',
@@ -110,9 +138,11 @@ describe('useAuth', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.isAuthenticated).toBe(true);
-    expect(result.current.user.email).toBe('stale@example.com');
-    expect(result.current.error).toBe('API request could not reach the server.');
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.user).toBeNull();
+    expect(result.current.storageScope).toBe('guest');
+    expect(result.current.error).toContain('안전을 위해 로그아웃했습니다');
+    expect(window.localStorage.getItem('fridgemate-auth-session')).toBeNull();
   });
 
   it('clears the stored session when restoring fails with an authorization error', async () => {
@@ -154,6 +184,28 @@ describe('useAuth', () => {
 
     expect(result.current.isAuthenticated).toBe(false);
     expect(window.localStorage.getItem('fridgemate-auth-session')).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-auth-logout-pending:v1')).toBeNull();
+  });
+
+  it('stays locally logged out and exposes an error when server logout fails', async () => {
+    authApiMocks.logout.mockRejectedValue(new Error('API request could not reach the server.'));
+    const { result } = await renderUseAuth();
+
+    await act(async () => {
+      await result.current.login({
+        email: 'login@example.com',
+        password: 'password123'
+      });
+    });
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.storageScope).toBe('guest');
+    expect(result.current.error).toContain('로그아웃 상태를 다시 확인합니다');
+    expect(window.localStorage.getItem('fridgemate-auth-logout-pending:v1')).toBe('1');
   });
 
   it('exposes a guest import prompt when guest ingredients exist', async () => {

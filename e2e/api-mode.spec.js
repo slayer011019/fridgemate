@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   createIngredient,
   DEFAULT_USER,
@@ -7,6 +9,9 @@ import {
   seedBrowserState,
   waitForIngredientNames
 } from './support/testApp';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const mockReceiptPath = path.join(__dirname, 'fixtures', 'mock-receipt.svg');
 
 async function clickServerBackupButton(page) {
   const backupButton = page.getByRole('button', { name: '서버에 백업하기' });
@@ -125,6 +130,121 @@ test('expired session clears stored auth and returns to login', async ({ page })
 
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.evaluate(() => window.localStorage.getItem('fridgemate-auth-session'))).resolves.toBeNull();
+});
+
+test('temporary session verification failure locks the user cache instead of restoring stale identity', async ({ page }) => {
+  await seedBrowserState(page, {
+    session: {
+      token: 'test-token',
+      user: DEFAULT_USER
+    },
+    scope: 'user:user-1',
+    ingredients: [createIngredient('cached-private-1', { name: '개인용 김치', syncState: 'clean' })]
+  });
+
+  await page.route('**/api/auth/refresh', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Temporary outage.' })
+    })
+  );
+
+  await gotoAndWait(page, '/account');
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByText(/안전을 위해 로그아웃했습니다/)).toBeVisible();
+  await expect(page.evaluate(() => window.localStorage.getItem('fridgemate-auth-session'))).resolves.toBeNull();
+
+  await gotoAndWait(page, '/ingredients');
+  await expect(page.getByRole('heading', { name: '개인용 김치' })).toHaveCount(0);
+});
+
+test('failed server logout stays fenced across a reload and never refreshes the old session', async ({ page }) => {
+  await page.addInitScript((session) => {
+    const seedKey = '__fridgemate-auth-fence-seeded__';
+
+    if (window.sessionStorage.getItem(seedKey) === 'done') {
+      return;
+    }
+
+    window.localStorage.clear();
+    window.localStorage.setItem('fridgemate-auth-session', JSON.stringify(session));
+    window.sessionStorage.setItem(seedKey, 'done');
+  }, { token: 'test-token', user: DEFAULT_USER });
+
+  let refreshRequestCount = 0;
+  await page.route('**/api/auth/refresh', (route) => {
+    refreshRequestCount += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ user: DEFAULT_USER })
+    });
+  });
+  await page.route('**/api/auth/logout', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Temporary outage.' })
+    })
+  );
+
+  await page.goto('/account');
+  await expect(page.getByRole('heading', { name: DEFAULT_USER.email })).toBeVisible();
+  expect(refreshRequestCount).toBeGreaterThan(0);
+  const refreshCountBeforeLogout = refreshRequestCount;
+
+  await page.getByRole('banner').getByRole('button', { name: '로그아웃' }).click();
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByText(/로그아웃 상태를 다시 확인합니다/)).toBeVisible();
+  await expect(
+    page.evaluate(() => window.localStorage.getItem('fridgemate-auth-logout-pending:v1'))
+  ).resolves.toBe('1');
+
+  await page.reload();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByText(/로그아웃 상태를 다시 확인합니다/)).toBeVisible();
+  expect(refreshRequestCount).toBe(refreshCountBeforeLogout);
+});
+
+test('import review and local save still work when correction embedding budget is exhausted', async ({ page }) => {
+  await seedBrowserState(page, {
+    session: {
+      token: 'test-token',
+      user: DEFAULT_USER
+    },
+    ocrResult: {
+      text: '두부 1모\n우유 1L'
+    }
+  });
+  await mockApiSession(page, { user: DEFAULT_USER, restoreSession: true });
+  let limitedRequestCount = 0;
+
+  const returnRateLimit = (route) => {
+    limitedRequestCount += 1;
+    return route.fulfill({
+      status: 429,
+      headers: { 'Retry-After': '60' },
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Too many import analysis requests. Please try again later.' })
+    });
+  };
+
+  await page.route('**/api/import/corrections/suggestions', returnRateLimit);
+  await page.route('**/api/import/corrections', returnRateLimit);
+  await gotoAndWait(page, '/import');
+
+  await page.getByLabel('사진 고르기').setInputFiles(mockReceiptPath);
+  await page.getByRole('button', { name: '사진에서 재료 찾기' }).click();
+
+  await expect(page.getByText('두부', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '선택 항목 저장' }).click();
+
+  await expect(page).toHaveURL(/\/ingredients$/);
+  await expect(page.getByRole('heading', { name: '두부' })).toBeVisible();
+  expect(limitedRequestCount).toBeGreaterThanOrEqual(1);
 });
 
 test('authenticated API mode falls back to the user cache when the ingredient API returns a server error', async ({ page }) => {
