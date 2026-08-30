@@ -17,6 +17,8 @@ Implemented:
 - first-pass conflict-aware manual sync with persisted pending states and deletion tombstones
 - recommendation impression and click event collection
 - recommendation training-data export
+- complete 1,166-row recipe embedding coverage with no missing or stale vectors
+- feature-flagged semantic recipe endpoint with bounded inputs and request limits
 - CI, unit tests, and core E2E coverage
 - Node.js 24 GitHub Actions with route-level browser code splitting
 - Metadata-only API request correlation, latency/error telemetry, and optional AI token/cost metrics
@@ -42,11 +44,10 @@ Implemented:
 ## AI and Data Roadmap
 
 - Analyze recommendation impression/click exports
-- Keep the ingredient-first embedding text at or above the stored-vector Hit@5 `10/10` result while expanding the fixture beyond UUID-order smoke coverage
-- Continue from the verified fixture-targeted stale replacement at `recipes=1,166`, `embeddings=1,166`, `current=226`, `missing=0`, and `stale=940`; all 20 realistic fixture targets are now current. Rerun the fixed 10-query and realistic 20-query gates under separate API approval, then decide whether to increase stale replacement batches to 50-100 rows
-- Run the separate 20-recipe Korean home-meal fixture after full vector coverage; it uses realistic pantry subsets, expiring ingredients, alias cases, and a 70% Hit@5 gate without replacing the UUID regression fixture
-- Keep semantic API publication separate from the backfill and require complete coverage, integrity verification, and a final stored-vector quality rerun first
-- Normalize recommendation event keys into `local:<seed-id>` and `catalog:<uuid>` with a nullable catalog recipe FK
+- Keep all 1,166 production embeddings current and preserve zero missing, duplicate, and orphan rows
+- Track vector-only quality separately from final ranking: the current home-meal baseline is 60% raw Hit@5, 95% candidate recall at 100, and 75% reranked Hit@5
+- Enable `SEMANTIC_RECIPE_API_ENABLED` only after staging smoke tests confirm the feature-flagged endpoint and rule fallback
+- Add a nullable catalog recipe FK to recommendation events after measuring how many historical text IDs can be safely linked; new browser events already use `local:<seed-id>` and `catalog:<uuid>` keys
 - Add canonical dishes, aliases, and source-attributed popularity signals after catalog recipe IDs are stable
 - Prototype ranking improvements from collected feature snapshots
 - Expand ingredient normalization examples

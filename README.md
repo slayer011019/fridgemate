@@ -211,6 +211,7 @@ OPENAI_API_KEY=
 RECIPE_EMBEDDING_MODEL=text-embedding-3-small
 RECIPE_EMBEDDING_DIMENSIONS=1536
 AI_USAGE_LOGGING_ENABLED=false
+SEMANTIC_RECIPE_API_ENABLED=false
 API_SLOW_REQUEST_MS=1500
 ```
 
@@ -219,6 +220,7 @@ API_SLOW_REQUEST_MS=1500
 - 서비스 역할 키와 AI API 키는 서버에서만 사용합니다.
 - 비밀값에 `VITE_` 접두사를 붙이지 않습니다.
 - `RECIPE_EMBEDDING_DIMENSIONS`는 DB의 `recipe_embeddings.embedding` 차원과 같아야 합니다.
+- `SEMANTIC_RECIPE_API_ENABLED`는 운영 임베딩 무결성과 검색 품질을 확인한 뒤에만 `true`로 전환합니다. 명시적 API는 `POST /api/recipes/recommendations/semantic`이며 인증과 요청 제한을 적용합니다.
 - 핵심 앱 기능은 AI API 키 없이도 동작합니다.
 - API 오류 응답에는 지원 추적용 request ID가 포함되며, 선택형 AI 사용량 로그에는 프롬프트·재료명·벡터 없이 모델, 건수, 토큰, 지연시간과 설정된 경우의 추정 비용만 기록합니다.
 
@@ -292,7 +294,7 @@ npm run recipes:embed -- --evaluate --execute --limit=1166 --output=docs/recipe-
 npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1166 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json
 ```
 
-첫 25-row stale 교체 후 저장 운영 벡터를 다시 평가한 결과, 고정 10-query는 Hit@1 `8/10`, Hit@5 `9/10`, MRR@5 `0.85`로 운영 기준을 통과했습니다. 반면 한국 가정식 20-query는 Hit@5 `2/20`이었고, 대상 20개 중 current 2개·stale 18개라는 세대 불일치가 확인됐습니다. 이후 별도 checkpoint와 승인 범위로 stale 18개만 교체해 fixture는 `current=20`, `stale=0`, 추가 계획 입력 0이 됐습니다. 전체 카탈로그는 MFDS 1,146개와 재료 행을 갖춘 `curated_home_v1` 20개를 합친 1,166개이며, 현재 기준점은 `embeddings=1,166`, `current=226`, `missing=0`, `stale=940`, 중복 0, 고아 0, `vector(1536)`입니다. 다음 단계는 DB 쓰기 없이 두 fixture를 별도 승인된 API 범위로 재평가하는 것이며, 전체 stale 교체 확대와 semantic 추천 API 공개는 해당 결과 확인 전까지 보류합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
+전체 카탈로그는 MFDS 1,146개와 재료 행을 갖춘 `curated_home_v1` 20개를 합친 1,166개입니다. 운영 임베딩은 `current=1,166`, `missing=0`, `stale=0`, 중복 0, 고아 0, `vector(1536)`로 검증됐습니다. 최종 저장 벡터 평가는 고정 10-query Hit@5 `9/10`, 한국 가정식 20-query 후보 100개 재현율 `19/20`, 70/30 재정렬 Hit@5 `15/20`을 기록했습니다. 벡터 단독 한국 가정식 Hit@5는 `12/20`이므로 pgvector는 후보 생성에만 사용하고 재료·유통기한 규칙 재정렬을 유지합니다. 상세 기준은 [레시피 검색 품질 문서](docs/RECIPE_SEARCH_QUALITY.md), 운영 기록은 [임베딩 운영 기록](docs/RECIPE_EMBEDDING_OPERATIONS.md)에 있습니다.
 
 ## 추천 이벤트 내보내기
 

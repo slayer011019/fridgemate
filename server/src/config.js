@@ -84,6 +84,8 @@ function createServerConfig(runtimeEnv = process.env) {
     recipeEmbeddingPricePerMillionTokens: nonNegativeNumber(
       runtimeValue(runtimeEnv, 'RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS')
     ),
+    semanticRecipeApiEnabled:
+      String(runtimeValue(runtimeEnv, 'SEMANTIC_RECIPE_API_ENABLED') || 'false').toLowerCase() === 'true',
     aiUsageLoggingEnabled:
       String(runtimeValue(runtimeEnv, 'AI_USAGE_LOGGING_ENABLED') || 'false').toLowerCase() === 'true',
     apiSlowRequestMs: nonNegativeNumber(runtimeValue(runtimeEnv, 'API_SLOW_REQUEST_MS'), 1500),

@@ -527,3 +527,23 @@ The immediate full-catalog verifier passed with:
 - Verification production writes: `0`
 
 A second fixture-scoped dry-run resolved all 20 targets as current with `missing=0`, `stale=0`, `plannedInputs=0`, no API calls, and no writes. This approval did not include either stored-vector quality evaluation. Those 30 query inputs remain a separate reviewed operation.
+
+## Full Stale Rollout and Normalization Refresh
+
+Before replacing the remaining 940 stale rows, a protected 1,166-row checkpoint was created and verified:
+
+- SHA-256: `920d821b86c8d07c08fed72fb3a953587a2b89f0420ac05bd7a3da522fb7b32c`
+- Compressed bytes: `7,998,013`
+- Production writes during checkpoint: `0`
+
+The runner replaced the 940 rows in nine 100-row batches and one final 40-row batch. Every batch used its explicit write cap and immediate read-only verification; total failures and retries were zero. The rollout used 940 embedding inputs, 10 API requests, and about 24,836 estimated input tokens.
+
+Full freshness exposed parser artifacts in 188 recipe texts. A write-free in-memory evaluation confirmed that normalizing dimension/fraction suffixes, section prefixes, and common aliases raised the Korean home-meal fixture to 70% raw Hit@5 and 80% reranked Hit@5 before production replacement. A second protected checkpoint was then created:
+
+- SHA-256: `fd46ee8eed6ff9f14ef63755166b02b3ff4c7fd994269ba1c871c77f086645c2`
+- Compressed bytes: `7,537,455`
+- Production writes during checkpoint: `0`
+
+Exactly 188 stale rows were replaced in capped 100-row and 88-row batches with zero failures or retries. The final verifier passed at `recipes=1,166`, `embeddings=1,166`, `current=1,166`, `missing=0`, `stale=0`, duplicates 0, orphans 0, and `vector(1536)`.
+
+The final stored-vector evaluations used 30 query inputs, two API requests, and zero database writes. The fixed fixture passed at raw and reranked Hit@5 `9/10`. The Korean home-meal fixture measured raw Hit@5 `12/20`, candidate recall@100 `19/20`, and reranked Hit@5 `15/20`; semantic publication may proceed only behind the disabled-by-default feature flag and rule fallback.

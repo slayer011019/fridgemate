@@ -13,10 +13,12 @@ import {
   normalizeRecipeIngredientName
 } from '../src/features/recipes/recipeIngredientClassification.js';
 import { getRecipeMatchScore } from '../src/utils/recommendations.js';
+import { calculateHybridRecommendationScore } from '../server/src/services/recipeHybridRecommendationService.js';
 
 const DEFAULT_MODEL = 'text-embedding-3-small';
 const DEFAULT_DIMENSIONS = 1536;
 const DEFAULT_CANDIDATE_LIMIT = 250;
+const DEFAULT_RERANK_CANDIDATE_COUNT = 100;
 const MAX_CANDIDATE_LIMIT = 1200;
 const EMBEDDING_BATCH_SIZE = 100;
 const FIXTURE_PATH = new URL('./fixtures/recipe-search-evaluation.json', import.meta.url);
@@ -26,6 +28,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     dryRun: argv.includes('--dry-run') || !argv.includes('--execute'),
     storedVectors: argv.includes('--stored-vectors'),
     limit: DEFAULT_CANDIDATE_LIMIT,
+    rerankCandidateCount: DEFAULT_RERANK_CANDIDATE_COUNT,
     fixture: '',
     output: ''
   };
@@ -36,6 +39,12 @@ function parseArgs(argv = process.argv.slice(2)) {
     }
     if (arg.startsWith('--output=')) options.output = arg.slice('--output='.length).trim();
     if (arg.startsWith('--fixture=')) options.fixture = arg.slice('--fixture='.length).trim();
+    if (arg.startsWith('--rerank-candidates=')) {
+      options.rerankCandidateCount = Math.max(
+        5,
+        Math.min(MAX_CANDIDATE_LIMIT, Number.parseInt(arg.split('=')[1], 10) || options.rerankCandidateCount)
+      );
+    }
   });
 
   return options;
@@ -273,11 +282,16 @@ export async function evaluateRecipeSearch(options = {}) {
     dryRun: true,
     storedVectors: false,
     limit: DEFAULT_CANDIDATE_LIMIT,
+    rerankCandidateCount: DEFAULT_RERANK_CANDIDATE_COUNT,
     fixture: '',
     output: '',
     ...options
   };
   settings.limit = Math.max(10, Math.min(MAX_CANDIDATE_LIMIT, Number(settings.limit) || DEFAULT_CANDIDATE_LIMIT));
+  settings.rerankCandidateCount = Math.max(
+    5,
+    Math.min(settings.limit, Number(settings.rerankCandidateCount) || DEFAULT_RERANK_CANDIDATE_COUNT)
+  );
   const prisma = settings.prismaClient;
   const fixture = typeof settings.fixture === 'object'
     ? settings.fixture
@@ -340,6 +354,7 @@ export async function evaluateRecipeSearch(options = {}) {
       model: config.model,
       dimensions: config.dimensions,
       candidateCount: candidates.length,
+      rerankCandidateCount: settings.rerankCandidateCount,
       targetCount: targets.length,
       fixtureVersion: Number(fixture.version || 1),
       fixtureProfile: String(fixture.profile || fixture.selection || 'fixed-regression'),
@@ -418,6 +433,25 @@ export async function evaluateRecipeSearch(options = {}) {
         type: ingredient.ingredientType,
         reason: ingredient.classificationReason
       }));
+      const reranked = ranked
+        .slice(0, settings.rerankCandidateCount)
+        .map(({ recipe, similarity }) => {
+          const structured = getRecipeMatchScore(available, recipe.ingredients, { recipeId: recipe.id });
+          return {
+            recipe,
+            similarity,
+            structured,
+            finalScore: calculateHybridRecommendationScore(structured.score, similarity)
+          };
+        })
+        .sort(
+          (left, right) =>
+            right.finalScore - left.finalScore ||
+            right.similarity - left.similarity ||
+            left.recipe.id.localeCompare(right.recipe.id)
+        );
+      const rerankedTargetIndex = reranked.findIndex((item) => item.recipe.id === target.id);
+      const rerankedRank = rerankedTargetIndex >= 0 ? rerankedTargetIndex + 1 : null;
       const top5 = ranked.slice(0, 5).map(({ recipe, similarity }) => {
         const structured = getRecipeMatchScore(available, recipe.ingredients, { recipeId: recipe.id });
         const coreIngredientCount = structured.matchedMain.length + structured.missingMain.length;
@@ -441,6 +475,16 @@ export async function evaluateRecipeSearch(options = {}) {
           expiringMatchedIngredients
         };
       });
+      const rerankedTop5 = reranked.slice(0, 5).map(({ recipe, similarity, structured, finalScore }) => ({
+        id: recipe.id,
+        name: recipe.name,
+        similarity: round(similarity, 6),
+        structuredScore: round(structured.score),
+        finalScore: round(finalScore),
+        matchedIngredientCount: structured.matchedIngredients.length,
+        missingIngredientCount: structured.missingIngredients.length,
+        missingSeasoningCount: structured.missingSeasonings.length
+      }));
 
       return {
         id: target.id,
@@ -458,12 +502,22 @@ export async function evaluateRecipeSearch(options = {}) {
         hit1: originalRank === 1,
         hit5: originalRank !== null && originalRank <= 5,
         reciprocalRankAt5: originalRank !== null && originalRank <= 5 ? 1 / originalRank : 0,
-        top5
+        candidatePoolHit: originalRank !== null && originalRank <= settings.rerankCandidateCount,
+        rerankedRank,
+        rerankedHit1: rerankedRank === 1,
+        rerankedHit5: rerankedRank !== null && rerankedRank <= 5,
+        rerankedReciprocalRankAt5: rerankedRank !== null && rerankedRank <= 5 ? 1 / rerankedRank : 0,
+        top5,
+        rerankedTop5
       };
     });
     const hit1Count = results.filter((result) => result.hit1).length;
     const hit5Count = results.filter((result) => result.hit5).length;
     const hitAt5Rate = targets.length ? hit5Count / targets.length : 0;
+    const candidatePoolHitCount = results.filter((result) => result.candidatePoolHit).length;
+    const rerankedHit1Count = results.filter((result) => result.rerankedHit1).length;
+    const rerankedHit5Count = results.filter((result) => result.rerankedHit5).length;
+    const rerankedHitAt5Rate = targets.length ? rerankedHit5Count / targets.length : 0;
     const minimumHitAt5Rate = Number(fixture.gate?.minimumHitAt5Rate ?? 0.7);
     const metrics = {
       hitAt1: `${hit1Count}/${targets.length}`,
@@ -471,6 +525,14 @@ export async function evaluateRecipeSearch(options = {}) {
       hitAt5Rate: round(hitAt5Rate),
       minimumHitAt5Rate,
       mrrAt5: round(results.reduce((sum, result) => sum + result.reciprocalRankAt5, 0) / targets.length),
+      candidatePoolRecall: `${candidatePoolHitCount}/${targets.length}`,
+      candidatePoolRecallRate: round(targets.length ? candidatePoolHitCount / targets.length : 0),
+      rerankedHitAt1: `${rerankedHit1Count}/${targets.length}`,
+      rerankedHitAt5: `${rerankedHit5Count}/${targets.length}`,
+      rerankedHitAt5Rate: round(rerankedHitAt5Rate),
+      rerankedMrrAt5: round(
+        results.reduce((sum, result) => sum + result.rerankedReciprocalRankAt5, 0) / targets.length
+      ),
       averageOriginalRank: round(
         results.reduce((sum, result) => sum + (result.originalRank || existingEmbeddingCount + 1), 0) / targets.length
       ),
@@ -479,7 +541,8 @@ export async function evaluateRecipeSearch(options = {}) {
       medianMissingSeasoningsTop5: median(seasoningCounts),
       medianOwnedIngredientRatioTop5: round(median(ownedIngredientRatios)),
       apiRequestCount: generated.requestCount,
-      fullBackfillGate: hitAt5Rate >= minimumHitAt5Rate ? 'Go' : 'No-Go'
+      fullBackfillGate: hitAt5Rate >= minimumHitAt5Rate ? 'Go' : 'No-Go',
+      semanticApiGate: rerankedHitAt5Rate >= minimumHitAt5Rate ? 'Go' : 'No-Go'
     };
     const report = { preflight: { ...preflight, mode: 'evaluate' }, metrics, results };
     const outputPath = assertOutputPath(settings.output);

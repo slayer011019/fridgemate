@@ -97,7 +97,9 @@ Semantic recipe retrieval groundwork:
 - Prisma recipe catalog models map the existing UUID-based Supabase columns instead of the earlier experimental cuid/inline-embedding shape
 - pgvector search is a candidate retrieval step, not the final recommendation ranker
 - rule-based reranking keeps ingredient ownership, expiration urgency, and missing ingredient penalties in control
-- the fixed quality fixture and in-memory evaluator prevent old and new embedding-text versions from being mixed during release decisions
+- the explicit semantic endpoint is authenticated, rate-limited, and disabled by default through `SEMANTIC_RECIPE_API_ENABLED`; vector failure returns bounded rule-ranked production candidates
+- the fixed and Korean home-meal fixtures report raw vector Hit@5, candidate-pool recall, and the same 70/30 structured/vector reranking used by the service
+- recommendation event keys use `catalog:<uuid>` for production recipes and `local:<id>` for bundled recipes
 
 ## Security Boundaries
 

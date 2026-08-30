@@ -4,6 +4,7 @@ import { seedRecipes } from '../../../src/data/seedRecipes.js';
 import { buildRecipeRecommendations } from '../../../src/utils/recommendations.js';
 import { recommendRecipes as recommendHybridRecipes } from './recipeHybridRecommendationService.js';
 import { recordRecommendationFallback } from '../lib/operationalTelemetry.js';
+import { createHttpError } from '../lib/httpError.js';
 
 function buildFallbackAiSuggestions(ingredients = []) {
   return buildRecipeRecommendations(seedRecipes, ingredients)
@@ -108,21 +109,41 @@ async function requestClaudeSuggestions(ingredients = []) {
   return parseClaudeJson(text);
 }
 
-export async function getRecipeRecommendations({ userId, ingredients, pantryItems = [] } = {}) {
+export async function getRecipeRecommendations({
+  userId,
+  ingredients,
+  pantryItems = [],
+  limit,
+  candidateCount,
+  requireSemantic = false
+} = {}) {
   const inputIngredients =
     Array.isArray(ingredients) && ingredients.length ? ingredients : await getStoredIngredients(userId);
 
-  try {
-    const hybridRecommendations = await recommendHybridRecipes(inputIngredients, { pantryItems });
-
-    if (hybridRecommendations.length) {
-      return hybridRecommendations;
-    }
-  } catch (error) {
-    recordRecommendationFallback('hybrid_recipe_recommendations', error);
+  if (requireSemantic && !serverConfig.semanticRecipeApiEnabled) {
+    throw createHttpError(503, 'Semantic recipe recommendations are not enabled.');
   }
 
-  return buildRecipeRecommendations(seedRecipes, inputIngredients, { pantryItems });
+  if (serverConfig.semanticRecipeApiEnabled) {
+    try {
+      const hybridRecommendations = await recommendHybridRecipes(inputIngredients, {
+        pantryItems,
+        limit,
+        candidateCount
+      });
+
+      if (hybridRecommendations.length) {
+        return hybridRecommendations;
+      }
+    } catch (error) {
+      recordRecommendationFallback('hybrid_recipe_recommendations', error);
+    }
+  }
+
+  const fallback = buildRecipeRecommendations(seedRecipes, inputIngredients, { pantryItems })
+    .map((recipe) => ({ ...recipe, _recommendationSource: 'rule' }));
+
+  return Number.isFinite(limit) ? fallback.slice(0, limit) : fallback;
 }
 
 export async function getAiRecipeSuggestions(ingredients = []) {

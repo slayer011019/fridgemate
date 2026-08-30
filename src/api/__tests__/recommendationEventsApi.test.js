@@ -17,11 +17,24 @@ vi.mock('../../utils/analytics', () => ({
   getAnalyticsSessionId: () => 'test-session'
 }));
 
-import { saveRecommendationEvent } from '../recommendationEventsApi';
+import { buildRecommendationEventPayload, saveRecommendationEvent } from '../recommendationEventsApi';
 
 describe('recommendationEventsApi', () => {
   beforeEach(() => {
     requestJsonMock.mockReset();
+  });
+
+  it('uses explicit local and catalog recipe id namespaces', () => {
+    expect(buildRecommendationEventPayload({ id: 'recipe-1' }, 'click').recipeId).toBe('local:recipe-1');
+    expect(
+      buildRecommendationEventPayload(
+        { id: '11111111-1111-4111-8111-111111111111' },
+        'impression'
+      ).recipeId
+    ).toBe('catalog:11111111-1111-4111-8111-111111111111');
+    expect(buildRecommendationEventPayload({ id: 'catalog:known-id' }, 'click').recipeId).toBe(
+      'catalog:known-id'
+    );
   });
 
   it('sends recommendation events sequentially to avoid connection bursts', async () => {

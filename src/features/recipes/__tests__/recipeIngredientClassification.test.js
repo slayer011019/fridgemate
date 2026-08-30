@@ -56,6 +56,12 @@ describe('recipe ingredient classification', () => {
 
   it('cleans section prefixes, amounts, aliases, and duplicate names', () => {
     expect(normalizeRecipeIngredientName('•필수재료 : 달걀 1개')).toBe('계란');
+    expect(normalizeRecipeIngredientName('감자 4×3×1cm')).toBe('감자');
+    expect(normalizeRecipeIngredientName('물 1½컵')).toBe('물');
+    expect(normalizeRecipeIngredientName('재료 굴')).toBe('굴');
+    expect(normalizeRecipeIngredientName('브로컬리')).toBe('브로콜리');
+    expect(normalizeRecipeIngredientName('들깻가루')).toBe('들깨가루');
+    expect(normalizeRecipeIngredientName('펜네')).toBe('파스타면');
     const deduped = dedupeRecipeIngredients([
       { normalizedName: '달걀', ingredientType: 'unknown', classificationConfidence: 0.35 },
       { normalizedName: '계란', ingredientType: 'main', classificationConfidence: 0.9 }

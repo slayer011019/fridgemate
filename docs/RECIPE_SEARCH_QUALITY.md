@@ -110,3 +110,16 @@ The in-memory, missing-row coverage, limited stale-row, integrity, fixed stored-
 - Add broader canonical aliases for meat cuts, dried herbs such as `바질마른것`/`오레가노마른것`/`타임 마른것`, and section-prefixed names.
 - Review and run the new category-balanced Korean home-meal fixture against complete stored vectors while preserving the original UUID fixture for regression comparison.
 - Evaluate candidate retrieval plus the existing structured reranker separately; several vector misses had much worse ingredient overlap than the target recipe.
+
+## Final Full-Catalog Result (2026-08-30)
+
+All 1,166 production rows now have current `text-embedding-3-small` vectors at 1,536 dimensions. Verification found no missing, stale, duplicate, or orphan rows, and the column remains `vector(1536)`.
+
+The evaluator now reports raw vector retrieval and the production-equivalent 70% structured / 30% vector rerank separately. The reranker considers the top 100 vector candidates; this matches the default service candidate pool for a 20-result response.
+
+| Fixture | Raw Hit@5 | Candidate recall@100 | Reranked Hit@5 | Reranked MRR@5 | Decision |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Fixed UUID regression, 10 queries | 9/10 (90%) | 9/10 (90%) | 9/10 (90%) | 0.85 | Go |
+| Korean home meal, 20 queries | 12/20 (60%) | 19/20 (95%) | 15/20 (75%) | 0.4017 | Semantic API Go |
+
+The realistic raw-vector gate remains below 70%, so pgvector must not be treated as the final ranker. Candidate recall and end-to-end reranked Hit@5 pass the 70% release threshold, supporting a feature-flagged semantic endpoint while preserving rule fallback. The remaining misses are mostly complex recipes whose fixture pantry subset also supports simpler alternatives; they remain regression cases rather than reasons to distort candidate text further.

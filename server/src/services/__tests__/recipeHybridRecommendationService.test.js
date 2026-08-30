@@ -51,6 +51,7 @@ describe('recipeHybridRecommendationService', () => {
       recipeId: 'recipe-1',
       name: '새우 두부 계란찜',
       vectorScore: 0.74,
+      _recommendationSource: 'hybrid',
       matchedIngredients: ['두부', '새우', '계란'],
       missingIngredients: [],
       missingSeasonings: ['설탕']
@@ -151,6 +152,7 @@ describe('recipeHybridRecommendationService', () => {
     expect(recommendations[0]).toMatchObject({
       recipeId: 'fallback-recipe',
       vectorScore: 0,
+      _recommendationSource: 'rule',
       canMakeNow: true
     });
   });

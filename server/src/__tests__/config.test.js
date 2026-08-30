@@ -76,12 +76,14 @@ describe('server config security requirements', () => {
 
   it('loads metadata-only API and AI usage telemetry settings', async () => {
     process.env.AI_USAGE_LOGGING_ENABLED = 'true';
+    process.env.SEMANTIC_RECIPE_API_ENABLED = 'true';
     process.env.API_SLOW_REQUEST_MS = '900';
     process.env.RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS = '0.02';
     const { serverConfig } = await import('../config.js');
 
     expect(serverConfig).toMatchObject({
       aiUsageLoggingEnabled: true,
+      semanticRecipeApiEnabled: true,
       apiSlowRequestMs: 900,
       recipeEmbeddingPricePerMillionTokens: 0.02
     });

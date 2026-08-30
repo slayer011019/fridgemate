@@ -87,13 +87,19 @@ describe('recipe search evaluation', () => {
       hitAt1: '2/2',
       hitAt5: '2/2',
       hitAt5Rate: 1,
+      candidatePoolRecall: '2/2',
+      rerankedHitAt5: '2/2',
+      rerankedHitAt5Rate: 1,
       minimumHitAt5Rate: 0.7,
-      fullBackfillGate: 'Go'
+      fullBackfillGate: 'Go',
+      semanticApiGate: 'Go'
     });
     expect(report.preflight.productionWrites).toBe(0);
     expect(report.results.map((result) => result.id)).toEqual([ID_A, ID_B]);
     expect(report.results[0]).toMatchObject({
       targetSimilarity: 1,
+      rerankedRank: 1,
+      rerankedHit5: true,
       queryIngredientClassifications: [{ name: '감자', type: 'unknown', reason: 'insufficient-evidence' }],
       candidateIngredientClassifications: [{ name: '감자', type: 'main', reason: 'explicit-category' }]
     });
@@ -180,6 +186,8 @@ describe('recipe search evaluation', () => {
     expect(report.metrics).toMatchObject({
       hitAt1: '2/2',
       hitAt5: '2/2',
+      candidatePoolRecall: '2/2',
+      rerankedHitAt5: '2/2',
       apiRequestCount: 1,
       unavailableTargetCount: 0
     });

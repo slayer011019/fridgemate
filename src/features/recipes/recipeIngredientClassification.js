@@ -122,7 +122,8 @@ function normalizeComparable(value) {
 function cleanSectionPrefix(value) {
   const normalized = normalizeSpaces(value)
     .replace(/^[●•·\-–—]+\s*/u, '')
-    .replace(/[①②③④⑤⑥⑦⑧⑨⑩]/gu, '');
+    .replace(/[①②③④⑤⑥⑦⑧⑨⑩]/gu, '')
+    .replace(/^(?:재료|주재료|부재료|양념)\s+(?=\S)/u, '');
   const segments = normalized.split(/\s*(?:>|:|：)\s*/u).filter(Boolean);
 
   return segments.length > 1 ? segments.at(-1) : normalized;
@@ -137,7 +138,10 @@ function cleanSectionPrefix(value) {
 export function normalizeRecipeIngredientName(value) {
   const cleaned = cleanSectionPrefix(value)
     .replace(/\([^)]*\)?/gu, ' ')
-    .replace(/\s+\d+(?:[./]\d+)?\s*(?:kg|g|mg|ml|mL|l|L|cm|개|마리|모|컵|큰술|작은술|줄기|쪽|알|장|봉|줌|스푼|T|t)\s*$/u, '')
+    .replace(
+      /\s+\d+(?:[./×xX]\d+)*(?:[¼½¾⅓⅔⅛⅜⅝⅞])?\s*(?:kg|g|mg|ml|mL|l|L|cm|개|마리|모|컵|큰술|작은술|줄기|쪽|알|장|봉|줌|스푼|T|t)\s*$/u,
+      ''
+    )
     .replace(/[①②③④⑤⑥⑦⑧⑨⑩]/gu, '')
     .trim();
   const matchedRule = NORMALIZE_RULES.find((rule) => rule.pattern.test(cleaned));

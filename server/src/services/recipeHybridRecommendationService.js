@@ -4,8 +4,16 @@ import { getRecipeMatchScore } from '../../../src/utils/recommendations.js';
 import { buildRecipeVectorQueryText, searchSimilarRecipesByVector } from './recipeVectorService.js';
 import { getProductionRecipesByIds, getRecentProductionRecipes } from './recipeCatalogService.js';
 
-const DEFAULT_STRUCTURED_WEIGHT = 0.7;
-const DEFAULT_VECTOR_WEIGHT = 0.3;
+export const DEFAULT_STRUCTURED_WEIGHT = 0.7;
+export const DEFAULT_VECTOR_WEIGHT = 0.3;
+
+export function calculateHybridRecommendationScore(structuredScore = 0, vectorScore = 0) {
+  return Math.round(
+    (Number(structuredScore || 0) * DEFAULT_STRUCTURED_WEIGHT +
+      Number(vectorScore || 0) * DEFAULT_VECTOR_WEIGHT) *
+      100
+  ) / 100;
+}
 
 function getIngredientName(ingredient) {
   return typeof ingredient === 'string' ? ingredient : ingredient?.normalizedName || ingredient?.name || '';
@@ -66,8 +74,8 @@ function mapRecipeForScoring(recipe = {}) {
   };
 }
 
-function buildHybridResult(recipe, structuredScore, vectorScore = 0) {
-  const finalScore = Math.round((structuredScore.score * DEFAULT_STRUCTURED_WEIGHT + vectorScore * DEFAULT_VECTOR_WEIGHT) * 100) / 100;
+function buildHybridResult(recipe, structuredScore, vectorScore = 0, source = 'hybrid') {
+  const finalScore = calculateHybridRecommendationScore(structuredScore.score, vectorScore);
 
   return {
     recipeId: recipe.id,
@@ -83,6 +91,7 @@ function buildHybridResult(recipe, structuredScore, vectorScore = 0) {
     matchRateLabel: `${Math.round(structuredScore.score * 100)}%`,
     structuredScore: structuredScore.score,
     vectorScore,
+    _recommendationSource: source,
     matchedIngredients: structuredScore.matchedIngredients,
     missingIngredients: structuredScore.missingIngredients,
     missingSeasonings: structuredScore.missingSeasonings,
@@ -146,9 +155,12 @@ export async function recommendRecipes(userIngredients = [], options = {}) {
     };
   });
   const vectorScoreById = new Map(vectorResults.map((result) => [result.recipeId || result.id, Number(result.vectorScore || 0)]));
+  const recommendationSource = vectorResults.length ? 'hybrid' : 'rule';
 
   return structuredResults
-    .map(({ recipe, structuredScore }) => buildHybridResult(recipe, structuredScore, vectorScoreById.get(recipe.id) || 0))
+    .map(({ recipe, structuredScore }) =>
+      buildHybridResult(recipe, structuredScore, vectorScoreById.get(recipe.id) || 0, recommendationSource)
+    )
     .sort((left, right) => right.finalScore - left.finalScore)
     .slice(0, limit);
 }

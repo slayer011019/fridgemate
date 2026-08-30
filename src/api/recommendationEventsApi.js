@@ -18,7 +18,15 @@ function enqueueEventRequest(request) {
 }
 
 function getRecipeId(recipe = {}) {
-  return String(recipe.recipeId || recipe.id || recipe.sourceRecipeId || recipe.title || recipe.name || '').trim();
+  const rawId = String(
+    recipe.recipeId || recipe.id || recipe.sourceRecipeId || recipe.title || recipe.name || ''
+  ).trim();
+
+  if (!rawId || /^(?:catalog|local):/u.test(rawId)) return rawId;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(rawId)) {
+    return `catalog:${rawId}`;
+  }
+  return `local:${rawId}`;
 }
 
 export function buildRecommendationEventPayload(recipe = {}, eventType, options = {}) {
