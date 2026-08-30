@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getCurrentUserHandler, loginHandler, logoutHandler, refreshSessionHandler, signupHandler } from '../controllers/authController.js';
 import { createAuthRateLimit } from '../middleware/authRateLimit.js';
+import { getClientAddress } from '../middleware/rateLimit.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
 export const authRoutes = Router();
@@ -9,7 +10,7 @@ const signupIpRateLimit = createAuthRateLimit({
   limit: 5,
   windowMs: 15 * 60 * 1000,
   scope: 'signup-ip',
-  key: (request) => request.ip || 'unknown'
+  key: getClientAddress
 });
 
 const signupEmailRateLimit = createAuthRateLimit({
@@ -23,7 +24,7 @@ const loginIpRateLimit = createAuthRateLimit({
   limit: 10,
   windowMs: 15 * 60 * 1000,
   scope: 'login-ip',
-  key: (request) => request.ip || 'unknown'
+  key: getClientAddress
 });
 
 const loginEmailRateLimit = createAuthRateLimit({

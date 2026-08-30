@@ -27,7 +27,7 @@ export class AuthRateLimiter extends DurableObject {
     `);
   }
 
-  consumeRateLimit({ limit, windowMs } = {}) {
+  consumeRateLimit({ limit, windowMs, cost = 1 } = {}) {
     const normalizedLimit = normalizeInteger(limit, {
       min: MIN_LIMIT,
       max: MAX_LIMIT,
@@ -38,37 +38,49 @@ export class AuthRateLimiter extends DurableObject {
       max: MAX_WINDOW_MS,
       name: 'windowMs'
     });
+    const normalizedCost = normalizeInteger(cost, {
+      min: MIN_LIMIT,
+      max: MAX_LIMIT,
+      name: 'cost'
+    });
     const now = Date.now();
     const currentState = this.ctx.storage.sql
       .exec('SELECT count, reset_time AS resetTime FROM rate_limit_state WHERE id = 1')
       .toArray()[0];
 
     if (!currentState || Number(currentState.resetTime) <= now) {
+      const resetTime = now + normalizedWindowMs;
+
       this.ctx.storage.sql.exec(
         `
           INSERT INTO rate_limit_state (id, count, reset_time)
-          VALUES (1, 1, ?)
+          VALUES (1, ?, ?)
           ON CONFLICT (id) DO UPDATE SET
-            count = 1,
+            count = excluded.count,
             reset_time = excluded.reset_time
         `,
-        now + normalizedWindowMs
+        normalizedCost <= normalizedLimit ? normalizedCost : 0,
+        resetTime
       );
 
       return {
-        allowed: true,
-        retryAfterSeconds: 0
+        allowed: normalizedCost <= normalizedLimit,
+        retryAfterSeconds:
+          normalizedCost <= normalizedLimit ? 0 : Math.max(1, Math.ceil((resetTime - now) / 1000))
       };
     }
 
-    if (Number(currentState.count) >= normalizedLimit) {
+    if (Number(currentState.count) + normalizedCost > normalizedLimit) {
       return {
         allowed: false,
         retryAfterSeconds: Math.max(1, Math.ceil((Number(currentState.resetTime) - now) / 1000))
       };
     }
 
-    this.ctx.storage.sql.exec('UPDATE rate_limit_state SET count = count + 1 WHERE id = 1');
+    this.ctx.storage.sql.exec(
+      'UPDATE rate_limit_state SET count = count + ? WHERE id = 1',
+      normalizedCost
+    );
 
     return {
       allowed: true,

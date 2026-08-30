@@ -2,6 +2,18 @@ import { createHash } from 'node:crypto';
 import { createClient } from 'redis';
 import { serverConfig } from '../config.js';
 
+const MAX_RATE_LIMIT_COST = 10_000;
+
+function normalizeRateLimitCost(value = 1) {
+  const cost = Number(value);
+
+  if (!Number.isInteger(cost) || cost < 1 || cost > MAX_RATE_LIMIT_COST) {
+    throw new Error(`Rate limit cost must be an integer between 1 and ${MAX_RATE_LIMIT_COST}.`);
+  }
+
+  return cost;
+}
+
 function createMemoryStore() {
   const rateLimitStore = new Map();
   const revokedTokenStore = new Map();
@@ -18,8 +30,9 @@ function createMemoryStore() {
     mode: 'memory',
     async connect() {},
     async disconnect() {},
-    async consumeRateLimit({ scope, key, limit, windowMs }) {
+    async consumeRateLimit({ scope, key, limit, windowMs, cost = 1 }) {
       const storeKey = `${scope}:${key}`;
+      const requestCost = normalizeRateLimitCost(cost);
       const now = Date.now();
       const existingWindow = rateLimitStore.get(storeKey);
       const windowState =
@@ -29,14 +42,14 @@ function createMemoryStore() {
 
       rateLimitStore.set(storeKey, windowState);
 
-      if (windowState.count >= limit) {
+      if (windowState.count + requestCost > limit) {
         return {
           allowed: false,
           retryAfterSeconds: Math.max(1, Math.ceil((windowState.resetTime - now) / 1000))
         };
       }
 
-      windowState.count += 1;
+      windowState.count += requestCost;
 
       return {
         allowed: true,
@@ -84,9 +97,9 @@ function createCloudflareStore({ kv, rateLimiter }) {
     mode: 'cloudflare',
     async connect() {},
     async disconnect() {},
-    async consumeRateLimit({ scope, key, limit, windowMs }) {
+    async consumeRateLimit({ scope, key, limit, windowMs, cost = 1 }) {
       const stub = rateLimiter.getByName(buildRateLimiterName(scope, key));
-      return stub.consumeRateLimit({ limit, windowMs });
+      return stub.consumeRateLimit({ limit, windowMs, cost: normalizeRateLimitCost(cost) });
     },
     async revokeToken(jti, exp) {
       const expiresAt = Number(exp);
@@ -125,11 +138,12 @@ function createRedisStore() {
         await client.quit();
       }
     },
-    async consumeRateLimit({ scope, key, limit, windowMs }) {
+    async consumeRateLimit({ scope, key, limit, windowMs, cost = 1 }) {
       const redisKey = `${redisPrefix}:ratelimit:${scope}:${key}`;
-      const currentCount = await client.incr(redisKey);
+      const requestCost = normalizeRateLimitCost(cost);
+      const currentCount = await client.incrBy(redisKey, requestCost);
 
-      if (currentCount === 1) {
+      if (currentCount === requestCost) {
         await client.pExpire(redisKey, windowMs);
       }
 

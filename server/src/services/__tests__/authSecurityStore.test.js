@@ -32,8 +32,8 @@ describe('authSecurityStore', () => {
       getByName(name) {
         objectNames.push(name);
         return {
-          async consumeRateLimit({ limit }) {
-            const nextCount = (rateLimitCounts.get(name) || 0) + 1;
+          async consumeRateLimit({ limit, cost = 1 }) {
+            const nextCount = (rateLimitCounts.get(name) || 0) + cost;
             rateLimitCounts.set(name, nextCount);
             return {
               allowed: nextCount <= limit,
@@ -47,10 +47,22 @@ describe('authSecurityStore', () => {
 
     await expect(authSecurityStore.initializeAuthSecurityStore({ kv, rateLimiter })).resolves.toBe('cloudflare');
     await expect(
-      authSecurityStore.consumeAuthRateLimit({ scope: 'login', key: 'client', limit: 1, windowMs: 60_000 })
+      authSecurityStore.consumeAuthRateLimit({
+        scope: 'login',
+        key: 'client',
+        limit: 2,
+        windowMs: 60_000,
+        cost: 2
+      })
     ).resolves.toEqual({ allowed: true, retryAfterSeconds: 0 });
     await expect(
-      authSecurityStore.consumeAuthRateLimit({ scope: 'login', key: 'client', limit: 1, windowMs: 60_000 })
+      authSecurityStore.consumeAuthRateLimit({
+        scope: 'login',
+        key: 'client',
+        limit: 2,
+        windowMs: 60_000,
+        cost: 1
+      })
     ).resolves.toMatchObject({ allowed: false });
 
     await authSecurityStore.revokeAuthToken('token-1', Math.floor(Date.now() / 1000) + 3600);
@@ -59,6 +71,30 @@ describe('authSecurityStore', () => {
     expect(objectNames[0]).toBe(objectNames[1]);
     expect(objectNames[0]).toMatch(/^[a-f0-9]{64}$/);
   }, 15_000);
+
+  it('enforces weighted limits without charging a rejected memory-store request', async () => {
+    const authSecurityStore = await import('../authSecurityStore.js');
+    authSecurityStore.resetAuthSecurityStoreForTests();
+    const options = {
+      scope: 'import-embedding-user-minute',
+      key: 'user:user-1',
+      limit: 30,
+      windowMs: 60_000
+    };
+
+    await expect(
+      authSecurityStore.consumeAuthRateLimit({ ...options, cost: 29 })
+    ).resolves.toMatchObject({ allowed: true });
+    await expect(
+      authSecurityStore.consumeAuthRateLimit({ ...options, cost: 2 })
+    ).resolves.toMatchObject({ allowed: false });
+    await expect(
+      authSecurityStore.consumeAuthRateLimit({ ...options, cost: 1 })
+    ).resolves.toMatchObject({ allowed: true });
+    await expect(
+      authSecurityStore.consumeAuthRateLimit({ ...options, cost: 1 })
+    ).resolves.toMatchObject({ allowed: false });
+  });
 
   it('requires both Cloudflare auth bindings', async () => {
     const authSecurityStore = await import('../authSecurityStore.js');
