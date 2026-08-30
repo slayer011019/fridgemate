@@ -25,9 +25,9 @@ Implemented:
 
 ## Near Term
 
-- Deploy frontend and backend to stable public environments
+- Keep the public frontend and Cloudflare Worker stable with production smoke tests and rollback notes
 - Keep lint, tests, build, and core E2E green in CI
-- Review the two recovered migration checksum differences before applying the pending ingredient tombstone migration
+- Preserve the accepted recovered-migration checksum caveat and verify migration status before every future production migration
 - Harden auth recovery when sessions expire
 - Polish guest import and manual sync messaging
 - Improve documentation for first-time contributors

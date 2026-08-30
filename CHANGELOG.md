@@ -9,9 +9,12 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Added weighted, shared user and client limits to both import-correction embedding endpoints so one 30-item request consumes 30 units and alternating suggestion/save calls cannot bypass the budget.
+- Made session restoration fail closed, stopped persisting server identity in `localStorage`, and fenced failed logouts so an uncleared HttpOnly session cannot silently sign the next browser user back in.
 - Completed the checkpointed stale-vector rollout and the 188-row normalization refresh with zero failures; production now verifies at 1,166 current embeddings, no missing/stale/duplicate/orphan rows, and `vector(1536)`.
 - Normalized catalog artifacts such as dimension/fraction suffixes, section prefixes, and common Korean ingredient aliases; the final stored-vector home-meal evaluation reached 95% candidate recall and 75% reranked Hit@5.
 - Namespaced recommendation event recipe keys as `local:<id>` or `catalog:<uuid>` so future CTR aggregation can distinguish bundled and production recipes.
+- Made Cloudflare login and signup throttles use the real `CF-Connecting-IP` value, and added persistent per-user and per-client limits to the paid AI suggestion endpoint.
 - Checkpointed all 1,166 production recipe embeddings, replaced exactly the 18 stale Korean home-meal fixture targets with one API request and zero failures, then verified `current=226`, `missing=0`, `stale=940`, duplicate/orphan counts of zero, `vector(1536)`, and fixture freshness at 20/20 current.
 - Added a guarded `--target-fixture` recipe embedding mode that resolves fixture IDs against the catalog, rejects missing/name-mismatched/duplicate targets, requires an explicit production write cap, and dry-ran the Korean home-meal fixture at exactly 2 current and 18 stale rows with zero API calls or writes.
 - Re-ran both stored-production-vector quality fixtures after the first 25-row stale replacement: the fixed ten-query gate passed at Hit@5 9/10, while the Korean home-meal gate stopped further rollout at Hit@5 2/20 because 18 of its 20 target vectors were stale.
@@ -55,6 +58,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 - Added a rate-limited, authenticated `/api/recipes/recommendations/semantic` endpoint behind `SEMANTIC_RECIPE_API_ENABLED`, with bounded inputs, rule fallback, and the existing impression/click event path.
 - Added candidate-pool recall and production-equivalent 70/30 reranking metrics to the recipe search evaluator without changing the retrieval model or vector dimensions.
+- Added optional Naver Search Advisor and Bing Webmaster Tools ownership-verification meta tags with token validation, build-time assertions, and deployment checklists alongside the existing Google Search Console support.
 - Added six source-backed ingredient recipe hubs, two fridge-use guides, complete internal linking for all 100 public recipes, and 113-route prerender/sitemap verification.
 - Added consent-gated GA4 delivery behind the existing analytics interface, including SPA page views, identifier filtering, accessible allow/deny controls, and revocable footer settings.
 - Added optional Search Console HTML-tag verification and strengthened the WebSite entity with natural `오늘 뭐 먹지` and `FridgeMate` alternate names without adding typo keywords to visible copy.

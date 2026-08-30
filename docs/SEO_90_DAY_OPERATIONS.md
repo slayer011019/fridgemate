@@ -6,6 +6,9 @@ Weekly operating guide for 오늘뭐먹지 after the technical SEO and public co
 
 - [ ] Verify the `오늘뭐먹지.com` Search Console domain property with a DNS TXT record.
 - [ ] Submit `https://오늘뭐먹지.com/sitemap.xml` and inspect the home page, `/recipes`, one ingredient hub, one guide, and one recipe detail.
+- [ ] Verify the site in Naver Search Advisor and submit `robots.txt` plus `sitemap.xml`.
+- [ ] Import the Search Console property into Bing Webmaster Tools or verify it with `VITE_BING_SITE_VERIFICATION`, then submit the sitemap.
+- [ ] Submit the site through Daum Search Registration and record the external review result.
 - [ ] Create or select the GA4 property, set `VITE_GA_MEASUREMENT_ID`, deploy, and verify that analytics stays unloaded until consent.
 - [ ] Link GA4 and Search Console and mark `activation_completed` and `signup_completed` as key events.
 

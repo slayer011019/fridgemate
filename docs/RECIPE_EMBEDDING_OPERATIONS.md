@@ -12,7 +12,7 @@ Production contained three migration names that were absent from the repository:
 
 The executed schema statements were recovered from production schema metadata and normalized PostgreSQL statement statistics, then restored under the same names. The home-priority migration matches the production checksum exactly. The catalog-alignment and import-security SQL reproduce the executed statements, but their lost original comments or formatting could not be reconstructed, so their local file checksums differ from the historical production checksums.
 
-No production migration row, checksum, table, or column was changed during recovery. `npx prisma migrate status` now reports only `20260826000000_add_ingredient_sync_tombstones` as pending. Keep that migration unapplied until the two recovered-checksum differences receive an explicit deployment review.
+No production migration row or checksum was changed during recovery. The two recovered-checksum differences received an explicit deployment review on 2026-08-30, after which `20260826000000_add_ingredient_sync_tombstones` was applied successfully. Production migration status was then verified as up to date; keep the checksum caveat documented and run `npx prisma migrate status` before every future production migration.
 
 ## Protected Checkpoint
 

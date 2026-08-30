@@ -72,6 +72,7 @@
 - 홈, 메뉴 추천, 서비스 소개, 문의, 개인정보 처리 안내와 식약처 공개 레시피 100개는 빌드 시 본문과 경로별 메타·JSON-LD를 HTML로 프리렌더합니다.
 - 재료, OCR 가져오기, 로그인, 회원가입, 계정 화면은 Vercel `X-Robots-Tag`와 `robots.txt`에서 색인을 차단합니다.
 - `npm run build`의 postbuild 단계는 공개 HTML의 `h1`, canonical, structured data와 기능 화면의 빈 `noindex` 앱 셸을 자동 검증합니다.
+- Google, 네이버, Bing의 URL-prefix 소유권 인증은 각각 `VITE_GOOGLE_SITE_VERIFICATION`, `VITE_NAVER_SITE_VERIFICATION`, `VITE_BING_SITE_VERIFICATION` 값이 있을 때 정적 `<meta>` 태그로 빌드되고 postbuild에서 검증됩니다.
 - 재료별 공개 허브 6개와 냉장고 활용 가이드 2개를 포함해 총 113개 공개 URL을 프리렌더하며, `/recipes`에서 100개 레시피 상세 URL을 모두 내부 링크합니다.
 - `VITE_GA_MEASUREMENT_ID`가 설정되어도 이용자가 분석을 허용하기 전에는 Google Analytics를 불러오지 않습니다.
 - 브라우저에서는 화면별 코드를 지연 로딩하고, SEO 사전 렌더링은 별도의 동기식 서버 엔트리를 사용해 공개 HTML 본문을 그대로 유지합니다.
@@ -80,7 +81,7 @@
 
 공개 레시피 카탈로그는 `npm run recipes:export-public -- --limit=100 --write`로 식품안전나라 `COOKRCP01` 원문에서 갱신합니다. 쓰기 옵션을 빼면 파일을 바꾸지 않는 사전 점검으로 동작하며, 공개 조건을 충족하지 못한 항목은 제외합니다.
 
-아직 운영 단계가 아닙니다.
+현재 공개 운영 서비스의 범위 밖입니다.
 
 - 자동 백그라운드 및 실시간 동기화
 - 공유 냉장고와 다중 사용자 협업
@@ -219,6 +220,9 @@ API_SLOW_REQUEST_MS=1500
 
 - 서비스 역할 키와 AI API 키는 서버에서만 사용합니다.
 - 비밀값에 `VITE_` 접두사를 붙이지 않습니다.
+- 로그인·가입 제한은 실제 클라이언트 주소와 정규화된 이메일을 함께 사용하며, AI 추천은 사용자 및 클라이언트 주소별로 제한됩니다.
+- OCR 교정 제안·저장 API는 처리 항목 수만큼 공용 예산을 차감합니다. 사용자 기준 분당 60개·시간당 180개, 클라이언트 주소 기준 분당 600개·시간당 1,800개를 넘으면 `429`와 `Retry-After`를 반환합니다.
+- 서버 사용자 정보는 `localStorage`에 보관하지 않습니다. 시작할 때 HttpOnly 갱신 쿠키로 세션을 다시 확인하며, 확인 실패 시 사용자 전용 로컬 캐시를 잠급니다. 서버 로그아웃 결과를 확인하지 못하면 대기 표식을 남겨 다음 연결에서 로그아웃 상태를 다시 확인합니다.
 - `RECIPE_EMBEDDING_DIMENSIONS`는 DB의 `recipe_embeddings.embedding` 차원과 같아야 합니다.
 - `SEMANTIC_RECIPE_API_ENABLED`는 운영 임베딩 무결성과 검색 품질을 확인한 뒤에만 `true`로 전환합니다. 명시적 API는 `POST /api/recipes/recommendations/semantic`이며 인증과 요청 제한을 적용합니다.
 - 핵심 앱 기능은 AI API 키 없이도 동작합니다.

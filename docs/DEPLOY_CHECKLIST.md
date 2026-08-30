@@ -34,6 +34,9 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] In Cloudflare AI Crawl Control, allow search/answer citation crawlers intentionally and keep training-only crawlers blocked; verify the effective `/robots.txt` because managed rules can be prepended to the repository response.
 - [ ] Add `https://오늘뭐먹지.com` to Google Search Console. Prefer a domain property verified with the DNS TXT record; for URL-prefix verification, set `VITE_GOOGLE_SITE_VERIFICATION` to only the HTML meta tag's `content` value and redeploy.
 - [ ] Submit `https://오늘뭐먹지.com/sitemap.xml`, inspect the home page and a representative recipe URL, then request indexing after the production deployment is stable.
+- [ ] Add `https://오늘뭐먹지.com` to Naver Search Advisor, set `VITE_NAVER_SITE_VERIFICATION` to the HTML meta tag's `content` value, redeploy, verify ownership, and submit `/robots.txt` plus `/sitemap.xml`.
+- [ ] Add the site to Bing Webmaster Tools by importing the verified Google Search Console property or by setting `VITE_BING_SITE_VERIFICATION`, then submit `/sitemap.xml` and inspect a representative recipe URL.
+- [ ] Submit the production URL through Daum Search Registration. Record the request date and result because Daum registration is an external review flow and has no repository verification tag.
 - [ ] Link the GA4 property to Search Console, mark `activation_completed` and `signup_completed` as key events, and record the first 28-day baseline in `docs/SEO_90_DAY_OPERATIONS.md`.
 - [ ] Record Search Console and Naver Search Advisor baselines after deployment and compare impressions, clicks, indexed pages, and citations after 14 days.
 
@@ -53,6 +56,10 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] `AUTH_COOKIE_SAME_SITE=Lax` for the same-site production frontend and API.
 - [ ] Production cookie names use `__Host-` prefixes and users are notified that the cutover requires one sign-in.
 - [ ] Cookie-authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests with a missing or untrusted `Origin`/`Referer` return `403`.
+- [ ] Login and signup IP throttles distinguish test clients by `CF-Connecting-IP` instead of the Worker adapter's internal peer address.
+- [ ] `/api/recipes/ai-suggest` returns `429` after 20 requests per user or 60 requests per client address in one hour.
+- [ ] Both import-correction embedding endpoints share item-weighted user and client budgets and return `429` with `Retry-After` when a budget is exhausted.
+- [ ] Keep `SEMANTIC_RECIPE_API_ENABLED=false` through deployment, verify all 1,166 embeddings are current, then enable it in staging and confirm `/api/recipes/recommendations/semantic` returns semantic results, bounded rule fallback, and `429` at its user/client limits.
 - [ ] `/api/recommendation-events` rejects unknown/oversized fields and returns `429` after 120 requests per user/client address in one minute.
 - [ ] `npm run worker:dry-run` completes before deployment.
 - [ ] `API_SLOW_REQUEST_MS` is intentional, error responses include `x-request-id`, and platform logs contain no query strings, request bodies, user IDs, prompts, or vectors.
@@ -74,10 +81,10 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 
 - [ ] Run `npx prisma migrate status` before every production migration and stop if production contains migration names that are absent from the repository.
 - [x] Restore the verified executed SQL for `20260828090000_add_home_priority_fields`, `20260828100000_align_recipe_catalog_pipeline`, and `20260828110000_secure_recipe_import_tables` under their production names.
-- [x] Confirm `npx prisma migrate status` reports only `20260826000000_add_ingredient_sync_tombstones` as pending.
-- [ ] Review the catalog-alignment and import-security checksum caveat in `docs/RECIPE_EMBEDDING_OPERATIONS.md`; their executed SQL is recovered but lost original comments/formatting prevent an exact historical checksum match.
-- [ ] Keep `20260826000000_add_ingredient_sync_tombstones` unapplied until the repository and production migration histories are reconciled.
-- [ ] Do not use `npx prisma migrate deploy` until the recovered-checksum review is explicitly accepted.
+- [x] Before the 2026-08-30 deployment, confirm `npx prisma migrate status` reported only `20260826000000_add_ingredient_sync_tombstones` as pending.
+- [x] Review and explicitly accept the catalog-alignment and import-security checksum caveat in `docs/RECIPE_EMBEDDING_OPERATIONS.md`; their executed SQL is recovered but lost original comments/formatting prevent an exact historical checksum match.
+- [x] Apply `20260826000000_add_ingredient_sync_tombstones` after reconciling the repository and production migration histories.
+- [x] Re-run `npx prisma migrate status` after deployment and confirm the production schema is up to date.
 
 ## Authentication
 
@@ -104,7 +111,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Edit ingredient while authenticated; confirm no immediate `PATCH /api/ingredients/:id`.
 - [ ] Delete ingredient while authenticated; confirm no immediate `DELETE /api/ingredients/:id`.
 - [ ] Account-page sync sends `POST /api/ingredients/sync`.
-- [ ] Apply `20260826000000_add_ingredient_sync_tombstones` before deploying the new API.
+- [x] Apply `20260826000000_add_ingredient_sync_tombstones` before deploying the API that reads `deletedAt`.
 - [ ] Confirm `GET /api/ingredients/sync` returns only the authenticated user's active records and tombstones.
 - [ ] Confirm backup sends only pending changes and preserves a newer change made on another device.
 - [ ] Reload after sync and confirm data remains available.
@@ -121,7 +128,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Verify `Ingredient_userId_deletedAt_idx` exists and `Ingredient_userId_clientId_key` remains unique.
 - [ ] Run the API as a non-owner member of `fridgemate_app`, set `app.current_user_id` transaction-locally, and verify user A cannot read or mutate user B rows.
 - [ ] Repeat newer update, stale update, tombstone, stale resurrection, and identical payload cases, then remove the disposable database.
-- [ ] Deploy `20260826000000_add_ingredient_sync_tombstones` before deploying server code that reads `deletedAt`; otherwise the API must be expected to fail safely with a generic `500` before writes.
+- [x] Deploy `20260826000000_add_ingredient_sync_tombstones` before server code that reads `deletedAt`; this ordering was completed on 2026-08-30.
 
 ## Core Smoke Path
 
