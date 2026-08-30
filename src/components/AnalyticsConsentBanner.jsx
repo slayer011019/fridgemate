@@ -61,8 +61,9 @@ function AnalyticsConsentBanner() {
             서비스 개선을 위한 이용 분석에 동의하시겠어요?
           </h2>
           <p id="analytics-consent-description" className="mt-2 text-sm leading-6 text-slate-600">
-            동의한 경우에만 Google Analytics를 불러옵니다. 이메일과 오늘뭐먹지 내부 사용자 식별자는 전송하지 않으며,
-            선택은 언제든 변경할 수 있습니다.{' '}
+            동의한 로그인 사용자에 한해 최소 이용 기록을 자체 서버에 저장할 수 있고, 설정된 경우에만 Google
+            Analytics를 불러옵니다. 이메일과 재료명은 분석 이벤트로 수집하지 않으며, 내부 사용자·세션 식별자는
+            외부 분석 도구나 학습용 내보내기에 포함하지 않습니다. 선택은 언제든 변경할 수 있습니다.{' '}
             <Link className="font-semibold text-brand-700 underline underline-offset-2" to="/privacy">
               개인정보 처리 안내
             </Link>

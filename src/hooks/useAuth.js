@@ -128,15 +128,17 @@ export function AuthProvider({ children }) {
   );
 
   const logout = useCallback(
-    async () =>
+    async (options = {}) =>
       logoutSession({
         backendEnabled,
+        clearLocalData: options?.clearLocalData === true,
+        user,
         setSession,
         setGuestImportPrompt,
         setError,
         defaultGuestImportPrompt
       }),
-    [backendEnabled]
+    [backendEnabled, user]
   );
 
   const deleteAccount = useCallback(

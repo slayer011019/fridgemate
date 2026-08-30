@@ -23,6 +23,26 @@ describe('authValidation', () => {
     ).toThrow('Password must be at least 8 characters long.');
   });
 
+  it('rejects malformed email structure without a backtracking expression', () => {
+    for (const email of ['user@@example.com', 'user@example..com', '.user@example.com', 'user@localhost']) {
+      expect(() =>
+        assertValidSignupInput({
+          email,
+          password: 'StrongPassphrase123!'
+        })
+      ).toThrow('A valid email address is required.');
+    }
+  });
+
+  it('rejects oversized signup emails before parsing their structure', () => {
+    expect(() =>
+      assertValidSignupInput({
+        email: `${'a'.repeat(100_000)}@example.com`,
+        password: 'StrongPassphrase123!'
+      })
+    ).toThrow('Email address is too long.');
+  });
+
   it('rejects signup passwords longer than 128 characters', () => {
     expect(() =>
       assertValidSignupInput({

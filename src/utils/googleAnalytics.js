@@ -1,12 +1,66 @@
 import { getAnalyticsConsent } from './analyticsConsent';
 
 const GA_SCRIPT_SELECTOR = 'script[data-fridgemate-ga]';
-const BLOCKED_PARAMETER_KEYS = new Set([
-  'analytics_id',
-  'session_id',
-  'user_id',
-  'email',
-  'occurred_at'
+const COMMON_EVENT_PARAMETER_KEYS = Object.freeze([
+  'api_mode',
+  'app_version',
+  'device_type',
+  'network_state',
+  'user_mode'
+]);
+const EVENT_PARAMETER_KEYS = Object.freeze({
+  activation_completed: ['activation_path'],
+  ingredient_consumed: ['days_to_expiry_bucket', 'source'],
+  ingredient_created: [
+    'creation_method',
+    'category',
+    'storage_type',
+    'has_expiry_date',
+    'has_purchase_date',
+    'quantity_present'
+  ],
+  ingredient_duplicates_cleaned: ['duplicate_group_count', 'removed_count'],
+  ingredient_restored: ['days_to_expiry_bucket'],
+  login_completed: ['restored_session', 'source_screen'],
+  ocr_import_saved: ['saved_item_count', 'edited_before_save_count', 'session_first_import'],
+  ocr_parse_completed: [
+    'raw_text_length',
+    'parsed_item_count',
+    'template_type',
+    'confidence_bucket'
+  ],
+  ocr_review_completed: [
+    'parsed_item_count',
+    'selected_item_count',
+    'edited_item_count',
+    'deleted_item_count'
+  ],
+  ocr_upload_started: ['file_type', 'source_screen'],
+  page_view: [],
+  recommendation_clicked: ['screen', 'group', 'score', 'missing_core_count'],
+  recommendations_viewed: [
+    'screen',
+    'available_ingredient_count',
+    'expiring_soon_count',
+    'ready_count',
+    'buy_one_more_count',
+    'use_soon_count'
+  ],
+  session_started: ['has_existing_local_data', 'has_restored_session'],
+  signup_completed: ['source_screen']
+});
+const STATIC_ROUTE_TEMPLATES = new Set([
+  '/',
+  '/about',
+  '/account',
+  '/contact',
+  '/import',
+  '/ingredients',
+  '/ingredients/new',
+  '/login',
+  '/privacy',
+  '/recipes',
+  '/signup'
 ]);
 
 function getMeasurementId() {
@@ -22,9 +76,27 @@ function looksLikeEmail(value) {
   return typeof value === 'string' && /\S+@\S+\.\S+/u.test(value);
 }
 
+export function normalizeGoogleAnalyticsRoute(value) {
+  const pathname = String(value || '').split(/[?#]/u, 1)[0] || '/';
+
+  if (STATIC_ROUTE_TEMPLATES.has(pathname)) return pathname;
+  if (/^\/ingredients\/[^/]+\/edit$/u.test(pathname)) return '/ingredients/:id/edit';
+  if (/^\/recipes\/ingredients\/[^/]+$/u.test(pathname)) return '/recipes/ingredients/:slug';
+  if (/^\/recipes\/[^/]+$/u.test(pathname)) return '/recipes/:slug';
+  if (/^\/guides\/[^/]+$/u.test(pathname)) return '/guides/:slug';
+  return '/other';
+}
+
 export function sanitizeGoogleAnalyticsParameters(payload = {}) {
+  const eventName = typeof payload.event_name === 'string' ? payload.event_name : '';
+  const eventKeys = EVENT_PARAMETER_KEYS[eventName];
+
+  if (!eventKeys) return {};
+
+  const allowedKeys = new Set([...COMMON_EVENT_PARAMETER_KEYS, ...eventKeys]);
+
   return Object.entries(payload).reduce((parameters, [key, value]) => {
-    if (BLOCKED_PARAMETER_KEYS.has(key) || /(?:^|_)email$/iu.test(key)) return parameters;
+    if (!allowedKeys.has(key)) return parameters;
     if (!isSafePrimitive(value) || looksLikeEmail(value)) return parameters;
 
     parameters[key] = typeof value === 'string' ? value.slice(0, 100) : value;
@@ -39,6 +111,19 @@ function installGtag() {
     function gtag() {
       window.dataLayer.push(arguments);
     };
+}
+
+function clearGoogleAnalyticsCookies() {
+  if (typeof document === 'undefined') return;
+
+  const cookieNames = document.cookie
+    .split(';')
+    .map((cookie) => cookie.split('=', 1)[0].trim())
+    .filter((name) => /^_(?:ga(?:_|$)|gat(?:_|$)|gcl_|gid$)/u.test(name));
+
+  for (const name of cookieNames) {
+    document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+  }
 }
 
 export function initializeGoogleAnalytics() {
@@ -71,19 +156,33 @@ export function initializeGoogleAnalytics() {
 }
 
 export function disableGoogleAnalytics() {
-  if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
-  window.gtag('consent', 'update', { analytics_storage: 'denied' });
+  if (typeof window === 'undefined') return;
+
+  if (typeof window.gtag === 'function') {
+    window.gtag('consent', 'update', { analytics_storage: 'denied' });
+  }
+
+  if (typeof document !== 'undefined') {
+    document.querySelectorAll(GA_SCRIPT_SELECTOR).forEach((script) => script.remove());
+    clearGoogleAnalyticsCookies();
+  }
+
+  window.dataLayer = [];
+  delete window.gtag;
 }
 
 export function trackGoogleAnalyticsEvent(payload) {
-  if (!payload?.event_name || !initializeGoogleAnalytics()) return false;
+  if (!Object.hasOwn(EVENT_PARAMETER_KEYS, payload?.event_name) || !initializeGoogleAnalytics()) {
+    return false;
+  }
 
-  const parameters = sanitizeGoogleAnalyticsParameters({
-    ...payload,
-    page_path: payload.route || '/'
-  });
-  delete parameters.event_name;
-  delete parameters.route;
+  const parameters = {
+    ...sanitizeGoogleAnalyticsParameters(payload),
+    page_path: normalizeGoogleAnalyticsRoute(payload.route)
+  };
+  if (typeof payload.entry_route === 'string') {
+    parameters.entry_route = normalizeGoogleAnalyticsRoute(payload.entry_route);
+  }
 
   window.gtag('event', payload.event_name, parameters);
   return true;

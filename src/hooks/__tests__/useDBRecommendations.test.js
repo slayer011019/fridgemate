@@ -15,7 +15,8 @@ const { MockRecipesApiError, apiMocks, authState, backendState } = vi.hoisted(()
   return {
     MockRecipesApiError: RecipesApiErrorMock,
     apiMocks: {
-      getRecipeRecommendations: vi.fn()
+      getRecipeRecommendations: vi.fn(),
+      getSemanticRecipeRecommendations: vi.fn()
     },
     authState: {
       isAuthenticated: true
@@ -41,7 +42,8 @@ class MockIntersectionObserver {
 
 vi.mock('../../api/recipesApi.js', () => ({
   RecipesApiError: MockRecipesApiError,
-  getRecipeRecommendations: (...args) => apiMocks.getRecipeRecommendations(...args)
+  getRecipeRecommendations: (...args) => apiMocks.getRecipeRecommendations(...args),
+  getSemanticRecipeRecommendations: (...args) => apiMocks.getSemanticRecipeRecommendations(...args)
 }));
 
 vi.mock('../useAuth.js', () => ({
@@ -65,6 +67,7 @@ function HookProbe({ ingredients = defaultIngredients, pantryItems = defaultPant
 describe('useDBRecommendations', () => {
   beforeEach(() => {
     apiMocks.getRecipeRecommendations.mockReset();
+    apiMocks.getSemanticRecipeRecommendations.mockReset();
     authState.isAuthenticated = true;
     backendState.enabled = true;
     observerInstances.length = 0;
@@ -89,7 +92,16 @@ describe('useDBRecommendations', () => {
     });
 
     await waitFor(() => {
-      expect(apiMocks.getRecipeRecommendations).toHaveBeenCalledWith([{ id: 'i1', name: '계란' }], ['소금']);
+      expect(apiMocks.getRecipeRecommendations).toHaveBeenCalledWith(
+        [{ id: 'i1', name: '계란' }],
+        ['소금'],
+        {
+          preferredIngredients: [],
+          dislikedIngredients: [],
+          spiceLevel: 'medium',
+          cookingTimePreference: 'flexible'
+        }
+      );
     });
     await waitFor(() => {
       expect(latestState.recommendations).toEqual([{ id: 'r1', title: '계란찜', score: 80 }]);
@@ -137,5 +149,29 @@ describe('useDBRecommendations', () => {
       expect(latestState.error).toBe('로그인이 필요합니다.');
     });
     expect(latestState.hidden).toBe(false);
+  });
+
+  it('requests semantic processing only from the exported explicit action', async () => {
+    let latestState;
+    apiMocks.getSemanticRecipeRecommendations.mockResolvedValue({
+      mode: 'semantic',
+      recommendations: [{ id: 'r2', title: '계란밥' }]
+    });
+
+    render(createElement(HookProbe, { onState: (state) => { latestState = state; } }));
+
+    expect(apiMocks.getSemanticRecipeRecommendations).not.toHaveBeenCalled();
+    await act(async () => {
+      await latestState.requestExternalAiRecommendations();
+    });
+
+    expect(apiMocks.getSemanticRecipeRecommendations).toHaveBeenCalledWith(
+      defaultIngredients,
+      defaultPantryItems,
+      expect.any(Object),
+      { userInitiated: true }
+    );
+    expect(latestState.mode).toBe('semantic');
+    expect(latestState.recommendations).toEqual([{ id: 'r2', title: '계란밥' }]);
   });
 });

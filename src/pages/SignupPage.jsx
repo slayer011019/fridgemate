@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useAuth } from '../hooks/useAuth';
+import { isPublicSignupEnabled } from '../utils/backendConfig';
 
 const defaultForm = {
   email: '',
@@ -16,6 +17,7 @@ function SignupPage() {
   const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const publicSignupEnabled = isPublicSignupEnabled();
 
   if (isAuthenticated) {
     return <Navigate replace to="/account" />;
@@ -63,9 +65,15 @@ function SignupPage() {
         </div>
       ) : null}
 
+      {!publicSignupEnabled ? (
+        <div className="card border border-amber-200 bg-amber-50 text-sm text-amber-900">
+          {'\uC774\uBA54\uC77C \uD655\uC778 \uAE30\uB2A5\uC744 \uC900\uBE44\uD558\uB294 \uB3D9\uC548 \uC2E0\uADDC \uD68C\uC6D0\uAC00\uC785\uC744 \uC77C\uC2DC \uC911\uB2E8\uD588\uC5B4\uC694. \uAE30\uC874 \uACC4\uC815\uC740 \uB85C\uADF8\uC778\uD560 \uC218 \uC788\uACE0, \uACC4\uC815 \uC5C6\uC774\uB3C4 \uC774 \uAE30\uAE30\uC5D0\uC11C \uB0C9\uC7A5\uACE0 \uAE30\uB2A5\uC744 \uACC4\uC18D \uC0AC\uC6A9\uD560 \uC218 \uC788\uC5B4\uC694.'}
+        </div>
+      ) : null}
+
       {error ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
 
-      <form className="card max-w-xl space-y-4" onSubmit={handleSubmit}>
+      {publicSignupEnabled ? <form className="card max-w-xl space-y-4" onSubmit={handleSubmit}>
         <div className="flex flex-wrap gap-2">
           <span className="summary-chip">{backendEnabled ? '\uACC4\uC815 \uC0DD\uC131 \uAC00\uB2A5' : '\uB85C\uCEEC \uC804\uC6A9 \uBAA8\uB4DC'}</span>
           <span className="summary-chip">{'\uBE44\uBC00\uBC88\uD638 8\uC790 + \uD2B9\uC218\uBB38\uC790'}</span>
@@ -93,7 +101,7 @@ function SignupPage() {
             {'\uC774\uBBF8 \uACC4\uC815\uC774 \uC788\uC5B4\uC694'}
           </Link>
         </div>
-      </form>
+      </form> : null}
     </div>
   );
 }

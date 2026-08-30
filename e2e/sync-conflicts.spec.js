@@ -178,9 +178,12 @@ test('keeps a tombstone when an older device retries an active record', async ({
     await backup(deviceB.page);
     await pull(deviceB.page);
 
-    expect(backend.ingredients).toEqual([
-      expect.objectContaining({ clientId: 'shared-delete', deletedAt, name: '삭제 대상' })
-    ]);
+    expect(backend.ingredients).toEqual([{
+      id: 'server-delete',
+      clientId: 'shared-delete',
+      updatedAt: deletedAt,
+      deletedAt
+    }]);
     expect((await readBrowserIngredients(deviceB.page, USER_SCOPE))[0]).toMatchObject({
       clientId: 'shared-delete',
       deletedAt,

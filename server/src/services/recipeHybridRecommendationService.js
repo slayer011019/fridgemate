@@ -76,6 +76,13 @@ function mapRecipeForScoring(recipe = {}) {
 
 function buildHybridResult(recipe, structuredScore, vectorScore = 0, source = 'hybrid') {
   const finalScore = calculateHybridRecommendationScore(structuredScore.score, vectorScore);
+  const reason = structuredScore.preferredMatches?.length
+    ? `${structuredScore.preferredMatches[0]} 선호를 반영한 메뉴예요.`
+    : structuredScore.expiringMatchedIngredients?.length
+      ? `${structuredScore.expiringMatchedIngredients[0]}처럼 먼저 쓸 재료를 활용하기 좋아요.`
+      : structuredScore.missingIngredients.length === 0
+        ? '핵심 재료가 모두 있어서 오늘 바로 고르기 좋아요.'
+        : `${structuredScore.matchedIngredients.length}개 재료가 현재 냉장고와 맞아요.`;
 
   return {
     recipeId: recipe.id,
@@ -92,6 +99,9 @@ function buildHybridResult(recipe, structuredScore, vectorScore = 0, source = 'h
     structuredScore: structuredScore.score,
     vectorScore,
     _recommendationSource: source,
+    reason,
+    preferredMatches: structuredScore.preferredMatches || [],
+    dislikedMatches: structuredScore.dislikedMatches || [],
     matchedIngredients: structuredScore.matchedIngredients,
     missingIngredients: structuredScore.missingIngredients,
     missingSeasonings: structuredScore.missingSeasonings,
@@ -127,7 +137,8 @@ export async function recommendRecipes(userIngredients = [], options = {}) {
 
   try {
     vectorResults = await (options.vectorSearch || searchSimilarRecipesByVector)(queryText, candidateCount, {
-      prismaClient
+      prismaClient,
+      externalAi: options.externalAi
     });
   } catch (_error) {
     vectorResults = [];
@@ -150,7 +161,8 @@ export async function recommendRecipes(userIngredients = [], options = {}) {
       recipe: mappedRecipe,
       structuredScore: getRecipeMatchScore(expandedUserIngredients, mappedRecipe.ingredients, {
         recipeId: recipe.id,
-        pantryItems: options.pantryItems
+        pantryItems: options.pantryItems,
+        preferences: options.preferences
       })
     };
   });

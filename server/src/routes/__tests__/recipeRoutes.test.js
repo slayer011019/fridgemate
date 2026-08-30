@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { recipeRoutes } from '../recipeRoutes.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  resetAuthSecurityStoreForTests,
+  setAuthSecurityStoreForTests
+} from '../../services/authSecurityStore.js';
+import {
+  getRecipeComputationRateLimitCost,
+  getSemanticRecommendationRateLimitCost,
+  recipeRoutes
+} from '../recipeRoutes.js';
 
 function listRoutes(router) {
   return router.stack
@@ -11,6 +19,10 @@ function listRoutes(router) {
 }
 
 describe('recipeRoutes', () => {
+  afterEach(() => {
+    resetAuthSecurityStoreForTests();
+  });
+
   it('exposes recommendation APIs without exposing the operational import handler', () => {
     expect(listRoutes(recipeRoutes)).toEqual([
       { path: '/recommendations', methods: ['get'] },
@@ -28,7 +40,7 @@ describe('recipeRoutes', () => {
     expect(semanticRoute.route.stack).toHaveLength(3);
   });
 
-  it('rate limits existing recommendation routes that can enable semantic retrieval', () => {
+  it('keeps automatic recommendation routes on their non-semantic budgets', () => {
     const recommendationRoutes = recipeRoutes.stack.filter(
       (layer) => layer.route?.path === '/recommendations'
     );
@@ -43,5 +55,64 @@ describe('recipeRoutes', () => {
     );
 
     expect(aiSuggestRoute.route.stack).toHaveLength(3);
+  });
+
+  it('charges recipe computation limits by bounded ingredient work', () => {
+    expect(getRecipeComputationRateLimitCost({ body: { ingredients: ['계란'] } })).toBe(1);
+    expect(getRecipeComputationRateLimitCost({ body: { ingredients: Array(50).fill('계란') } })).toBe(5);
+    expect(
+      getRecipeComputationRateLimitCost({ body: { availableIngredients: Array(5_000).fill('계란') } })
+    ).toBe(50);
+  });
+
+  it('charges the bounded stored-ingredient workload for body-less semantic requests', () => {
+    expect(getSemanticRecommendationRateLimitCost({})).toBe(5);
+    expect(getSemanticRecommendationRateLimitCost({ body: { ingredients: [] } })).toBe(5);
+    expect(
+      getSemanticRecommendationRateLimitCost({ body: { ingredients: Array(50).fill('계란') } })
+    ).toBe(5);
+    expect(
+      getSemanticRecommendationRateLimitCost({
+        body: { availableIngredients: Array(5_000).fill('계란') }
+      })
+    ).toBe(50);
+  });
+
+  it('uses the semantic default cost on the explicit semantic route', async () => {
+    const calls = [];
+    setAuthSecurityStoreForTests({
+      async consumeRateLimit(options) {
+        calls.push(options);
+        return { allowed: true, retryAfterSeconds: 0 };
+      }
+    });
+    const recommendationRoute = recipeRoutes.stack.find(
+      (layer) => layer.route?.path === '/recommendations/semantic'
+    );
+    const request = {
+      auth: { userId: 'user-1' },
+      ip: '203.0.113.10'
+    };
+
+    for (const layer of recommendationRoute.route.stack.slice(0, 2)) {
+      await layer.handle(request, {}, () => {});
+    }
+
+    expect(calls).toEqual([
+      {
+        scope: 'semantic-recommendations-user',
+        key: 'user:user-1',
+        limit: 30,
+        windowMs: 60 * 60 * 1000,
+        cost: 5
+      },
+      {
+        scope: 'semantic-recommendations-client',
+        key: '203.0.113.10',
+        limit: 60,
+        windowMs: 60 * 60 * 1000,
+        cost: 5
+      }
+    ]);
   });
 });

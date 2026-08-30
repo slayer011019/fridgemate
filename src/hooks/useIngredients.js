@@ -6,19 +6,15 @@ import {
   createPushAction,
   createRepositoryCommandRunner
 } from '../features/ingredients/ingredientsActions';
-import { createEmptySyncSummary, getScopeState } from '../features/ingredients/ingredientsScopeState';
+import {
+  createEmptySyncSummary,
+  getScopeState,
+  getStoredLastSyncedAt
+} from '../features/ingredients/ingredientsScopeState';
 import { isBackendEnabled } from '../utils/backendConfig';
 import { useAuth } from './useAuth';
 
 const IngredientsContext = createContext(null);
-
-function getStoredLastSyncedAt() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.localStorage.getItem('fridgemate-last-synced-at');
-}
 
 export function IngredientsProvider({ children }) {
   const { isAuthenticated, storageScope } = useAuth();
@@ -31,7 +27,7 @@ export function IngredientsProvider({ children }) {
   const [dataSource, setDataSource] = useState('indexeddb');
   const [syncSummary, setSyncSummary] = useState(() => initialScopeState.syncSummary || createEmptySyncSummary());
   const [syncStatus, setSyncStatus] = useState('idle');
-  const [lastSyncedAt, setLastSyncedAt] = useState(getStoredLastSyncedAt);
+  const [lastSyncedAt, setLastSyncedAt] = useState(() => getStoredLastSyncedAt(storageScope));
   const [syncError, setSyncError] = useState(null);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
   const isSyncing = syncStatus === 'syncing';
@@ -77,7 +73,7 @@ export function IngredientsProvider({ children }) {
     setSyncStatus('idle');
     setSyncError(null);
     setHasUnsyncedChanges(false);
-    setLastSyncedAt(getStoredLastSyncedAt());
+    setLastSyncedAt(getStoredLastSyncedAt(storageScope));
   }, [storageScope]);
 
   useEffect(() => {

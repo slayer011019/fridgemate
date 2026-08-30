@@ -7,10 +7,12 @@ FridgeMate can seed public recipe source data from the Food Safety Korea data se
 - Provider: 식품의약품안전처 데이터활용서비스
 - Service name: `COOKRCP01`
 - Data type: `json`
-- URL format: `http://openapi.foodsafetykorea.go.kr/api/{FOODSAFETY_API_KEY}/COOKRCP01/json/{startIdx}/{endIdx}`
-- Example: `http://openapi.foodsafetykorea.go.kr/api/{FOODSAFETY_API_KEY}/COOKRCP01/json/1/100`
+- URL format: `https://openapi.foodsafetykorea.go.kr/api/{FOODSAFETY_API_KEY}/COOKRCP01/json/{startIdx}/{endIdx}`
+- Example: `https://openapi.foodsafetykorea.go.kr/api/{FOODSAFETY_API_KEY}/COOKRCP01/json/1/100`
 
 Apply for an API key through the Food Safety Korea data service before running the seed.
+
+The importer accepts HTTPS responses only. Redirects are followed manually and only while they stay on the exact Food Safety Korea HTTPS API origin. Before any database write, the script validates the final response origin, JSON content type, a 25 MiB response limit, the `COOKRCP01` envelope, result code, total and page counts, scalar row fields, required recipe identifiers and names, and duplicate identifiers. A page is limited to 1,000 rows and an advertised catalog count above 100,000 is rejected as an operational safety bound.
 
 ## Environment Variables
 
@@ -18,11 +20,14 @@ Set these in your local `.env` before running the script:
 
 ```bash
 SUPABASE_URL=
+SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 FOODSAFETY_API_KEY=
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` must only be used from local or server-side scripts. Do not prefix it with `VITE_`, do not expose it to browser code, and do not commit real key values.
+`FOODSAFETY_API_KEY` is required for seed dry runs and executed seed runs. `SUPABASE_URL` is required by the ingredient parser. Parser dry runs and parser-training exports use only `SUPABASE_ANON_KEY`; they do not read the writer credential. `SUPABASE_SERVICE_ROLE_KEY` is read only by executed seed and parser writes.
+
+`SUPABASE_SERVICE_ROLE_KEY` must only be used from local or server-side scripts. Do not prefix it with `VITE_`, do not expose it to browser code, and do not commit real key values. The export does not fall back to this key. None of the scripts print API keys or database credentials.
 
 The scripts read `.env` automatically through Node's `--env-file=.env` flag.
 
@@ -47,9 +52,13 @@ To split recipe ingredients, also run [../supabase/sql/create_recipe_ingredients
 npm run seed:recipes
 npm run seed:recipes -- --dry-run --limit=10
 npm run seed:recipes -- --all
+npm run seed:recipes -- --execute --confirm-project-ref=PROJECT_REF --limit=10
+npm run seed:recipes -- --execute --confirm-project-ref=PROJECT_REF --all
 ```
 
-The script fetches `COOKRCP01` pages sequentially using `startIdx` and `endIdx`, maps rows into the `recipes` table shape, and upserts by `external_id` so repeated runs do not duplicate recipes. By default it imports 10 rows. Use `--limit=N` for a bounded import, `--all` for the full source, and `--dry-run` to fetch and map without writing to Supabase.
+The script fetches `COOKRCP01` pages sequentially using `startIdx` and `endIdx`, maps rows into the `recipes` table shape, and upserts by `external_id` so repeated executed runs do not duplicate recipes. It is a dry run by default and validates 10 rows without creating a Supabase client. Use `--limit=N` for another bounded dry run or `--all` to validate the full source.
+
+A database write requires both `--execute` and `--confirm-project-ref=PROJECT_REF`. Replace `PROJECT_REF` with the exact 20-character lowercase project ref from the current `SUPABASE_URL` (`https://PROJECT_REF.supabase.co`). The script rejects missing or mismatched confirmation, non-HTTPS URLs, custom hosts, credentials in URLs, and non-canonical paths. `--execute` cannot be combined with `--dry-run`.
 
 Progress is logged per batch. Missing required environment variables, Food Safety Korea API errors, invalid JSON, HTTP failures, and Supabase upsert failures stop the script with a clear message.
 
@@ -63,9 +72,13 @@ After seeding recipes and creating `recipe_ingredients`, run:
 npm run parse:recipe-ingredients
 npm run parse:recipe-ingredients -- --dry-run --limit=10
 npm run parse:recipe-ingredients -- --all
+npm run parse:recipe-ingredients -- --execute --confirm-project-ref=PROJECT_REF --limit=10
+npm run parse:recipe-ingredients -- --execute --confirm-project-ref=PROJECT_REF --all
 ```
 
-The parser reads `recipes.id`, `recipes.name`, and `recipes.ingredients_text`, then upserts normalized chunks into `recipe_ingredients`. It stores the raw chunk, raw name, normalized name, canonical name, amount, unit, confidence, and source. Low-confidence rows are logged for manual review.
+The parser reads `recipes.id`, `recipes.name`, and `recipes.ingredients_text`, then prepares normalized chunks for `recipe_ingredients`. It is also a dry run by default and uses `SUPABASE_ANON_KEY` for that public `SELECT`. It writes only when the same `--execute` and exact `--confirm-project-ref` checks described above pass; only that confirmed branch reads `SUPABASE_SERVICE_ROLE_KEY`. Executed writes store the raw chunk, raw name, normalized name, canonical name, amount, unit, confidence, and source. Low-confidence rows are logged for manual review.
+
+Current limitation: executed catalog writes still use the broad Supabase service role because this project does not yet provision a dedicated `catalog_writer` credential. The execution and project-ref gates reduce accidental targeting but do not reduce that credential's database privileges. Provisioning a narrowly granted writer role and replacing the service-role key in these two write paths remains recommended operational hardening.
 
 This production Supabase table shape is the recipe catalog source of truth. Semantic vectors remain in `recipe_embeddings`; recommendation services join its `recipe_id` UUID to `recipes.id` and then load canonical or normalized names from `recipe_ingredients`.
 
@@ -81,6 +94,8 @@ npm run export:recipe-parser-training -- --low-confidence-only --output=data/tra
 ```
 
 The default output is `data/training/recipe-parser-examples.jsonl`, which is ignored by Git. Each JSONL row includes the raw ingredient chunk, full recipe ingredient context, parser label, confidence metadata, and `needsReview`. Treat these rows as baseline labels for review and future model training, not as hand-verified ground truth.
+
+The training export performs public `SELECT` queries with `SUPABASE_ANON_KEY`. It never reads or falls back to `SUPABASE_SERVICE_ROLE_KEY`, and the shared read-only key validator rejects service-role JWTs and Supabase `sb_secret_` keys if either is accidentally placed in `SUPABASE_ANON_KEY`.
 
 Use `scripts/label-review.js` to turn the low-confidence export into a gold set:
 

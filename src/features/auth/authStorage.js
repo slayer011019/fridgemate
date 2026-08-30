@@ -113,8 +113,51 @@ export function setGuestImportDecision(userId, decision) {
 
 export function clearGuestImportDecision(userId) {
   if (!userId) {
-    return;
+    return true;
   }
 
-  removeStorageValue(getGuestImportDecisionKey(userId));
+  return removeStorageValue(getGuestImportDecisionKey(userId));
+}
+
+export function clearAccountFeatureStorage(userId) {
+  const storage = getStorage();
+
+  if (!userId) return true;
+  if (!storage) return false;
+
+  const scope = buildUserStorageScope(userId);
+  const exactKeys = [
+    `fridgemate-pantry-ownership:v2:${scope}`,
+    `fridgemate-user-preferences:v1:${scope}`
+  ];
+  const prefixes = [`fridgemate-dismissed-recipes:v1:${scope}:`];
+  const storedKeys = [];
+
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const storageKey = storage.key(index);
+
+      if (storageKey) {
+        storedKeys.push(storageKey);
+      }
+    }
+  } catch {
+    return false;
+  }
+
+  const keysToRemove = new Set([
+    ...exactKeys,
+    ...storedKeys.filter((storageKey) => prefixes.some((prefix) => storageKey.startsWith(prefix)))
+  ]);
+  let cleanupComplete = true;
+
+  keysToRemove.forEach((storageKey) => {
+    try {
+      storage.removeItem(storageKey);
+    } catch {
+      cleanupComplete = false;
+    }
+  });
+
+  return cleanupComplete;
 }

@@ -30,6 +30,29 @@ async function loadIndexedDbModule() {
   return import('../indexedDB.js');
 }
 
+function openRawDatabase(name) {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(name, 2);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function writeRawIngredient(databaseName, ingredient) {
+  const database = await openRawDatabase(databaseName);
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction('ingredients', 'readwrite');
+      transaction.objectStore('ingredients').put(ingredient);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  } finally {
+    database.close();
+  }
+}
+
 describe('indexedDB utilities', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -185,8 +208,138 @@ describe('indexedDB utilities', () => {
     await db.saveIngredient(tombstone, { scope: 'user:user-1' });
 
     expect(await db.getAllIngredients({ scope: 'user:user-1' })).toEqual([]);
-    expect(await db.getAllIngredientsForSync({ scope: 'user:user-1' })).toEqual([
-      expect.objectContaining({ clientId: 'deleted', syncState: 'pendingDelete' })
-    ]);
+    expect(await db.getIngredientById('deleted', { scope: 'user:user-1' })).toBeUndefined();
+    expect(await db.getAllIngredientsForSync({ scope: 'user:user-1' })).toEqual([{
+      id: 'deleted',
+      clientId: 'deleted',
+      updatedAt: '2026-08-26T10:00:00.000Z',
+      deletedAt: '2026-08-26T10:00:00.000Z',
+      syncState: 'pendingDelete'
+    }]);
+  });
+
+  it('scrubs a legacy full tombstone on first sync read and keeps the rewrite idempotent', async () => {
+    const db = await loadIndexedDbModule();
+    const scope = { scope: 'user:user-legacy' };
+    await db.saveIngredient(createIngredient('legacy-delete'), scope);
+    await writeRawIngredient('fridgemate-db__user_user-legacy', createIngredient('legacy-delete', {
+      clientId: 'legacy-delete',
+      memo: 'private legacy memo',
+      createdAt: '2026-08-01T00:00:00.000Z',
+      deletedAt: '2026-08-26T10:00:00.000Z'
+    }));
+
+    const firstRead = await db.getAllIngredientsForSync(scope);
+    const secondRead = await db.getAllIngredientsForSync(scope);
+
+    expect(firstRead).toEqual([{
+      id: 'legacy-delete',
+      clientId: 'legacy-delete',
+      updatedAt: '2026-08-26T10:00:00.000Z',
+      deletedAt: '2026-08-26T10:00:00.000Z',
+      syncState: 'pendingDelete'
+    }]);
+    expect(secondRead).toEqual(firstRead);
+  });
+
+  it('rejects stale active writes and replacement snapshots over an existing tombstone', async () => {
+    const db = await loadIndexedDbModule();
+    const scope = { scope: 'user:user-1' };
+    await db.saveIngredient(createIngredient('deleted', {
+      clientId: 'stable-delete-key',
+      updatedAt: '2026-08-26T10:00:00.000Z',
+      deletedAt: '2026-08-26T10:00:00.000Z',
+      syncState: 'clean'
+    }), scope);
+
+    await expect(db.saveIngredient(createIngredient('deleted', {
+      clientId: 'stable-delete-key',
+      name: 'must-not-return',
+      updatedAt: '2026-08-26T11:00:00.000Z'
+    }), scope)).rejects.toThrow(/cannot be restored/u);
+    await expect(db.replaceIngredients([createIngredient('server-active', {
+      clientId: 'stable-delete-key',
+      name: 'must-not-return',
+      updatedAt: '2026-08-26T12:00:00.000Z'
+    })], scope)).rejects.toThrow(/cannot be restored/u);
+
+    await expect(db.replaceIngredients([], scope)).resolves.toBeNull();
+
+    expect(await db.getAllIngredientsForSync(scope)).toEqual([{
+      id: 'deleted',
+      clientId: 'stable-delete-key',
+      updatedAt: '2026-08-26T10:00:00.000Z',
+      deletedAt: '2026-08-26T10:00:00.000Z',
+      syncState: 'clean'
+    }]);
+  });
+
+  it('stores menu decisions in the upgraded database without affecting ingredients', async () => {
+    const db = await loadIndexedDbModule();
+    const decision = {
+      decisionDate: '2026-08-30',
+      clientId: 'decision-1',
+      recipeKey: 'local:recipe-1',
+      status: 'selected'
+    };
+
+    await db.saveIngredient(createIngredient('ingredient-1'));
+    await db.saveMenuDecision(decision);
+
+    expect(await db.getMenuDecision('2026-08-30')).toEqual(decision);
+    expect(await db.getAllIngredients()).toHaveLength(1);
+    await db.deleteMenuDecision('2026-08-30');
+    expect(await db.getMenuDecision('2026-08-30')).toBeUndefined();
+  });
+
+  it('isolates guest and authenticated menu decisions', async () => {
+    const db = await loadIndexedDbModule();
+    await db.saveMenuDecision({ decisionDate: '2026-08-30', clientId: 'guest' }, { scope: 'guest' });
+    await db.saveMenuDecision({ decisionDate: '2026-08-30', clientId: 'user' }, { scope: 'user:user-1' });
+
+    expect(await db.getMenuDecision('2026-08-30', { scope: 'guest' })).toMatchObject({ clientId: 'guest' });
+    expect(await db.getMenuDecision('2026-08-30', { scope: 'user:user-1' })).toMatchObject({ clientId: 'user' });
+  });
+
+  it('closes and deletes an authenticated scope database without deleting guest data', async () => {
+    const db = await loadIndexedDbModule();
+    await db.saveIngredient(createIngredient('guest-1'), { scope: 'guest' });
+    await db.saveIngredient(createIngredient('user-1'), { scope: 'user:user-1' });
+    await db.saveIngredient(createIngredient('user-2'), { scope: 'user:user-2' });
+
+    await expect(db.deleteDatabase({ scope: 'user:user-1' })).resolves.toBeUndefined();
+
+    const databaseNames = (await window.indexedDB.databases()).map(({ name }) => name);
+    expect(databaseNames).not.toContain('fridgemate-db__user_user-1');
+    expect(databaseNames).toContain('fridgemate-db__guest');
+    expect(databaseNames).toContain('fridgemate-db__user_user-2');
+    expect(await db.getAllIngredients({ scope: 'guest' })).toHaveLength(1);
+    expect(await db.getAllIngredients({ scope: 'user:user-2' })).toHaveLength(1);
+    expect(await db.getAllIngredients({ scope: 'user:user-1' })).toEqual([]);
+  });
+
+  it('can clear scoped records before another connection blocks database deletion', async () => {
+    const db = await loadIndexedDbModule();
+    await db.saveIngredient(createIngredient('user-1'), { scope: 'user:user-1' });
+    await db.saveMenuDecision(
+      { decisionDate: '2026-08-30', clientId: 'decision-1' },
+      { scope: 'user:user-1' }
+    );
+    const blockingConnection = await new Promise((resolve, reject) => {
+      const request = window.indexedDB.open('fridgemate-db__user_user-1', 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    try {
+      await db.clearIngredients({ scope: 'user:user-1' });
+      await db.clearMenuDecisions({ scope: 'user:user-1' });
+
+      expect(await db.getAllIngredients({ scope: 'user:user-1' })).toEqual([]);
+      expect(await db.getMenuDecision('2026-08-30', { scope: 'user:user-1' })).toBeUndefined();
+      await expect(db.deleteDatabase({ scope: 'user:user-1' })).rejects.toThrow(/blocked/i);
+    } finally {
+      blockingConnection.close();
+    }
   });
 });

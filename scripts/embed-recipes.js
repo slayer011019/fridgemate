@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import { buildProductionRecipeEmbeddingText } from '../server/src/services/recipeEmbeddingTextBuilder.js';
+import { withExternalAiTimeout } from '../server/src/lib/externalAiRequest.js';
 import { evaluateRecipeSearch } from './evaluate-recipe-search.js';
 
 const DEFAULT_MODEL = 'text-embedding-3-small';
@@ -13,6 +14,7 @@ const DEFAULT_API_BATCH_SIZE = 25;
 const DEFAULT_MAX_RETRIES = 4;
 const DEFAULT_RETRY_BASE_MS = 500;
 const DEFAULT_RETRY_MAX_MS = 10000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 const DEFAULT_STATE_FILE = '.local/recipe-embedding-backfill-state.json';
 const MAX_API_BATCH_SIZE = 100;
 
@@ -40,6 +42,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     maxRetries: DEFAULT_MAX_RETRIES,
     retryBaseMs: DEFAULT_RETRY_BASE_MS,
     retryMaxMs: DEFAULT_RETRY_MAX_MS,
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     maxWrites: Number.POSITIVE_INFINITY
   };
 
@@ -69,6 +72,13 @@ export function parseArgs(argv = process.argv.slice(2)) {
 
     if (arg.startsWith('--retry-max-ms=')) {
       options.retryMaxMs = Math.max(0, Number.parseInt(arg.split('=')[1], 10) || 0);
+    }
+
+    if (arg.startsWith('--request-timeout-ms=')) {
+      options.requestTimeoutMs = Math.max(
+        1,
+        Math.min(120_000, Number.parseInt(arg.split('=')[1], 10) || DEFAULT_REQUEST_TIMEOUT_MS)
+      );
     }
 
     if (arg.startsWith('--max-writes=')) {
@@ -276,6 +286,7 @@ export async function createEmbeddingBatch(texts, config, options = {}) {
     maxRetries: DEFAULT_MAX_RETRIES,
     retryBaseMs: DEFAULT_RETRY_BASE_MS,
     retryMaxMs: DEFAULT_RETRY_MAX_MS,
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     fetchImpl: fetch,
     sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
     ...options
@@ -286,22 +297,43 @@ export async function createEmbeddingBatch(texts, config, options = {}) {
   for (let attempt = 0; attempt <= settings.maxRetries; attempt += 1) {
     requestCount += 1;
     let response;
+    let payload;
     try {
-      response = await settings.fetchImpl('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: config.model,
-          dimensions: config.dimensions,
-          input: texts
-        })
+      const result = await withExternalAiTimeout({
+        provider: 'OpenAI recipe embedding backfill',
+        timeoutMs: settings.requestTimeoutMs,
+        operation: async (signal) => {
+          const providerResponse = await settings.fetchImpl('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${config.apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: config.model,
+              dimensions: config.dimensions,
+              input: texts
+            }),
+            signal
+          });
+
+          return {
+            response: providerResponse,
+            payload: providerResponse.ok ? await providerResponse.json() : null
+          };
+        }
       });
-    } catch {
+      response = result.response;
+      payload = result.payload;
+    } catch (requestError) {
       if (attempt >= settings.maxRetries) {
-        const error = new Error('Recipe embedding request failed because of a network error.');
+        const timedOut = requestError?.code === 'EXTERNAL_AI_TIMEOUT';
+        const error = new Error(
+          timedOut
+            ? 'Recipe embedding request timed out.'
+            : 'Recipe embedding request failed because of a network error.'
+        );
+        error.code = timedOut ? 'EXTERNAL_AI_TIMEOUT' : 'EXTERNAL_AI_NETWORK_ERROR';
         error.requestCount = requestCount;
         error.retryCount = retryCount;
         throw error;
@@ -312,7 +344,6 @@ export async function createEmbeddingBatch(texts, config, options = {}) {
     }
 
     if (response.ok) {
-      const payload = await response.json();
       try {
         return {
           vectors: normalizeEmbeddingPayload(payload, texts.length, config.dimensions),
@@ -471,6 +502,7 @@ export async function embedRecipes(options = parseArgs()) {
     maxRetries: DEFAULT_MAX_RETRIES,
     retryBaseMs: DEFAULT_RETRY_BASE_MS,
     retryMaxMs: DEFAULT_RETRY_MAX_MS,
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     stateFile: DEFAULT_STATE_FILE,
     resume: false,
     resumeFrom: '',
@@ -689,7 +721,8 @@ export async function embedRecipes(options = parseArgs()) {
             await createEmbeddingsForBatch(texts, config, {
               maxRetries: settings.maxRetries,
               retryBaseMs: settings.retryBaseMs,
-              retryMaxMs: settings.retryMaxMs
+              retryMaxMs: settings.retryMaxMs,
+              requestTimeoutMs: settings.requestTimeoutMs
             }),
             selected.length,
             Number(config.dimensions)

@@ -70,4 +70,10 @@ describe('recipe ingredient classification', () => {
     expect(deduped).toHaveLength(1);
     expect(deduped[0]).toMatchObject({ normalizedName: '계란', ingredientType: 'main' });
   });
+
+  it('handles quantity suffixes in linear time and rejects oversized uncontrolled text', () => {
+    expect(normalizeRecipeIngredientName('감자 4×3×1cm')).toBe('감자');
+    expect(normalizeRecipeIngredientName('물 1½컵')).toBe('물');
+    expect(normalizeRecipeIngredientName(`감자 ${'1'.repeat(100_000)}!`)).toBe('');
+  });
 });

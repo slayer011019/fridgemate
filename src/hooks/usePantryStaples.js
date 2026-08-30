@@ -1,16 +1,24 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { PANTRY_STATUS, PANTRY_STATUS_ORDER, pantryStaples } from '../data/pantryStaples';
+import { getPantryOwnership, savePantryOwnership } from '../api/personalizationApi';
+import { useAuth } from './useAuth';
 
-const STORAGE_KEY = 'fridgemate-pantry-ownership';
+const LEGACY_STORAGE_KEY = 'fridgemate-pantry-ownership';
 const PantryStaplesContext = createContext(null);
 
-function getInitialPantryOwnership() {
+function storageKey(scope) {
+  return `fridgemate-pantry-ownership:v2:${scope}`;
+}
+
+function getInitialPantryOwnership(scope = 'guest') {
   if (typeof window === 'undefined') {
     return {};
   }
 
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
+    const scopedValue = window.localStorage.getItem(storageKey(scope));
+    const legacyValue = scope === 'guest' ? window.localStorage.getItem(LEGACY_STORAGE_KEY) : null;
+    const parsed = JSON.parse(scopedValue || legacyValue || '{}');
 
     if (!parsed || typeof parsed !== 'object') {
       return {};
@@ -29,19 +37,47 @@ function getNextStatus(currentStatus) {
 }
 
 export function PantryStaplesProvider({ children }) {
-  const [pantryOwnership, setPantryOwnership] = useState(getInitialPantryOwnership);
+  const { isAuthenticated, storageScope } = useAuth();
+  const [pantryOwnership, setPantryOwnership] = useState(() => getInitialPantryOwnership(storageScope));
+  const [syncError, setSyncError] = useState('');
 
   const persistPantryOwnership = useCallback((updater) => {
     setPantryOwnership((current) => {
       const nextOwnership = typeof updater === 'function' ? updater(current) : updater;
 
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextOwnership));
+        window.localStorage.setItem(storageKey(storageScope), JSON.stringify(nextOwnership));
       }
 
       return nextOwnership;
     });
-  }, []);
+  }, [storageScope]);
+
+  useEffect(() => {
+    let mounted = true;
+    const local = getInitialPantryOwnership(storageScope);
+    queueMicrotask(() => {
+      if (!mounted) return;
+      setPantryOwnership(local);
+      setSyncError('');
+    });
+
+    if (!isAuthenticated) return undefined;
+
+    getPantryOwnership()
+      .then((items) => {
+        if (!mounted || !Array.isArray(items)) return;
+        const remote = Object.fromEntries(items.map((item) => [item.stapleId, item.status]));
+        const merged = { ...local, ...remote };
+        window.localStorage.setItem(storageKey(storageScope), JSON.stringify(merged));
+        setPantryOwnership(merged);
+      })
+      .catch(() => {
+        if (mounted) setSyncError('팬트리 서버 상태를 불러오지 못해 이 기기의 설정을 사용합니다.');
+      });
+
+    return () => { mounted = false; };
+  }, [isAuthenticated, storageScope]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -49,39 +85,51 @@ export function PantryStaplesProvider({ children }) {
     }
 
     const handleStorage = (event) => {
-      if (event.key !== STORAGE_KEY) {
+      if (event.key !== storageKey(storageScope)) {
         return;
       }
 
-      setPantryOwnership(getInitialPantryOwnership());
+      setPantryOwnership(getInitialPantryOwnership(storageScope));
     };
 
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  }, [storageScope]);
 
   const setPantryStatus = useCallback(
     (id, status) => {
       const nextStatus = Object.values(PANTRY_STATUS).includes(status) ? status : PANTRY_STATUS.UNKNOWN;
-      persistPantryOwnership((current) => ({
-        ...current,
-        [id]: nextStatus
-      }));
+      persistPantryOwnership((current) => {
+        const next = { ...current, [id]: nextStatus };
+        if (isAuthenticated) {
+          savePantryOwnership([{ stapleId: id, status: nextStatus }])
+            .then(() => setSyncError(''))
+            .catch(() => setSyncError('서버 저장에 실패했지만 이 기기의 팬트리 설정은 유지됩니다.'));
+        }
+        return next;
+      });
     },
-    [persistPantryOwnership]
+    [isAuthenticated, persistPantryOwnership]
   );
 
   const cyclePantryStatus = useCallback(
     (id) =>
       persistPantryOwnership((current) => {
         const currentStatus = current[id] || PANTRY_STATUS.UNKNOWN;
+        const nextStatus = getNextStatus(currentStatus);
+
+        if (isAuthenticated) {
+          savePantryOwnership([{ stapleId: id, status: nextStatus }])
+            .then(() => setSyncError(''))
+            .catch(() => setSyncError('서버 저장에 실패했지만 이 기기의 팬트리 설정은 유지됩니다.'));
+        }
 
         return {
           ...current,
-          [id]: getNextStatus(currentStatus)
+          [id]: nextStatus
         };
       }),
-    [persistPantryOwnership]
+    [isAuthenticated, persistPantryOwnership]
   );
 
   const pantrySummary = useMemo(() => {
@@ -104,10 +152,11 @@ export function PantryStaplesProvider({ children }) {
       pantryStaples,
       pantryOwnership,
       pantrySummary,
+      syncError,
       setPantryStatus,
       cyclePantryStatus
     }),
-    [cyclePantryStatus, pantryOwnership, pantrySummary, setPantryStatus]
+    [cyclePantryStatus, pantryOwnership, pantrySummary, setPantryStatus, syncError]
   );
 
   return createElement(PantryStaplesContext.Provider, { value }, children);

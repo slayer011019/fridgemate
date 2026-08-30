@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createClient } from 'redis';
 import { serverConfig } from '../config.js';
+import { parseExpirySeconds } from '../lib/token.js';
 
 const MAX_RATE_LIMIT_COST = 10_000;
 
@@ -90,9 +91,44 @@ function buildRateLimiterName(scope, key) {
     .digest('hex');
 }
 
-function createCloudflareStore({ kv, rateLimiter }) {
-  const prefix = serverConfig.authRedisPrefix;
+function buildRevokedTokenName(jti) {
+  return createHash('sha256')
+    .update(`${serverConfig.authRedisPrefix}:revoked:${jti}`)
+    .digest('hex');
+}
 
+function buildRedisRateLimitKey(redisPrefix, scope, key) {
+  return `${redisPrefix}:ratelimit:${buildRateLimiterName(scope, key)}`;
+}
+
+function buildRedisRevokedTokenKey(redisPrefix, jti) {
+  return `${redisPrefix}:revoked:${buildRevokedTokenName(jti)}`;
+}
+
+function resolveRevocationExpiry(value, tokenExpiresAt, ttlMs, nowSeconds) {
+  const storedExpiresAt = Number(value);
+  const verifiedTokenExpiresAt = Number(tokenExpiresAt);
+
+  if (Number.isFinite(storedExpiresAt) && storedExpiresAt > nowSeconds) {
+    return storedExpiresAt;
+  }
+
+  if (Number.isFinite(verifiedTokenExpiresAt) && verifiedTokenExpiresAt > nowSeconds) {
+    return verifiedTokenExpiresAt;
+  }
+
+  if (ttlMs > 0) {
+    return nowSeconds + Math.max(1, Math.ceil(ttlMs / 1000));
+  }
+
+  if (value === '1') {
+    return nowSeconds + parseExpirySeconds(serverConfig.jwtExpiresIn);
+  }
+
+  return 0;
+}
+
+function createCloudflareStore({ rateLimiter }) {
   return {
     mode: 'cloudflare',
     async connect() {},
@@ -106,12 +142,13 @@ function createCloudflareStore({ kv, rateLimiter }) {
 
       if (!jti || !Number.isFinite(expiresAt)) return;
 
-      const ttlSeconds = Math.max(60, expiresAt - Math.floor(Date.now() / 1000));
-      await kv.put(`${prefix}:revoked:${jti}`, '1', { expirationTtl: ttlSeconds });
+      const stub = rateLimiter.getByName(buildRevokedTokenName(jti));
+      await stub.revokeToken({ expiresAt });
     },
     async isTokenRevoked(jti) {
       if (!jti) return false;
-      return (await kv.get(`${prefix}:revoked:${jti}`)) === '1';
+      const stub = rateLimiter.getByName(buildRevokedTokenName(jti));
+      return stub.isTokenRevoked();
     }
   };
 }
@@ -139,15 +176,16 @@ function createRedisStore() {
       }
     },
     async consumeRateLimit({ scope, key, limit, windowMs, cost = 1 }) {
-      const redisKey = `${redisPrefix}:ratelimit:${scope}:${key}`;
+      const redisKey = buildRedisRateLimitKey(redisPrefix, scope, key);
       const requestCost = normalizeRateLimitCost(cost);
+
       const currentCount = await client.incrBy(redisKey, requestCost);
+      let ttlMs = await client.pTTL(redisKey);
 
-      if (currentCount === requestCost) {
+      if (ttlMs < 0) {
         await client.pExpire(redisKey, windowMs);
+        ttlMs = windowMs;
       }
-
-      const ttlMs = await client.pTTL(redisKey);
 
       if (currentCount > limit) {
         return {
@@ -169,17 +207,40 @@ function createRedisStore() {
       }
 
       const ttlSeconds = Math.max(1, expiresAt - Math.floor(Date.now() / 1000));
-      await client.set(`${redisPrefix}:revoked:${jti}`, '1', {
+      const redisKey = buildRedisRevokedTokenKey(redisPrefix, jti);
+
+      await client.set(redisKey, String(expiresAt), {
         EX: ttlSeconds
       });
     },
-    async isTokenRevoked(jti) {
+    async isTokenRevoked(jti, exp) {
       if (!jti) {
         return false;
       }
 
-      const value = await client.get(`${redisPrefix}:revoked:${jti}`);
-      return value === '1';
+      const redisKey = buildRedisRevokedTokenKey(redisPrefix, jti);
+      const value = await client.get(redisKey);
+
+      if (value === null) {
+        return false;
+      }
+
+      const ttlMs = await client.pTTL(redisKey);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const expiresAt = resolveRevocationExpiry(value, exp, ttlMs, nowSeconds);
+
+      if (expiresAt <= nowSeconds) {
+        await client.del(redisKey);
+        return false;
+      }
+
+      const ttlSeconds = Math.max(1, expiresAt - nowSeconds);
+
+      if (ttlMs < 0) {
+        await client.pExpire(redisKey, ttlSeconds * 1000);
+      }
+
+      return true;
     },
     async clear() {
       const keys = await client.keys(`${redisPrefix}:*`);
@@ -194,13 +255,17 @@ function createRedisStore() {
 let activeStore = createMemoryStore();
 let configuredMode = 'memory';
 
-export async function initializeAuthSecurityStore({ kv, rateLimiter } = {}) {
+export async function initializeAuthSecurityStore({ kv, rateLimiter, requireDistributed = false } = {}) {
+  if (requireDistributed && !rateLimiter) {
+    throw new Error('Cloudflare auth security requires the AUTH_RATE_LIMITER binding.');
+  }
+
   if (kv || rateLimiter) {
-    if (!kv || !rateLimiter) {
-      throw new Error('Cloudflare auth security requires both AUTH_KV and AUTH_RATE_LIMITER bindings.');
+    if (!rateLimiter) {
+      throw new Error('Cloudflare auth security requires the AUTH_RATE_LIMITER binding.');
     }
 
-    activeStore = createCloudflareStore({ kv, rateLimiter });
+    activeStore = createCloudflareStore({ rateLimiter });
     configuredMode = 'cloudflare';
     return configuredMode;
   }
@@ -229,8 +294,8 @@ export async function revokeAuthToken(jti, exp) {
   return activeStore.revokeToken(jti, exp);
 }
 
-export async function checkRevokedToken(jti) {
-  return activeStore.isTokenRevoked(jti);
+export async function checkRevokedToken(jti, exp) {
+  return activeStore.isTokenRevoked(jti, exp);
 }
 
 export function getAuthSecurityStoreMode() {

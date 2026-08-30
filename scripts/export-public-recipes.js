@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const API_BASE_URL = 'https://openapi.foodsafetykorea.go.kr/api';
@@ -10,10 +10,37 @@ const SOURCE_URL =
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 const STEP_COUNT = 20;
+const MAX_API_RESPONSE_BYTES = 20 * 1024 * 1024;
+const MAX_REVIEW_FILE_BYTES = 20 * 1024 * 1024;
+const ALLOWED_PUBLIC_URL_HOSTS = new Set(['foodsafetykorea.go.kr', 'www.foodsafetykorea.go.kr']);
+export const PUBLIC_RECIPES_OUTPUT_PATH = resolve(process.cwd(), 'src/data/publicRecipes.json');
 
-function emptyToNull(value) {
-  const normalized = String(value ?? '').trim();
+function emptyToNull(value, maxLength = 500) {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+
+  const normalized = String(value).normalize('NFC').trim();
+  if (normalized.length > maxLength) return null;
+
+  for (const character of normalized) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === 0 || (codePoint < 32 && character !== '\n' && character !== '\r' && character !== '\t')) {
+      return null;
+    }
+  }
+
   return normalized || null;
+}
+
+function normalizeExternalId(value) {
+  const normalized = emptyToNull(value, 64);
+  if (!normalized) return null;
+
+  for (const character of normalized) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint < 48 || codePoint > 57) return null;
+  }
+
+  return normalized;
 }
 
 function parseNumeric(value) {
@@ -25,12 +52,13 @@ function parseNumeric(value) {
 }
 
 function normalizePublicUrl(value) {
-  const normalized = emptyToNull(value);
+  const normalized = emptyToNull(value, 2048);
   if (!normalized) return null;
 
   try {
     const url = new URL(normalized);
-    if (!/(^|\.)foodsafetykorea\.go\.kr$/iu.test(url.hostname)) return null;
+    if (!ALLOWED_PUBLIC_URL_HOSTS.has(url.hostname.toLowerCase())) return null;
+    if (url.username || url.password || (url.port && url.port !== '443')) return null;
     if (url.protocol === 'http:') {
       url.protocol = 'https:';
     }
@@ -46,7 +74,7 @@ function mapSteps(row) {
 
   for (let index = 1; index <= STEP_COUNT; index += 1) {
     const suffix = String(index).padStart(2, '0');
-    const text = emptyToNull(row[`MANUAL${suffix}`])?.replace(/\.[a-z]$/iu, '.');
+    const text = emptyToNull(row[`MANUAL${suffix}`], 4000)?.replace(/\.[a-z]$/iu, '.');
     if (!text) continue;
 
     steps.push({
@@ -60,9 +88,11 @@ function mapSteps(row) {
 }
 
 export function mapPublicRecipe(row = {}) {
-  const externalId = emptyToNull(row.RCP_SEQ);
-  const name = emptyToNull(row.RCP_NM);
-  const ingredientsText = emptyToNull(row.RCP_PARTS_DTLS);
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+
+  const externalId = normalizeExternalId(row.RCP_SEQ);
+  const name = emptyToNull(row.RCP_NM, 200);
+  const ingredientsText = emptyToNull(row.RCP_PARTS_DTLS, 20_000);
   const steps = mapSteps(row);
   const imageLargeUrl = normalizePublicUrl(row.ATT_FILE_NO_MK);
   const imageSmallUrl = normalizePublicUrl(row.ATT_FILE_NO_MAIN);
@@ -74,9 +104,9 @@ export function mapPublicRecipe(row = {}) {
   return {
     externalId,
     name,
-    cookingMethod: emptyToNull(row.RCP_WAY2),
-    dishType: emptyToNull(row.RCP_PAT2),
-    servingWeight: emptyToNull(row.INFO_WGT),
+    cookingMethod: emptyToNull(row.RCP_WAY2, 100),
+    dishType: emptyToNull(row.RCP_PAT2, 100),
+    servingWeight: emptyToNull(row.INFO_WGT, 100),
     nutrition: {
       calories: parseNumeric(row.INFO_ENG),
       carbohydrate: parseNumeric(row.INFO_CAR),
@@ -84,7 +114,7 @@ export function mapPublicRecipe(row = {}) {
       fat: parseNumeric(row.INFO_FAT),
       sodium: parseNumeric(row.INFO_NA)
     },
-    hashTags: String(row.HASH_TAG || '')
+    hashTags: String(emptyToNull(row.HASH_TAG, 500) || '')
       .split(/[,#]/u)
       .map((tag) => tag.trim())
       .filter(Boolean),
@@ -92,7 +122,7 @@ export function mapPublicRecipe(row = {}) {
     imageLargeUrl,
     ingredientsText,
     steps,
-    sodiumTip: emptyToNull(row.RCP_NA_TIP),
+    sodiumTip: emptyToNull(row.RCP_NA_TIP, 2000),
     source: '식품의약품안전처 조리식품의 레시피 DB',
     sourceUrl: SOURCE_URL
   };
@@ -101,17 +131,57 @@ export function mapPublicRecipe(row = {}) {
 export function parseArgs(argv = process.argv.slice(2)) {
   const limitArg = argv.find((arg) => arg.startsWith('--limit='));
   const parsedLimit = Number.parseInt(limitArg?.slice('--limit='.length) || '', 10);
+  const writeFromArg = argv.find((arg) => arg.startsWith('--write-from='));
+
+  if (argv.includes('--write')) {
+    throw new Error('Direct network-to-file export is disabled. Review a --print-review file, then use --write-from=.');
+  }
 
   return {
-    write: argv.includes('--write'),
+    printReview: argv.includes('--print-review'),
+    writeFrom: writeFromArg?.slice('--write-from='.length).trim() || '',
     limit: Number.isFinite(parsedLimit) ? Math.max(1, Math.min(MAX_LIMIT, parsedLimit)) : DEFAULT_LIMIT
   };
 }
 
+async function readBoundedResponseText(response) {
+  if (typeof response.body?.getReader !== 'function') {
+    const text = await response.text();
+    if (Buffer.byteLength(text, 'utf8') > MAX_API_RESPONSE_BYTES) {
+      throw new Error('Food Safety Korea response exceeded the safe size limit.');
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let byteLength = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    byteLength += value.byteLength;
+    if (byteLength > MAX_API_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error('Food Safety Korea response exceeded the safe size limit.');
+    }
+    chunks.push(Buffer.from(value));
+  }
+
+  return Buffer.concat(chunks, byteLength).toString('utf8');
+}
+
 async function fetchRows(apiKey, limit) {
   const url = `${API_BASE_URL}/${apiKey}/${DATASET_ID}/json/1/${limit}`;
-  const response = await fetch(url);
-  const responseText = await response.text();
+  const response = await fetch(url, { redirect: 'error' });
+  const declaredLength = Number(response.headers?.get?.('content-length'));
+
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_API_RESPONSE_BYTES) {
+    throw new Error('Food Safety Korea response exceeded the safe size limit.');
+  }
+
+  const responseText = await readBoundedResponseText(response);
 
   if (!response.ok) {
     throw new Error(`Food Safety Korea request failed with status ${response.status}.`);
@@ -126,22 +196,86 @@ async function fetchRows(apiKey, limit) {
   return Array.isArray(payload?.[DATASET_ID]?.row) ? payload[DATASET_ID].row : [];
 }
 
+function resolveReviewFilePath(reviewFile) {
+  const workspaceRoot = resolve(process.cwd());
+  const reviewPath = resolve(workspaceRoot, reviewFile);
+  const workspaceRelativePath = relative(workspaceRoot, reviewPath);
+
+  if (
+    !reviewFile ||
+    isAbsolute(workspaceRelativePath) ||
+    workspaceRelativePath === '..' ||
+    workspaceRelativePath.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) ||
+    !reviewPath.toLowerCase().endsWith('.json')
+  ) {
+    throw new Error('The reviewed recipe file must be a JSON file inside the workspace.');
+  }
+
+  return reviewPath;
+}
+
+async function readReviewedRows(reviewFile) {
+  const reviewPath = resolveReviewFilePath(reviewFile);
+  const reviewStats = await lstat(reviewPath);
+  if (reviewStats.isSymbolicLink() || !reviewStats.isFile() || reviewStats.size > MAX_REVIEW_FILE_BYTES) {
+    throw new Error('The reviewed recipe file is not a bounded regular file.');
+  }
+
+  const rows = JSON.parse(await readFile(reviewPath, 'utf8'));
+  if (!Array.isArray(rows) || rows.length > MAX_LIMIT) {
+    throw new Error(`The reviewed recipe file must contain at most ${MAX_LIMIT} rows.`);
+  }
+
+  return rows;
+}
+
+async function assertSafeOutputTarget() {
+  const outputDirectory = dirname(PUBLIC_RECIPES_OUTPUT_PATH);
+  await mkdir(outputDirectory, { recursive: true });
+
+  const directoryStats = await lstat(outputDirectory);
+  if (directoryStats.isSymbolicLink() || !directoryStats.isDirectory()) {
+    throw new Error('The public recipe output directory must be a regular repository directory.');
+  }
+
+  try {
+    const outputStats = await lstat(PUBLIC_RECIPES_OUTPUT_PATH);
+    if (outputStats.isSymbolicLink() || !outputStats.isFile()) {
+      throw new Error('The public recipe output must be a regular repository file.');
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+}
+
+export async function writeReviewedPublicRecipes(reviewFile) {
+  const rows = await readReviewedRows(reviewFile);
+  const recipes = rows.map(mapPublicRecipe).filter(Boolean);
+
+  await assertSafeOutputTarget();
+  await writeFile(PUBLIC_RECIPES_OUTPUT_PATH, `${JSON.stringify(recipes, null, 2)}\n`, 'utf8');
+
+  console.log(
+    `Reviewed public recipe import: reviewed=${rows.length} ready=${recipes.length} output=src/data/publicRecipes.json`
+  );
+  return recipes;
+}
+
 export async function exportPublicRecipes(options = parseArgs()) {
+  if (options.writeFrom) return writeReviewedPublicRecipes(options.writeFrom);
+
   const apiKey = String(process.env.FOODSAFETY_API_KEY || '').trim();
   if (!apiKey) throw new Error('FOODSAFETY_API_KEY is required.');
 
   const rows = await fetchRows(apiKey, options.limit);
   const recipes = rows.map(mapPublicRecipe).filter(Boolean);
-  const outputPath = resolve(process.cwd(), 'src/data/publicRecipes.json');
 
-  if (options.write) {
-    await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, `${JSON.stringify(recipes, null, 2)}\n`, 'utf8');
+  if (options.printReview) {
+    console.log(JSON.stringify(rows, null, 2));
   }
 
-  console.log(
-    `Public recipe export: fetched=${rows.length} ready=${recipes.length} write=${options.write} output=src/data/publicRecipes.json`
-  );
+  const log = options.printReview ? console.error : console.log;
+  log(`Public recipe preview: fetched=${rows.length} ready=${recipes.length} write=false`);
 
   return recipes;
 }

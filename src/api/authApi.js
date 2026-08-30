@@ -45,8 +45,18 @@ export function getCurrentUser() {
   return requestJson('/auth/me', {}, { authMode: 'required', errorClass: AuthApiError });
 }
 
-export function exportUserData() {
-  return requestJson('/auth/data-export', {}, { authMode: 'required', errorClass: AuthApiError });
+export function exportUserData(password) {
+  return requestJson(
+    '/auth/data-export',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ password })
+    },
+    { authMode: 'required', errorClass: AuthApiError }
+  );
 }
 
 export function deleteAccount(password) {

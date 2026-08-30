@@ -11,8 +11,21 @@ import {
 import { createAuthRateLimit } from '../middleware/authRateLimit.js';
 import { getClientAddress } from '../middleware/rateLimit.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { normalizeEmail } from '../lib/authValidation.js';
+import { serverConfig } from '../config.js';
 
 export const authRoutes = Router();
+
+export function enforcePublicSignupPolicy(_request, response, next) {
+  if (serverConfig.publicSignupEnabled) {
+    next();
+    return;
+  }
+
+  response.status(503).json({
+    message: 'New account registration is temporarily unavailable.'
+  });
+}
 
 const signupIpRateLimit = createAuthRateLimit({
   limit: 5,
@@ -25,7 +38,7 @@ const signupEmailRateLimit = createAuthRateLimit({
   limit: 3,
   windowMs: 15 * 60 * 1000,
   scope: 'signup-email',
-  key: (request) => request.body?.email || ''
+  key: (request) => `${getClientAddress(request)}:${request.body?.email || ''}`
 });
 
 const loginIpRateLimit = createAuthRateLimit({
@@ -39,7 +52,35 @@ const loginEmailRateLimit = createAuthRateLimit({
   limit: 5,
   windowMs: 15 * 60 * 1000,
   scope: 'login-email',
-  key: (request) => request.body?.email || ''
+  key: (request) => `${getClientAddress(request)}:${normalizeEmail(request.body?.email)}`
+});
+
+const refreshIpBurstRateLimit = createAuthRateLimit({
+  limit: 120,
+  windowMs: 60 * 1000,
+  scope: 'refresh-ip-minute',
+  key: getClientAddress
+});
+
+const refreshIpHourlyRateLimit = createAuthRateLimit({
+  limit: 1_200,
+  windowMs: 60 * 60 * 1000,
+  scope: 'refresh-ip-hour',
+  key: getClientAddress
+});
+
+const logoutIpBurstRateLimit = createAuthRateLimit({
+  limit: 120,
+  windowMs: 60 * 1000,
+  scope: 'logout-ip-minute',
+  key: getClientAddress
+});
+
+const logoutIpHourlyRateLimit = createAuthRateLimit({
+  limit: 1_200,
+  windowMs: 60 * 60 * 1000,
+  scope: 'logout-ip-hour',
+  key: getClientAddress
 });
 
 const accountDeletionIpRateLimit = createAuthRateLimit({
@@ -56,11 +97,64 @@ const accountDeletionUserRateLimit = createAuthRateLimit({
   key: (request) => request.auth?.userId || ''
 });
 
-authRoutes.post('/signup', signupIpRateLimit, signupEmailRateLimit, signupHandler);
-authRoutes.post('/login', loginIpRateLimit, loginEmailRateLimit, loginHandler);
-authRoutes.post('/refresh', refreshSessionHandler);
-authRoutes.get('/me', requireAuth, getCurrentUserHandler);
-authRoutes.get('/data-export', requireAuth, exportUserDataHandler);
+const dataExportIpRateLimit = createAuthRateLimit({
+  limit: 10,
+  windowMs: 15 * 60 * 1000,
+  scope: 'data-export-ip',
+  key: getClientAddress
+});
+
+const dataExportUserRateLimit = createAuthRateLimit({
+  limit: 3,
+  windowMs: 15 * 60 * 1000,
+  scope: 'data-export-user',
+  key: (request) => request.auth?.userId || ''
+});
+
+const currentUserRateLimit = createAuthRateLimit({
+  limit: 120,
+  windowMs: 60 * 1000,
+  scope: 'auth-me-user-minute',
+  key: (request) => request.auth?.userId || ''
+});
+
+const currentUserClientRateLimit = createAuthRateLimit({
+  limit: 6_000,
+  windowMs: 60 * 1000,
+  scope: 'auth-me-client-minute',
+  key: getClientAddress
+});
+
+authRoutes.post(
+  '/signup',
+  enforcePublicSignupPolicy,
+  signupIpRateLimit,
+  signupEmailRateLimit,
+  signupHandler
+);
+authRoutes.post(
+  '/login',
+  // These source-scoped guards run before the expensive password check. The
+  // distributed account bucket is consumed only after a failed check.
+  loginIpRateLimit,
+  loginEmailRateLimit,
+  loginHandler
+);
+authRoutes.post('/refresh', refreshIpBurstRateLimit, refreshIpHourlyRateLimit, refreshSessionHandler);
+authRoutes.get(
+  '/me',
+  requireAuth,
+  currentUserRateLimit,
+  currentUserClientRateLimit,
+  getCurrentUserHandler
+);
+authRoutes.post(
+  '/data-export',
+  requireAuth,
+  dataExportIpRateLimit,
+  dataExportUserRateLimit,
+  exportUserDataHandler
+);
 authRoutes.delete(
   '/account',
   requireAuth,
@@ -68,4 +162,4 @@ authRoutes.delete(
   accountDeletionUserRateLimit,
   deleteUserAccountHandler
 );
-authRoutes.post('/logout', logoutHandler);
+authRoutes.post('/logout', logoutIpBurstRateLimit, logoutIpHourlyRateLimit, logoutHandler);

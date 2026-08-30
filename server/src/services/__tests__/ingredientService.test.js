@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMock = {
   ingredient: {
+    count: vi.fn(),
     create: vi.fn(),
     deleteMany: vi.fn(),
     findFirst: vi.fn(),
@@ -41,6 +42,7 @@ describe('ingredientService', () => {
     vi.setSystemTime(new Date('2026-08-26T12:00:00.000Z'));
     vi.clearAllMocks();
     prismaMock.$queryRaw.mockResolvedValue([{ set_config: 'user-1' }]);
+    prismaMock.ingredient.count.mockResolvedValue(0);
     prismaMock.ingredient.deleteMany.mockResolvedValue({ count: 1 });
     prismaMock.ingredient.findFirst.mockResolvedValue(null);
     prismaMock.ingredient.updateMany.mockResolvedValue({ count: 1 });
@@ -62,7 +64,7 @@ describe('ingredientService', () => {
       data: expect.objectContaining({ clientId: 'local-1', userId: 'user-1' })
     });
     expect(prismaMock.$transaction).toHaveBeenCalledWith(expect.any(Function));
-    expect(prismaMock.$queryRaw).toHaveBeenCalledOnce();
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ items: [], appliedCount: 1 });
   });
 
@@ -105,9 +107,107 @@ describe('ingredientService', () => {
     ]);
 
     expect(prismaMock.ingredient.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ deletedAt: '2026-08-26T11:00:00.000Z', userId: 'user-1' })
+      data: {
+        clientId: 'deleted',
+        name: null,
+        category: null,
+        storageType: null,
+        quantity: null,
+        purchaseDate: null,
+        expiryDate: null,
+        memo: null,
+        consumed: null,
+        createdAt: null,
+        updatedAt: '2026-08-26T11:00:00.000Z',
+        deletedAt: '2026-08-26T11:00:00.000Z',
+        userId: 'user-1'
+      }
     });
     expect(prismaMock.ingredient.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('serializes legacy full tombstones as identity and ordering metadata only', async () => {
+    prismaMock.ingredient.findMany.mockResolvedValue([
+      createIngredient('server-delete', {
+        clientId: 'deleted',
+        userId: 'user-1',
+        memo: 'legacy private memo',
+        updatedAt: new Date('2026-08-26T11:00:00.000Z'),
+        deletedAt: new Date('2026-08-26T11:00:00.000Z')
+      })
+    ]);
+    const { listIngredientSyncState, syncIngredientChanges } = await import('../ingredientService.js');
+
+    const expectedTombstone = {
+      id: 'server-delete',
+      clientId: 'deleted',
+      userId: 'user-1',
+      updatedAt: new Date('2026-08-26T11:00:00.000Z'),
+      deletedAt: new Date('2026-08-26T11:00:00.000Z')
+    };
+    await expect(listIngredientSyncState('user-1')).resolves.toEqual([expectedTombstone]);
+    await expect(syncIngredientChanges('user-1', [])).resolves.toEqual({
+      items: [expectedTombstone],
+      appliedCount: 0
+    });
+  });
+
+  it('treats an existing tombstone as terminal even when an active device copy is newer', async () => {
+    prismaMock.ingredient.findFirst.mockResolvedValue(createIngredient('server-delete', {
+      clientId: 'deleted',
+      deletedAt: new Date('2026-08-26T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-26T10:00:00.000Z')
+    }));
+    const { syncIngredientChanges } = await import('../ingredientService.js');
+
+    const result = await syncIngredientChanges('user-1', [
+      createIngredient('stale-active', {
+        clientId: 'deleted',
+        name: 'must-not-return',
+        updatedAt: '2026-08-26T11:00:00.000Z'
+      })
+    ]);
+
+    expect(result.appliedCount).toBe(0);
+    expect(prismaMock.ingredient.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.ingredient.create).not.toHaveBeenCalled();
+  });
+
+  it('scrubs every business field when a deletion tombstone updates an active row', async () => {
+    prismaMock.ingredient.findFirst.mockResolvedValue(createIngredient('server-active', {
+      clientId: 'deleted',
+      updatedAt: new Date('2026-08-26T10:00:00.000Z')
+    }));
+    const { syncIngredientChanges } = await import('../ingredientService.js');
+
+    await syncIngredientChanges('user-1', [createIngredient('local-delete', {
+      clientId: 'deleted',
+      memo: 'must-not-survive',
+      updatedAt: '2026-08-26T11:00:00.000Z',
+      deletedAt: '2026-08-26T11:00:00.000Z'
+    })]);
+
+    expect(prismaMock.ingredient.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        clientId: 'deleted',
+        updatedAt: { lt: new Date('2026-08-26T11:00:00.000Z') }
+      },
+      data: {
+        clientId: 'deleted',
+        name: null,
+        category: null,
+        storageType: null,
+        quantity: null,
+        purchaseDate: null,
+        expiryDate: null,
+        memo: null,
+        consumed: null,
+        createdAt: null,
+        updatedAt: '2026-08-26T11:00:00.000Z',
+        deletedAt: '2026-08-26T11:00:00.000Z'
+      }
+    });
   });
 
   it('scopes sync lookups, writes, and returned state to the authenticated user', async () => {
@@ -179,6 +279,132 @@ describe('ingredientService', () => {
     expect(prismaMock.ingredient.updateMany).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [
+      'bulk',
+      () => import('../ingredientService.js').then(({ createIngredientsBulk }) =>
+        createIngredientsBulk(
+          'user-1',
+          Array.from({ length: 51 }, (_, index) => createIngredient(`bulk-${index}`))
+        ))
+    ],
+    [
+      'sync',
+      () => import('../ingredientService.js').then(({ syncIngredientChanges }) =>
+        syncIngredientChanges(
+          'user-1',
+          Array.from({ length: 51 }, (_, index) => createIngredient(`sync-${index}`))
+        ))
+    ]
+  ])('rejects a %s batch above 50 items before opening a transaction', async (_label, operation) => {
+    await expect(operation()).rejects.toMatchObject({ status: 400 });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects null and array ingredient bodies before opening a transaction', async () => {
+    const { createIngredient, updateIngredientById } = await import('../ingredientService.js');
+
+    await expect(createIngredient('user-1', null)).rejects.toMatchObject({
+      status: 400,
+      message: 'Ingredient must be an object.'
+    });
+    await expect(updateIngredientById('user-1', 'ingredient-1', [])).rejects.toMatchObject({
+      status: 400,
+      message: 'Ingredient must be an object.'
+    });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('counts active and deleted rows together and rejects a create at the account quota', async () => {
+    prismaMock.ingredient.count.mockResolvedValue(5_000);
+    const { createIngredient: createIngredientService } = await import('../ingredientService.js');
+
+    await expect(createIngredientService('user-1', createIngredient('over-quota'))).rejects.toMatchObject({
+      status: 409,
+      message: 'Ingredient storage is limited to 5000 records, including deleted items.'
+    });
+    expect(prismaMock.ingredient.count).toHaveBeenCalledWith({ where: { userId: 'user-1' } });
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prismaMock.ingredient.create).not.toHaveBeenCalled();
+  });
+
+  it('serializes quota checks with a transaction-scoped advisory lock', async () => {
+    const { createIngredient: createIngredientService } = await import('../ingredientService.js');
+
+    await createIngredientService('user-1', createIngredient('within-quota'));
+
+    const [quotaLockQuery, ...quotaLockValues] = prismaMock.$queryRaw.mock.calls[1] || [];
+    expect(quotaLockQuery?.join('')).toContain(
+      'SELECT pg_advisory_xact_lock(hashtextextended(, 0))::text AS "lock"'
+    );
+    expect(quotaLockValues).toEqual(['user-1']);
+  });
+
+  it('rejects a bulk create when the entire batch would cross the account quota', async () => {
+    prismaMock.ingredient.count.mockResolvedValue(4_999);
+    const { createIngredientsBulk } = await import('../ingredientService.js');
+
+    await expect(
+      createIngredientsBulk('user-1', [createIngredient('one'), createIngredient('two')])
+    ).rejects.toMatchObject({ status: 409 });
+    expect(prismaMock.ingredient.create).not.toHaveBeenCalled();
+  });
+
+  it('allows an existing sync update when the account is already at the quota', async () => {
+    prismaMock.ingredient.count.mockResolvedValue(5_000);
+    prismaMock.ingredient.findFirst.mockResolvedValue(
+      createIngredient('server-id', {
+        clientId: 'existing',
+        updatedAt: new Date('2026-08-26T10:00:00.000Z')
+      })
+    );
+    const { syncIngredientChanges } = await import('../ingredientService.js');
+
+    await expect(
+      syncIngredientChanges('user-1', [
+        createIngredient('local-existing', {
+          clientId: 'existing',
+          updatedAt: '2026-08-26T11:00:00.000Z'
+        })
+      ])
+    ).resolves.toMatchObject({ appliedCount: 1 });
+    expect(prismaMock.ingredient.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ clientId: 'existing', userId: 'user-1' }) })
+    );
+    expect(prismaMock.ingredient.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a new sync row when the account is already at the quota', async () => {
+    prismaMock.ingredient.count.mockResolvedValue(5_000);
+    prismaMock.ingredient.findFirst.mockResolvedValue(null);
+    const { syncIngredientChanges } = await import('../ingredientService.js');
+
+    await expect(
+      syncIngredientChanges('user-1', [
+        createIngredient('new-row', { updatedAt: '2026-08-26T11:00:00.000Z' })
+      ])
+    ).rejects.toMatchObject({ status: 409 });
+    expect(prismaMock.ingredient.create).not.toHaveBeenCalled();
+  });
+
+  it('cannot resurrect a concurrently inserted tombstone in the unique-conflict retry', async () => {
+    prismaMock.ingredient.findFirst.mockResolvedValue(null);
+    prismaMock.ingredient.create.mockRejectedValue(Object.assign(new Error('Unique conflict.'), { code: 'P2002' }));
+    prismaMock.ingredient.updateMany.mockResolvedValue({ count: 0 });
+    const { syncIngredientChanges } = await import('../ingredientService.js');
+
+    await expect(syncIngredientChanges('user-1', [
+      createIngredient('racing-active', { updatedAt: '2026-08-26T11:00:00.000Z' })
+    ])).resolves.toMatchObject({ appliedCount: 0 });
+
+    expect(prismaMock.ingredient.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        clientId: 'racing-active',
+        deletedAt: null
+      })
+    }));
+  });
+
   it('fails before writing when the deployed schema does not have the sync column', async () => {
     const missingColumnError = Object.assign(new Error('Missing column.'), { code: 'P2022' });
     prismaMock.ingredient.findFirst.mockRejectedValue(missingColumnError);
@@ -210,7 +436,8 @@ describe('ingredientService', () => {
         where: {
           userId: 'user-1',
           clientId: 'shared',
-          updatedAt: { lt: new Date('2026-08-26T11:00:00.000Z') }
+          updatedAt: { lt: new Date('2026-08-26T11:00:00.000Z') },
+          deletedAt: null
         }
       })
     );
@@ -235,7 +462,8 @@ describe('ingredientService', () => {
     expect(prismaMock.ingredient.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'ingredient-1',
-        userId: 'user-1'
+        userId: 'user-1',
+        deletedAt: null
       },
       data: expect.objectContaining({
         name: 'updated ingredient'
@@ -254,6 +482,9 @@ describe('ingredientService', () => {
       status: 404,
       message: 'Ingredient not found.'
     });
+    expect(prismaMock.ingredient.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'ingredient-1', userId: 'user-1', deletedAt: null }
+    }));
   });
 
   it('soft deletes only when both ingredient id and authenticated user match', async () => {
@@ -268,6 +499,15 @@ describe('ingredientService', () => {
         deletedAt: null
       },
       data: {
+        name: null,
+        category: null,
+        storageType: null,
+        quantity: null,
+        purchaseDate: null,
+        expiryDate: null,
+        memo: null,
+        consumed: null,
+        createdAt: null,
         deletedAt: expect.any(Date),
         updatedAt: expect.any(Date)
       }

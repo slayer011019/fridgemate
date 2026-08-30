@@ -1,3 +1,5 @@
+import { parseExpirySeconds } from './lib/token.js';
+
 const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -6,6 +8,8 @@ const DEFAULT_ALLOWED_ORIGINS = [
 ];
 
 const REQUIRED_ENV_VARS = ['JWT_SECRET', 'DATABASE_URL'];
+const DEFAULT_JWT_EXPIRES_IN = '15m';
+const DEFAULT_REFRESH_TOKEN_EXPIRES_IN = '30d';
 
 function splitEnvList(value) {
   return String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
@@ -27,6 +31,17 @@ function buildOriginMatcher(pattern) {
   return (origin) => regex.test(origin);
 }
 
+function isExactSecureOrigin(value) {
+  if (!value || value.includes('*')) return false;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.origin === value;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function runtimeValue(runtimeEnv, name) {
   return runtimeEnv?.[name] ?? process.env[name];
 }
@@ -45,18 +60,26 @@ function nonNegativeNumber(value, fallback = 0) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+function explicitBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  return String(value).trim().toLowerCase() === 'true';
+}
+
 function createServerConfig(runtimeEnv = process.env) {
   const configuredAllowedOrigins = splitEnvList(runtimeValue(runtimeEnv, 'ALLOWED_ORIGINS'));
   const clientOrigin = runtimeValue(runtimeEnv, 'CLIENT_ORIGIN') || 'http://localhost:5173';
   const hyperdrive = runtimeEnv?.HYPERDRIVE;
   const databaseUrl = hyperdrive ? '' : runtimeValue(runtimeEnv, 'DATABASE_URL') || '';
+  const nodeEnv = runtimeValue(runtimeEnv, 'NODE_ENV') || 'development';
+  const configuredRefreshTokenExpiresIn = runtimeValue(runtimeEnv, 'REFRESH_TOKEN_EXPIRES_IN');
+  const configuredJwtRefreshExpiresIn = runtimeValue(runtimeEnv, 'JWT_REFRESH_EXPIRES_IN');
   const allowedOrigins = configuredAllowedOrigins.length
     ? configuredAllowedOrigins
     : uniqueValues([clientOrigin, ...DEFAULT_ALLOWED_ORIGINS]);
 
   return {
     runtime: hyperdrive ? 'cloudflare' : 'node',
-    nodeEnv: runtimeValue(runtimeEnv, 'NODE_ENV') || 'development',
+    nodeEnv,
     host: runtimeValue(runtimeEnv, 'HOST') || '0.0.0.0',
     port: Number(runtimeValue(runtimeEnv, 'PORT') || 4000),
     clientOrigin,
@@ -65,10 +88,13 @@ function createServerConfig(runtimeEnv = process.env) {
     databaseUrlProvider: hyperdrive ? () => hyperdrive.connectionString : null,
     databaseConfigured: Boolean(hyperdrive || databaseUrl),
     jwtSecret: runtimeValue(runtimeEnv, 'JWT_SECRET'),
-    jwtExpiresIn: runtimeValue(runtimeEnv, 'JWT_EXPIRES_IN') || '15m',
+    jwtExpiresIn: runtimeValue(runtimeEnv, 'JWT_EXPIRES_IN') ?? DEFAULT_JWT_EXPIRES_IN,
     jwtIssuer: runtimeValue(runtimeEnv, 'JWT_ISSUER') || 'fridgemate-api',
     jwtAudience: runtimeValue(runtimeEnv, 'JWT_AUDIENCE') || 'fridgemate-client',
-    refreshTokenExpiresIn: runtimeValue(runtimeEnv, 'REFRESH_TOKEN_EXPIRES_IN') || '30d',
+    refreshTokenExpiresIn:
+      configuredRefreshTokenExpiresIn ??
+      configuredJwtRefreshExpiresIn ??
+      DEFAULT_REFRESH_TOKEN_EXPIRES_IN,
     accessTokenCookieName: runtimeValue(runtimeEnv, 'ACCESS_TOKEN_COOKIE_NAME') || 'fridgemate_access',
     refreshTokenCookieName: runtimeValue(runtimeEnv, 'REFRESH_TOKEN_COOKIE_NAME') || 'fridgemate_refresh',
     authCookieSecure:
@@ -76,6 +102,10 @@ function createServerConfig(runtimeEnv = process.env) {
     authCookieSameSite: normalizeSameSite(runtimeValue(runtimeEnv, 'AUTH_COOKIE_SAME_SITE')),
     redisUrl: runtimeValue(runtimeEnv, 'REDIS_URL') || '',
     authRedisPrefix: runtimeValue(runtimeEnv, 'AUTH_REDIS_PREFIX') || 'fridgemate:auth',
+    publicSignupEnabled: explicitBoolean(
+      runtimeValue(runtimeEnv, 'PUBLIC_SIGNUP_ENABLED'),
+      nodeEnv !== 'production'
+    ),
     anthropicApiKey: runtimeValue(runtimeEnv, 'ANTHROPIC_API_KEY') || '',
     openAiApiKey: runtimeValue(runtimeEnv, 'OPENAI_API_KEY') || '',
     openaiApiKey: runtimeValue(runtimeEnv, 'OPENAI_API_KEY') || '',
@@ -84,8 +114,19 @@ function createServerConfig(runtimeEnv = process.env) {
     recipeEmbeddingPricePerMillionTokens: nonNegativeNumber(
       runtimeValue(runtimeEnv, 'RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS')
     ),
+    externalAiDataProcessingEnabled: explicitBoolean(
+      runtimeValue(runtimeEnv, 'EXTERNAL_AI_DATA_PROCESSING_ENABLED')
+    ),
     semanticRecipeApiEnabled:
       String(runtimeValue(runtimeEnv, 'SEMANTIC_RECIPE_API_ENABLED') || 'false').toLowerCase() === 'true',
+    recommendationEventsEnabled:
+      String(runtimeValue(runtimeEnv, 'RECOMMENDATION_EVENTS_ENABLED') || 'false').toLowerCase() === 'true',
+    productEventsEnabled:
+      String(runtimeValue(runtimeEnv, 'PRODUCT_EVENTS_ENABLED') || 'false').toLowerCase() === 'true',
+    importCorrectionLearningEnabled:
+      String(runtimeValue(runtimeEnv, 'IMPORT_CORRECTION_LEARNING_ENABLED') || 'false').toLowerCase() === 'true',
+    importCorrectionEmbeddingEnabled:
+      String(runtimeValue(runtimeEnv, 'IMPORT_CORRECTION_EMBEDDING_ENABLED') || 'false').toLowerCase() === 'true',
     aiUsageLoggingEnabled:
       String(runtimeValue(runtimeEnv, 'AI_USAGE_LOGGING_ENABLED') || 'false').toLowerCase() === 'true',
     apiSlowRequestMs: nonNegativeNumber(runtimeValue(runtimeEnv, 'API_SLOW_REQUEST_MS'), 1500),
@@ -111,12 +152,32 @@ export function validateServerConfig({ exitOnError = true } = {}) {
   const missingEnvVars = REQUIRED_ENV_VARS.filter((name) => !String(values[name] || '').trim());
   const errors = missingEnvVars.map((name) => `${name} is required. Set it in your environment variables.`);
 
+  const expirySettings = [
+    ['JWT_EXPIRES_IN', serverConfig.jwtExpiresIn],
+    ['REFRESH_TOKEN_EXPIRES_IN (or JWT_REFRESH_EXPIRES_IN)', serverConfig.refreshTokenExpiresIn]
+  ];
+
+  for (const [name, value] of expirySettings) {
+    try {
+      parseExpirySeconds(value);
+    } catch (_error) {
+      errors.push(`${name} must be a positive integer followed by s, m, h, or d.`);
+    }
+  }
+
   if (String(serverConfig.jwtSecret || '').trim().length < 32 && !missingEnvVars.includes('JWT_SECRET')) {
     errors.push('JWT_SECRET must be at least 32 characters long.');
   }
 
   if (serverConfig.runtime === 'node' && serverConfig.nodeEnv === 'production' && !serverConfig.redisUrl) {
     errors.push('REDIS_URL is required for a production Node server.');
+  }
+
+  if (
+    serverConfig.nodeEnv === 'production' &&
+    serverConfig.allowedOrigins.some((origin) => !isExactSecureOrigin(origin))
+  ) {
+    errors.push('ALLOWED_ORIGINS must contain only exact HTTPS origins in production.');
   }
 
   if (!['Lax', 'Strict', 'None'].includes(serverConfig.authCookieSameSite)) {

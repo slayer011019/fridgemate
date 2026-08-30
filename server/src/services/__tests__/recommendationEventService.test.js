@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeRecommendationEventPayload } from '../recommendationEventService.js';
+import {
+  createRecommendationEvent,
+  normalizeRecommendationEventPayload
+} from '../recommendationEventService.js';
 
 const VALID_PAYLOAD = {
   eventType: 'impression',
   recipeId: 'recipe-1',
+  clientEventId: 'event-1234-abcd',
   sessionId: 'fm-1234-abcd',
   rank: 1,
   score: 85.5,
@@ -14,7 +18,8 @@ const VALID_PAYLOAD = {
   source: 'hybrid',
   metadata: {
     recipeName: '김치볶음밥',
-    group: 'useSoon'
+    group: 'useSoon',
+    screen: 'home'
   }
 };
 
@@ -33,5 +38,16 @@ describe('recommendationEventService validation', () => {
     ['non-boolean flags', { ...VALID_PAYLOAD, canMakeNow: 'true' }]
   ])('rejects %s', (_label, payload) => {
     expect(() => normalizeRecommendationEventPayload(payload)).toThrow();
+  });
+
+  it('rejects anonymous writes before opening a database scope', async () => {
+    await expect(createRecommendationEvent({ body: VALID_PAYLOAD })).rejects.toMatchObject({
+      status: 401,
+      message: 'Authentication is required.'
+    });
+  });
+
+  it.each(['select', 'dismiss', 'external_open', 'complete'])('accepts the %s menu action', (eventType) => {
+    expect(normalizeRecommendationEventPayload({ ...VALID_PAYLOAD, eventType }).eventType).toBe(eventType);
   });
 });

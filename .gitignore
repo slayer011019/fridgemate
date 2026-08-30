@@ -6,6 +6,7 @@ dist/
 .env.*
 !.env.example
 !.env.production
+!.env.staging.example
 
 # Logs
 *.log
@@ -19,6 +20,7 @@ pnpm-debug.log*
 .vite/
 .wrangler-state/
 .wrangler/
+wrangler.staging.jsonc
 supabase/.temp/
 coverage/
 
@@ -61,6 +63,7 @@ playwright/.cache/
 # 번들 분석
 stats.html
 bundle-stats.json
+*.cpuprofile
 # Local code review graph
 .code-review-graph/
 

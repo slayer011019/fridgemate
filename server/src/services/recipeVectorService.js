@@ -4,6 +4,11 @@ import {
 } from '../../../src/features/recipes/recipeIngredientClassification.js';
 import { generateRecipeSearchLinks } from '../../../src/features/recipes/recipeSearchLinks.js';
 import { generateRecipeEmbedding } from './recipeEmbeddingService.js';
+import {
+  EXTERNAL_AI_ACTIONS,
+  assertExternalAiOperationAllowed,
+  normalizeExternalAiText
+} from '../lib/externalAiPrivacy.js';
 
 function clampLimit(limit) {
   const parsed = Number(limit);
@@ -85,9 +90,16 @@ function mapVectorRow(row = {}) {
  * @returns {Promise<Array<{recipeId: string, name: string, vectorScore: number}>>}
  */
 export async function searchSimilarRecipesByVector(queryText, limit = 20, options = {}) {
+  assertExternalAiOperationAllowed(options.externalAi, EXTERNAL_AI_ACTIONS.semanticRecipes);
+  const providerQueryText = normalizeExternalAiText(
+    String(queryText || '').replace(/[\r\n\t]+/g, ' '),
+    'Semantic recipe query',
+    { maxLength: 4096 }
+  );
+
   const prismaClient = await getPrismaClient(options);
   const { model, dimensions } = getSearchConfig(options);
-  const embedding = await (options.generateEmbedding || generateRecipeEmbedding)(queryText, {
+  const embedding = await (options.generateEmbedding || generateRecipeEmbedding)(providerQueryText, {
     model,
     dimensions
   });

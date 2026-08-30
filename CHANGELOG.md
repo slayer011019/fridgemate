@@ -7,8 +7,37 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+### Added
+
+- Added a local-first daily menu decision loop with Korean calendar dates, one menu per user/day, explicit completion and cancellation, guest import, IndexedDB persistence, and retryable server writes.
+- Added authenticated pantry ownership and lightweight preference storage, structured preference-aware recommendation reasons, and bounded idempotent product-event ingestion.
+- Extended recommendation events with select, dismiss, external-open, and completion actions, client-generated idempotency keys, safe catalog recipe links, and aggregate funnel/join auditing in the training export.
+- Added staging-only Cloudflare configuration guidance and a semantic release/rollback runbook that forbids production user-data copies and keeps AdSense disabled.
+
+### Changed
+
+- Updated recipe-search documentation to separate historical staged-backfill checkpoints from the final 1,166-current-vector state.
+
 ### Fixed
 
+- Normalized the Cloudflare training-crawler WAF rule with `lower(http.user_agent)` for GPTBot, CCBot, and Google-Extended, closing lowercase and mixed-case User-Agent bypasses while preserving search-crawler access.
+- Replaced attacker-controlled unknown URL segments in request telemetry with fixed `/api/unknown` or `/unknown` groups so 404 probes cannot inject personal data or unbounded labels into platform logs.
+- Removed per-request reads and deletes of legacy raw Redis auth keys so login email, client addresses, and token IDs never re-enter Redis commands after opaque-key migration.
+- Clear the in-memory analytics event buffer, Google Analytics loader, `dataLayer`, `gtag`, and readable GA cookies when consent is withdrawn, in addition to deleting local identifiers and denying future storage.
+- Added end-to-end deadlines for OpenAI and Anthropic requests, sanitized provider failures without reading error bodies, and gave the operator embedding backfill a bounded per-attempt timeout.
+- Made MFDS recipe seeding and ingredient parsing dry-run by default, gated writes behind an exact Supabase project-ref confirmation, restricted source fetches and redirects to the trusted HTTPS origin with bounded schema validation, and moved parser dry runs and training exports to anon-only public reads.
+- Scrubbed ingredient business payload immediately when creating server or IndexedDB deletion tombstones, made deletion terminal across sync and concurrent writes, sanitized legacy tombstones at every outbound boundary, and added a dry-run-first bounded manual backfill for existing rows without introducing physical tombstone purge.
+- Hardened public-recipe imports, cookie parsing, analytics identifiers, recipe/SEO text parsing, upload previews, and bounded auth/ingredient validation against the corresponding CodeQL findings; public recipe updates now require a reviewed local JSON handoff before the source artifact is written.
+- Enforced the per-account ingredient storage cap with a transaction-scoped advisory lock, aligned the Durable Object limit validator with the 20,000/hour shared-client write budget, and retained privacy-safe nested failure codes for operational diagnosis.
+- Added a normalized per-account hourly login budget after the existing IP and IP/email limits, and capped body-less semantic recommendation work at 50 stored ingredients with a default weighted cost of five.
+- Cleared and deleted account-scoped IndexedDB databases and import-correction learning keys from the browser, detected blocked deletion by another tab, and kept the cleanup warning visible after redirecting to login.
+- Kept successful account deletion at 204 with expired cookies when post-commit access-token revocation fails, while recording only bounded non-sensitive failure metadata.
+- Bounded each account's refresh-session history to 24 records, preserved recent rotation records for reuse detection, acquired the per-user lock before session inserts to avoid concurrent-login deadlocks, pruned existing excess history in migration, and added a tenant-scoped RLS delete policy plus a per-user refresh budget.
+- Moved Cloudflare access-token revocation from eventually consistent Workers KV to per-token SQLite Durable Objects, made a missing binding fail closed, and added alarm cleanup so logout state and rate-limit rows expire without accumulating indefinitely.
+- Hardened the import-correction embedding backfill with both feature gates, privacy-checked field reconstruction, default dry-run behavior, and explicit target-host confirmation before external calls or database writes.
+- Defined 90-day raw product-event and 180-day recommendation-event policies, added server-time indexes and a dry-run-first capped manual maintenance task with target-host acknowledgement, aggregate-only logs and legacy ownerless-event cleanup, and matched training exports to a 180-day window. Recurring enforcement remains an explicit deployment follow-up.
+- Applied the shared ingredient read budget to single-record lookups and aligned JWT expiration with the exact `exp` boundary.
+- Bounded legacy and AI recipe request arrays and string fields, and made paid semantic/AI rate limits charge by ingredient workload instead of treating oversized work as one request.
 - Added weighted, shared user and client limits to both import-correction embedding endpoints so one 30-item request consumes 30 units and alternating suggestion/save calls cannot bypass the budget.
 - Made session restoration fail closed, stopped persisting server identity in `localStorage`, and fenced failed logouts so an uncleared HttpOnly session cannot silently sign the next browser user back in.
 - Completed the checkpointed stale-vector rollout and the 188-row normalization refresh with zero failures; production now verifies at 1,166 current embeddings, no missing/stale/duplicate/orphan rows, and `vector(1536)`.

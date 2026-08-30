@@ -15,10 +15,14 @@ Implemented:
 - JWT auth and session restore
 - manual server backup and pull sync
 - first-pass conflict-aware manual sync with persisted pending states and deletion tombstones
+- deletion-time scrubbing that keeps only non-PII tombstone identity, ordering, and sync metadata
 - recommendation impression and click event collection
 - recommendation training-data export
 - complete 1,166-row recipe embedding coverage with no missing or stale vectors
 - feature-flagged semantic recipe endpoint with bounded inputs and request limits
+- local-first daily menu selection, completion, cancellation, and retry state
+- server models and APIs for menu decisions, pantry ownership, lightweight preferences, and idempotent product events
+- recommendation action events with idempotent client IDs and nullable catalog recipe links
 - CI, unit tests, and core E2E coverage
 - Node.js 24 GitHub Actions with route-level browser code splitting
 - Metadata-only API request correlation, latency/error telemetry, and optional AI token/cost metrics
@@ -35,19 +39,22 @@ Implemented:
 ## v2.0
 
 - Validate conflict-aware manual sync against production and multiple real devices
-- Add tombstone retention/compaction after all clients have a safe synchronization checkpoint
+- Add a server generation/checkpoint protocol, then compact or purge minimal tombstones only after every client is safely past the deletion boundary
 - Replace device-clock ordering with a server-issued revision or hybrid logical version if manual sync expands further
-- Persist pantry staple ownership per authenticated user
+- Provision an isolated Supabase and Cloudflare semantic staging environment without production user data
+- Apply the new menu, event, pantry, preference, and product-event migrations to staging and pass browser/API isolation tests
+- Enable semantic retrieval in production only after staging fixture, fallback, auth, and rate-limit gates pass
+- Deploy pantry staple ownership per authenticated user after its staging migration gate
 - Expand browser E2E coverage
 - Add release notes and maintainer automation around recurring workflows
 
 ## AI and Data Roadmap
 
-- Analyze recommendation impression/click exports
+- Analyze the impression -> select -> external_open -> complete funnel and catalog join rate
 - Keep all 1,166 production embeddings current and preserve zero missing, duplicate, and orphan rows
 - Track vector-only quality separately from final ranking: the current home-meal baseline is 60% raw Hit@5, 95% candidate recall at 100, and 75% reranked Hit@5
 - Enable `SEMANTIC_RECIPE_API_ENABLED` only after staging smoke tests confirm the feature-flagged endpoint and rule fallback
-- Add a nullable catalog recipe FK to recommendation events after measuring how many historical text IDs can be safely linked; new browser events already use `local:<seed-id>` and `catalog:<uuid>` keys
+- Apply the reviewed nullable catalog recipe FK migration after its aggregate-only historical-key audit passes in staging
 - Add canonical dishes, aliases, and source-attributed popularity signals after catalog recipe IDs are stable
 - Prototype ranking improvements from collected feature snapshots
 - Expand ingredient normalization examples

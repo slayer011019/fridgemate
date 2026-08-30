@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyImportCorrections,
+  clearImportCorrections,
   getImportCorrectionKey,
   saveImportCorrections
 } from '../importLearning.js';
 
-const STORAGE_KEY = 'fridgemate-import-corrections';
+const STORAGE_KEY = 'fridgemate-import-corrections:v2:guest';
 
 function createImportItem(overrides = {}) {
   return {
@@ -147,6 +148,51 @@ describe('importLearning', () => {
       const correctedItems = applyImportCorrections(items);
 
       expect(correctedItems).toEqual(items);
+    });
+
+    it('keeps learned corrections isolated between signed-in users', () => {
+      saveImportCorrections(
+        [createImportItem({ name: '사용자1 우유', normalizedName: '우유' })],
+        'user:user-1'
+      );
+
+      const userOneItems = applyImportCorrections(
+        [createImportItem({ normalizedName: '우유' })],
+        'user:user-1'
+      );
+      const userTwoItems = applyImportCorrections(
+        [createImportItem({ normalizedName: '우유' })],
+        'user:user-2'
+      );
+
+      expect(userOneItems[0].name).toBe('사용자1 우유');
+      expect(userTwoItems[0].name).toBe('우유');
+    });
+  });
+
+  describe('clearImportCorrections', () => {
+    it('removes only the requested authenticated scope', () => {
+      saveImportCorrections(
+        [createImportItem({ name: '사용자1 우유', normalizedName: '우유' })],
+        'user:user-1'
+      );
+      saveImportCorrections(
+        [createImportItem({ name: '사용자2 우유', normalizedName: '우유' })],
+        'user:user-2'
+      );
+
+      expect(clearImportCorrections('user:user-1')).toBe(true);
+      expect(window.localStorage.getItem('fridgemate-import-corrections:v2:user:user-1')).toBeNull();
+      expect(window.localStorage.getItem('fridgemate-import-corrections:v2:user:user-2')).not.toBeNull();
+    });
+
+    it('removes both current and legacy guest correction keys', () => {
+      window.localStorage.setItem(STORAGE_KEY, '{}');
+      window.localStorage.setItem('fridgemate-import-corrections', '{}');
+
+      expect(clearImportCorrections()).toBe(true);
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+      expect(window.localStorage.getItem('fridgemate-import-corrections')).toBeNull();
     });
   });
 });

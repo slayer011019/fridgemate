@@ -118,6 +118,7 @@ describe('rateLimit', () => {
 
     expect(consumeRateLimit).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'RATE_LIMIT_INVALID_COST',
       message: expect.stringContaining('Rate limit cost')
     }));
   });

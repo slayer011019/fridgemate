@@ -11,7 +11,7 @@
     "dev:worker": "wrangler dev",
     "lint": "eslint .",
     "build": "vite build",
-    "postbuild": "node scripts/generate-adsense-assets.js && node scripts/generate-seo-pages.js && node scripts/verify-seo-output.js",
+    "postbuild": "node scripts/copy-tesseract-assets.js && node scripts/generate-adsense-assets.js && node scripts/generate-seo-pages.js && node scripts/verify-seo-output.js",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
@@ -35,6 +35,8 @@
     "recipes:verify-embeddings": "node --env-file=.env scripts/verify-recipe-embeddings.js",
     "export:recipe-parser-training": "node --env-file=.env scripts/export-recipe-parser-training.js",
     "export:recommendation-training": "node --env-file=.env scripts/export-recommendation-training.js",
+    "events:prune-retention": "node --env-file=.env scripts/pruneEventRetention.js",
+    "ingredients:scrub-tombstones": "node --env-file=.env scripts/scrubIngredientTombstones.js",
     "label:recipe-parser-training": "node scripts/label-review.js"
   },
   "dependencies": {
@@ -56,6 +58,8 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.59.1",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/kor": "^1.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
