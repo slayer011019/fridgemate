@@ -1,0 +1,2 @@
+# Public recipients only. Never add the matching private recovery key to this repository.
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBBuATEcqGmS5UK5VWq5PsBh4qbgkdbT/IINxqximt2j fridgemate-backup-recovery-20260831
