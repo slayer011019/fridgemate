@@ -253,6 +253,8 @@ npm run prisma:deploy
 
 이 명령은 개발·테스트 과정에서 자동으로 실행하지 않습니다.
 
+운영 백업 존재 여부와 PITR 설정은 Supabase Dashboard 또는 Management API의 직접 증거로 확인해야 합니다. 운영 DB를 덮어쓰지 않는 별도 프로젝트 복구 훈련과 RLS 검증 절차는 [백업·복구 런북](docs/BACKUP_RESTORE_RUNBOOK.md)을 따릅니다.
+
 ## 레시피 임베딩과 검색
 
 임베딩 저장은 모델 훈련이 아닙니다. 레시피 제목·설명·분류된 재료를 벡터로 변환해 semantic 후보를 가져오고, 최종 순위는 재료 일치도와 유통기한 규칙으로 다시 계산합니다.

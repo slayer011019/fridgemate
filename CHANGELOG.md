@@ -56,6 +56,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added a production database backup and restore runbook with explicit evidence gates, separate-project restoration, aggregate validation, RLS/runtime-role checks, and tenant-isolation smoke tests.
 - Added a scheduled production uptime workflow that validates the minimized public health response every 15 minutes and can also be run manually.
 - Added authenticated self-service JSON data export and password-confirmed account deletion with scoped RLS delete policies, attempt limits, cookie expiry, and current-device account-cache cleanup.
 - Added weekly Dependabot updates, pinned-action CodeQL analysis, production dependency audits, and full-history Gitleaks scanning for pushes, pull requests, and scheduled security checks.
