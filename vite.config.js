@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { getAdSenseConfig, isValidAdSenseClient } from './src/utils/adsenseConfig.js';
+import { getWebmasterVerificationTags } from './src/utils/webmasterVerification.js';
 
 function adsenseHeadPlugin(mode) {
   const config = getAdSenseConfig(loadEnv(mode, process.cwd(), ''));
@@ -27,31 +28,17 @@ function adsenseHeadPlugin(mode) {
   };
 }
 
-function searchConsoleHeadPlugin(mode) {
-  const verification = loadEnv(mode, process.cwd(), '').VITE_GOOGLE_SITE_VERIFICATION?.trim();
-
-  if (!verification) {
-    return {
-      name: 'fridgemate-search-console-verification'
-    };
-  }
-
-  if (!/^[A-Za-z0-9_-]+$/.test(verification)) {
-    throw new Error(
-      'VITE_GOOGLE_SITE_VERIFICATION must contain only the content value from the Google verification meta tag.'
-    );
-  }
+function webmasterVerificationHeadPlugin(mode) {
+  const tags = getWebmasterVerificationTags(loadEnv(mode, process.cwd(), ''));
 
   return {
-    name: 'fridgemate-search-console-verification',
+    name: 'fridgemate-webmaster-verification',
     transformIndexHtml() {
-      return [
-        {
-          tag: 'meta',
-          attrs: { name: 'google-site-verification', content: verification },
-          injectTo: 'head'
-        }
-      ];
+      return tags.map(({ metaName, content }) => ({
+        tag: 'meta',
+        attrs: { name: metaName, content },
+        injectTo: 'head'
+      }));
     }
   };
 }
@@ -68,6 +55,6 @@ export default defineConfig(({ mode }) => {
   validateGoogleAnalyticsConfig(mode);
 
   return {
-    plugins: [react(), adsenseHeadPlugin(mode), searchConsoleHeadPlugin(mode)]
+    plugins: [react(), adsenseHeadPlugin(mode), webmasterVerificationHeadPlugin(mode)]
   };
 });
