@@ -26,6 +26,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
+    "backup:preflight": "node --env-file=.env scripts/checkBackupPrerequisites.js",
     "import-corrections:backfill": "node --env-file=.env scripts/backfillImportCorrectionEmbeddings.js",
     "seed:recipes": "node --env-file=.env scripts/seed-mfds-recipes.js",
     "recipes:export-public": "node --env-file=.env scripts/export-public-recipes.js",
