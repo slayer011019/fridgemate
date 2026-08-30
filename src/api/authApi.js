@@ -45,6 +45,28 @@ export function getCurrentUser() {
   return requestJson('/auth/me', {}, { authMode: 'required', errorClass: AuthApiError });
 }
 
+export function exportUserData() {
+  return requestJson('/auth/data-export', {}, { authMode: 'required', errorClass: AuthApiError });
+}
+
+export function deleteAccount(password) {
+  return requestJson(
+    '/auth/account',
+    {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ password })
+    },
+    {
+      authMode: 'required',
+      allowNoContent: true,
+      errorClass: AuthApiError
+    }
+  );
+}
+
 export function refreshSession() {
   return requestJson(
     '/auth/refresh',

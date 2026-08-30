@@ -75,7 +75,8 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] With `app.current_user_id` unset, direct runtime-role reads of `Ingredient` and `ImportCorrection` return no rows; with user A set locally in a transaction, user B rows remain inaccessible.
 - [ ] `GET /api/health` returns only `{ "status": "ok" }` and does not expose database state.
 - [ ] Verify database connectivity through authenticated functional smoke tests and private platform telemetry.
-- [ ] Update any external uptime or Cloudflare Health Check assertion that previously parsed `db` or `timestamp`; the public contract is now only `status: ok`.
+- [x] The scheduled GitHub Actions uptime check validates the public `{status: "ok"}` contract every 15 minutes without parsing removed `db` or `timestamp` fields.
+- [ ] Enable GitHub Actions failure notifications for the repository owner, and add a separate paging channel or Cloudflare Health Check if near-real-time alerts are required.
 
 ## Migration History Integrity
 
@@ -129,6 +130,52 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Run the API as a non-owner member of `fridgemate_app`, set `app.current_user_id` transaction-locally, and verify user A cannot read or mutate user B rows.
 - [ ] Repeat newer update, stale update, tombstone, stale resurrection, and identical payload cases, then remove the disposable database.
 - [x] Deploy `20260826000000_add_ingredient_sync_tombstones` before server code that reads `deletedAt`; this ordering was completed on 2026-08-30.
+
+## Production Real-Device Sync Drill
+
+Use one disposable account on the production custom domain. Do not use personal fridge contents, screenshots containing personal data, or a production administrator account.
+
+Record before starting:
+
+- [ ] Drill date, operator, production frontend URL, and API URL.
+- [ ] PC operating system and browser/version.
+- [ ] Mobile operating system and browser/version.
+- [ ] Both devices use automatic network time and differ by less than one minute.
+- [ ] A unique marker such as `sync-drill-YYYYMMDD-HHMM` identifies every test record.
+
+Propagation and idempotency:
+
+- [ ] Login to the same disposable account on PC (device A) and mobile (device B).
+- [ ] On A, create the marker ingredient and press **서버에 백업하기**.
+- [ ] On B, press **서버에서 가져오기** and confirm exactly one matching record appears.
+- [ ] Repeat backup on A and pull on B; confirm the record is not duplicated.
+- [ ] Reload both devices and confirm the record remains scoped to the test account.
+
+Newest-edit conflict:
+
+- [ ] Pull the same baseline record onto both devices.
+- [ ] Edit it on A and keep the change unsynced.
+- [ ] At least five seconds later, edit and back up a different value on B.
+- [ ] Back up A's older pending edit, then pull on both devices.
+- [ ] Confirm B's newer value wins and A's stale retry does not overwrite it.
+
+Deletion and stale reconnect:
+
+- [ ] Pull the same baseline record onto both devices.
+- [ ] Take B offline, edit the record once, and leave that older change pending.
+- [ ] At least five seconds later, delete the record on online device A and back up the deletion.
+- [ ] Reconnect B, back up its older pending active copy, and then pull.
+- [ ] Confirm the deleted record remains absent on both devices after reload.
+- [ ] Repeat backup and pull once more; confirm the tombstone remains idempotent.
+
+Failure and cleanup:
+
+- [ ] If an operation fails, record the visible message, time, request ID, device, and action without recording cookies or tokens.
+- [ ] Do not change a physical device clock by more than five minutes; the future-timestamp rejection is covered by the production API smoke test and automated sync tests because changing the OS clock can also invalidate TLS and unrelated sessions.
+- [ ] Export the disposable account only if drill evidence is needed, then delete the account from the account page.
+- [ ] Verify both devices return to logged-out state and the deleted credentials can no longer log in.
+
+The drill passes only when propagation, conflict resolution, deletion, reload persistence, account isolation, and cleanup all pass on both physical devices. Browser-context E2E is supporting evidence, not a substitute for this section.
 
 ## Core Smoke Path
 

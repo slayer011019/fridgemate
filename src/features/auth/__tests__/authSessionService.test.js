@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const authApiMocks = {
+  deleteAccount: vi.fn(),
   getCurrentUser: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
@@ -8,7 +9,12 @@ const authApiMocks = {
   signup: vi.fn()
 };
 
+const indexedDbMocks = {
+  clearIngredients: vi.fn()
+};
+
 vi.mock('../../../api/authApi.js', () => ({
+  deleteAccount: (...args) => authApiMocks.deleteAccount(...args),
   getCurrentUser: (...args) => authApiMocks.getCurrentUser(...args),
   login: (...args) => authApiMocks.login(...args),
   logout: (...args) => authApiMocks.logout(...args),
@@ -16,10 +22,15 @@ vi.mock('../../../api/authApi.js', () => ({
   signup: (...args) => authApiMocks.signup(...args)
 }));
 
+vi.mock('../../../db/indexedDB.js', () => ({
+  clearIngredients: (...args) => indexedDbMocks.clearIngredients(...args)
+}));
+
 describe('authSessionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    indexedDbMocks.clearIngredients.mockResolvedValue(undefined);
   });
 
   it('restores a server-verified session without persisting identity in localStorage', async () => {
@@ -231,5 +242,55 @@ describe('authSessionService', () => {
     } finally {
       setItemSpy.mockRestore();
     }
+  });
+
+  it('clears the account-scoped local cache after server account deletion succeeds', async () => {
+    authApiMocks.deleteAccount.mockResolvedValue(null);
+    window.localStorage.setItem('fridgemate-auth-session-present:v1', '1');
+    window.localStorage.setItem('fridgemate-guest-import:user-1', 'dismissed');
+    const { deleteAccountWithSession } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+    const setGuestImportPrompt = vi.fn();
+    const setError = vi.fn();
+    const defaultGuestImportPrompt = { available: false, count: 0, loading: false };
+
+    const result = await deleteAccountWithSession('StrongPassphrase123!', {
+      backendEnabled: true,
+      user: { id: 'user-1', email: 'user@example.com' },
+      setSession,
+      setGuestImportPrompt,
+      setError,
+      defaultGuestImportPrompt
+    });
+
+    expect(authApiMocks.deleteAccount).toHaveBeenCalledWith('StrongPassphrase123!');
+    expect(indexedDbMocks.clearIngredients).toHaveBeenCalledWith({ scope: 'user:user-1' });
+    expect(window.localStorage.getItem('fridgemate-guest-import:user-1')).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-auth-session-present:v1')).toBeNull();
+    expect(setSession).toHaveBeenLastCalledWith(null);
+    expect(setGuestImportPrompt).toHaveBeenCalledWith(defaultGuestImportPrompt);
+    expect(setError).toHaveBeenLastCalledWith('');
+    expect(result).toEqual({ localCleanupComplete: true });
+  });
+
+  it('keeps the local session when server account deletion is rejected', async () => {
+    const deletionError = Object.assign(new Error('Current password is incorrect.'), { status: 403 });
+    authApiMocks.deleteAccount.mockRejectedValue(deletionError);
+    const { deleteAccountWithSession } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+
+    await expect(
+      deleteAccountWithSession('wrong-password', {
+        backendEnabled: true,
+        user: { id: 'user-1' },
+        setSession,
+        setGuestImportPrompt: vi.fn(),
+        setError: vi.fn(),
+        defaultGuestImportPrompt: {}
+      })
+    ).rejects.toBe(deletionError);
+
+    expect(indexedDbMocks.clearIngredients).not.toHaveBeenCalled();
+    expect(setSession).not.toHaveBeenCalled();
   });
 });

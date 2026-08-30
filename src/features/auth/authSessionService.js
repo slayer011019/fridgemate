@@ -1,5 +1,8 @@
 import * as authApi from '../../api/authApi';
+import * as indexedDb from '../../db/indexedDB';
 import {
+  buildUserStorageScope,
+  clearGuestImportDecision,
   clearPendingLogout,
   clearSessionHint,
   clearStoredAuthSession,
@@ -147,4 +150,42 @@ export async function logoutSession({
     setError(LOGOUT_FAILED_MESSAGE);
     return { ok: false, pending: false };
   }
+}
+
+export async function deleteAccountWithSession(
+  password,
+  {
+    backendEnabled,
+    user,
+    setSession,
+    setGuestImportPrompt,
+    setError,
+    defaultGuestImportPrompt
+  }
+) {
+  if (!backendEnabled || !user?.id) {
+    throw createUnavailableAuthError();
+  }
+
+  await authApi.deleteAccount(password);
+
+  let localCleanupComplete = true;
+
+  try {
+    await indexedDb.clearIngredients({ scope: buildUserStorageScope(user.id) });
+    clearGuestImportDecision(user.id);
+  } catch {
+    localCleanupComplete = false;
+  }
+
+  clearPendingLogout();
+  persistSession(null, setSession);
+  setGuestImportPrompt(defaultGuestImportPrompt);
+  setError(
+    localCleanupComplete
+      ? ''
+      : '계정은 삭제됐지만 이 기기의 로컬 캐시를 모두 지우지 못했습니다. 브라우저 사이트 데이터를 삭제해주세요.'
+  );
+
+  return { localCleanupComplete };
 }

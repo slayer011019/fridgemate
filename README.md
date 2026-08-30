@@ -223,6 +223,8 @@ API_SLOW_REQUEST_MS=1500
 - 로그인·가입 제한은 실제 클라이언트 주소와 정규화된 이메일을 함께 사용하며, AI 추천은 사용자 및 클라이언트 주소별로 제한됩니다.
 - OCR 교정 제안·저장 API는 처리 항목 수만큼 공용 예산을 차감합니다. 사용자 기준 분당 60개·시간당 180개, 클라이언트 주소 기준 분당 600개·시간당 1,800개를 넘으면 `429`와 `Retry-After`를 반환합니다.
 - 서버 사용자 정보는 `localStorage`에 보관하지 않습니다. 시작할 때 HttpOnly 갱신 쿠키로 세션을 다시 확인하며, 확인 실패 시 사용자 전용 로컬 캐시를 잠급니다. 서버 로그아웃 결과를 확인하지 못하면 대기 표식을 남겨 다음 연결에서 로그아웃 상태를 다시 확인합니다.
+- 로그인 사용자는 `GET /api/auth/data-export`로 비밀번호·세션 비밀값을 제외한 자기 데이터를 내려받을 수 있습니다. `DELETE /api/auth/account`는 현재 비밀번호 재확인, 사용자·클라이언트 주소별 시도 제한, RLS 사용자 범위 정책을 거쳐 계정과 연결 데이터를 한 트랜잭션에서 삭제합니다.
+- 계정 화면에서 삭제가 성공하면 현재 기기의 해당 계정 전용 IndexedDB 재료 캐시도 지웁니다. 다른 기기의 로컬 저장소는 해당 기기에서 사이트 데이터를 별도로 삭제해야 합니다.
 - `RECIPE_EMBEDDING_DIMENSIONS`는 DB의 `recipe_embeddings.embedding` 차원과 같아야 합니다.
 - `SEMANTIC_RECIPE_API_ENABLED`는 운영 임베딩 무결성과 검색 품질을 확인한 뒤에만 `true`로 전환합니다. 명시적 API는 `POST /api/recipes/recommendations/semantic`이며 인증과 요청 제한을 적용합니다.
 - 핵심 앱 기능은 AI API 키 없이도 동작합니다.
@@ -250,6 +252,8 @@ npm run prisma:deploy
 ```
 
 이 명령은 개발·테스트 과정에서 자동으로 실행하지 않습니다.
+
+운영 백업 존재 여부와 PITR 설정은 Supabase Dashboard 또는 Management API의 직접 증거로 확인해야 합니다. 운영 DB를 덮어쓰지 않는 별도 프로젝트 복구 훈련과 RLS 검증 절차는 [백업·복구 런북](docs/BACKUP_RESTORE_RUNBOOK.md)을 따릅니다.
 
 ## 레시피 임베딩과 검색
 
