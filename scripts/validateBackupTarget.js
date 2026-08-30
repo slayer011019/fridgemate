@@ -28,10 +28,14 @@ function validateBackupTarget(rawUrl, expectedProjectRef) {
   if ((url.port || '5432') !== '5432') {
     throw new Error('Backups require the direct or session-pooler endpoint on port 5432.');
   }
-  if (url.searchParams.get('pgbouncer')?.toLowerCase() === 'true') {
-    throw new Error('Transaction-pooler mode is not valid for logical backups.');
+  const connectionOptions = [...url.searchParams.entries()].map(([key, value]) => [
+    key.toLowerCase(),
+    value.toLowerCase()
+  ]);
+  if (connectionOptions.length !== 1 || connectionOptions[0][0] !== 'sslmode') {
+    throw new Error('BACKUP_DATABASE_URL may contain only one sslmode query option.');
   }
-  if (!SAFE_SSL_MODES.has(url.searchParams.get('sslmode')?.toLowerCase())) {
+  if (!SAFE_SSL_MODES.has(connectionOptions[0][1])) {
     throw new Error('BACKUP_DATABASE_URL must explicitly require TLS with sslmode.');
   }
 

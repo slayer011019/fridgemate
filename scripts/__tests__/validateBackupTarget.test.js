@@ -34,6 +34,14 @@ describe('validateBackupTarget', () => {
       `postgresql://postgres.${PROJECT_REF}:secret@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true`
     ],
     [
+      'duplicate TLS override',
+      `postgresql://postgres:secret@db.${PROJECT_REF}.supabase.co/postgres?sslmode=require&sslmode=disable`
+    ],
+    [
+      'query host override',
+      `postgresql://postgres:secret@db.${PROJECT_REF}.supabase.co/postgres?sslmode=require&host=example.com`
+    ],
+    [
       'non-owner role',
       `postgresql://fridgemate_runtime:secret@db.${PROJECT_REF}.supabase.co/postgres?sslmode=require`
     ],
