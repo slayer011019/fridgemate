@@ -1,6 +1,7 @@
 import 'dotenv/config';
-import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { constants } from 'node:fs';
+import { lstat, open, realpath } from 'node:fs/promises';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const API_BASE_URL = 'https://openapi.foodsafetykorea.go.kr/api';
@@ -12,6 +13,9 @@ const MAX_LIMIT = 500;
 const STEP_COUNT = 20;
 const MAX_API_RESPONSE_BYTES = 20 * 1024 * 1024;
 const MAX_REVIEW_FILE_BYTES = 20 * 1024 * 1024;
+const FILE_READ_CHUNK_BYTES = 64 * 1024;
+const NO_FOLLOW_FLAG = constants.O_NOFOLLOW ?? 0;
+const NON_BLOCKING_FLAG = constants.O_NONBLOCK ?? 0;
 const ALLOWED_PUBLIC_URL_HOSTS = new Set(['foodsafetykorea.go.kr', 'www.foodsafetykorea.go.kr']);
 export const PUBLIC_RECIPES_OUTPUT_PATH = resolve(process.cwd(), 'src/data/publicRecipes.json');
 
@@ -196,16 +200,96 @@ async function fetchRows(apiKey, limit) {
   return Array.isArray(payload?.[DATASET_ID]?.row) ? payload[DATASET_ID].row : [];
 }
 
-function resolveReviewFilePath(reviewFile) {
-  const workspaceRoot = resolve(process.cwd());
-  const reviewPath = resolve(workspaceRoot, reviewFile);
-  const workspaceRelativePath = relative(workspaceRoot, reviewPath);
+function isPathOutsideRoot(workspaceRoot, filePath) {
+  const workspaceRelativePath = relative(workspaceRoot, filePath);
+  return (
+    isAbsolute(workspaceRelativePath) ||
+    workspaceRelativePath === '..' ||
+    workspaceRelativePath.startsWith(`..${sep}`)
+  );
+}
+
+function isSameFileIdentity(left, right) {
+  return left.dev === right.dev && left.ino === right.ino;
+}
+
+function isSameResolvedPath(left, right) {
+  return process.platform === 'win32'
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
+}
+
+function isUnlinkedRegularFile(stats) {
+  return !stats.isSymbolicLink() && stats.isFile() && stats.nlink === 1;
+}
+
+async function openVerifiedWorkspaceFile(
+  filePath,
+  { flags, invalidMessage, maxBytes = Number.POSITIVE_INFINITY, workspaceRoot = process.cwd() }
+) {
+  const resolvedWorkspaceRoot = resolve(workspaceRoot);
+  const resolvedFilePath = resolve(resolvedWorkspaceRoot, filePath);
+  let handle;
+
+  if (isPathOutsideRoot(resolvedWorkspaceRoot, resolvedFilePath)) {
+    throw new Error(invalidMessage);
+  }
+
+  try {
+    // Open without truncating first. Once this handle is verified, all I/O uses
+    // the handle so a later path or symlink swap cannot redirect the operation.
+    handle = await open(resolvedFilePath, flags | NO_FOLLOW_FLAG | NON_BLOCKING_FLAG);
+    const openedStats = await handle.stat();
+    const pathStats = await lstat(resolvedFilePath);
+    const canonicalWorkspaceRoot = await realpath(resolvedWorkspaceRoot);
+    const canonicalFilePath = await realpath(resolvedFilePath);
+
+    if (
+      !isSameResolvedPath(canonicalWorkspaceRoot, resolvedWorkspaceRoot) ||
+      !isSameResolvedPath(canonicalFilePath, resolvedFilePath) ||
+      !isUnlinkedRegularFile(openedStats) ||
+      !isUnlinkedRegularFile(pathStats) ||
+      !isSameFileIdentity(openedStats, pathStats) ||
+      openedStats.size > maxBytes
+    ) {
+      throw new Error(invalidMessage);
+    }
+
+    return handle;
+  } catch (error) {
+    await handle?.close().catch(() => {});
+    if (error?.message === invalidMessage) throw error;
+    throw new Error(invalidMessage, { cause: error });
+  }
+}
+
+async function readBoundedFileHandle(handle, maxBytes) {
+  const chunks = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const remainingBytes = maxBytes + 1 - totalBytes;
+    const buffer = Buffer.allocUnsafe(Math.min(FILE_READ_CHUNK_BYTES, remainingBytes));
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, totalBytes);
+
+    if (bytesRead === 0) break;
+    totalBytes += bytesRead;
+    if (totalBytes > maxBytes) {
+      throw new Error('The reviewed recipe file is not a bounded regular file.');
+    }
+    chunks.push(buffer.subarray(0, bytesRead));
+  }
+
+  return Buffer.concat(chunks, totalBytes).toString('utf8');
+}
+
+function resolveReviewFilePath(reviewFile, workspaceRoot = process.cwd()) {
+  const resolvedWorkspaceRoot = resolve(workspaceRoot);
+  const reviewPath = resolve(resolvedWorkspaceRoot, reviewFile);
 
   if (
     !reviewFile ||
-    isAbsolute(workspaceRelativePath) ||
-    workspaceRelativePath === '..' ||
-    workspaceRelativePath.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) ||
+    isPathOutsideRoot(resolvedWorkspaceRoot, reviewPath) ||
     !reviewPath.toLowerCase().endsWith('.json')
   ) {
     throw new Error('The reviewed recipe file must be a JSON file inside the workspace.');
@@ -214,14 +298,21 @@ function resolveReviewFilePath(reviewFile) {
   return reviewPath;
 }
 
-async function readReviewedRows(reviewFile) {
-  const reviewPath = resolveReviewFilePath(reviewFile);
-  const reviewStats = await lstat(reviewPath);
-  if (reviewStats.isSymbolicLink() || !reviewStats.isFile() || reviewStats.size > MAX_REVIEW_FILE_BYTES) {
-    throw new Error('The reviewed recipe file is not a bounded regular file.');
-  }
+export async function readReviewedRows(reviewFile, { workspaceRoot = process.cwd() } = {}) {
+  const reviewPath = resolveReviewFilePath(reviewFile, workspaceRoot);
+  const handle = await openVerifiedWorkspaceFile(reviewPath, {
+    flags: constants.O_RDONLY,
+    invalidMessage: 'The reviewed recipe file is not a bounded regular file.',
+    maxBytes: MAX_REVIEW_FILE_BYTES,
+    workspaceRoot
+  });
+  let rows;
 
-  const rows = JSON.parse(await readFile(reviewPath, 'utf8'));
+  try {
+    rows = JSON.parse(await readBoundedFileHandle(handle, MAX_REVIEW_FILE_BYTES));
+  } finally {
+    await handle.close();
+  }
   if (!Array.isArray(rows) || rows.length > MAX_LIMIT) {
     throw new Error(`The reviewed recipe file must contain at most ${MAX_LIMIT} rows.`);
   }
@@ -229,22 +320,23 @@ async function readReviewedRows(reviewFile) {
   return rows;
 }
 
-async function assertSafeOutputTarget() {
-  const outputDirectory = dirname(PUBLIC_RECIPES_OUTPUT_PATH);
-  await mkdir(outputDirectory, { recursive: true });
-
-  const directoryStats = await lstat(outputDirectory);
-  if (directoryStats.isSymbolicLink() || !directoryStats.isDirectory()) {
-    throw new Error('The public recipe output directory must be a regular repository directory.');
-  }
-
+export async function writeVerifiedPublicRecipeArtifact(
+  outputPath,
+  contents,
+  { workspaceRoot = process.cwd() } = {}
+) {
+  const invalidMessage = 'The public recipe output must be an existing, unlinked regular repository file.';
+  const handle = await openVerifiedWorkspaceFile(outputPath, {
+    flags: constants.O_WRONLY,
+    invalidMessage,
+    workspaceRoot
+  });
   try {
-    const outputStats = await lstat(PUBLIC_RECIPES_OUTPUT_PATH);
-    if (outputStats.isSymbolicLink() || !outputStats.isFile()) {
-      throw new Error('The public recipe output must be a regular repository file.');
-    }
-  } catch (error) {
-    if (error?.code !== 'ENOENT') throw error;
+    await handle.truncate(0);
+    await handle.writeFile(contents, 'utf8');
+    await handle.sync();
+  } finally {
+    await handle.close();
   }
 }
 
@@ -252,8 +344,10 @@ export async function writeReviewedPublicRecipes(reviewFile) {
   const rows = await readReviewedRows(reviewFile);
   const recipes = rows.map(mapPublicRecipe).filter(Boolean);
 
-  await assertSafeOutputTarget();
-  await writeFile(PUBLIC_RECIPES_OUTPUT_PATH, `${JSON.stringify(recipes, null, 2)}\n`, 'utf8');
+  await writeVerifiedPublicRecipeArtifact(
+    PUBLIC_RECIPES_OUTPUT_PATH,
+    `${JSON.stringify(recipes, null, 2)}\n`
+  );
 
   console.log(
     `Reviewed public recipe import: reviewed=${rows.length} ready=${recipes.length} output=src/data/publicRecipes.json`

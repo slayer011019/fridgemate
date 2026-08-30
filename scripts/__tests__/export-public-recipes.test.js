@@ -1,10 +1,14 @@
-import { resolve } from 'node:path';
+import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   PUBLIC_RECIPES_OUTPUT_PATH,
   exportPublicRecipes,
   mapPublicRecipe,
-  parseArgs
+  parseArgs,
+  readReviewedRows,
+  writeVerifiedPublicRecipeArtifact
 } from '../export-public-recipes.js';
 
 const READY_ROW = {
@@ -28,14 +32,26 @@ const READY_ROW = {
   RCP_NA_TIP: '소금은 적게 사용한다.'
 };
 const originalFoodSafetyApiKey = process.env.FOODSAFETY_API_KEY;
+const temporaryDirectories = new Set();
 
-afterEach(() => {
+async function createTemporaryDirectory() {
+  const directory = await mkdtemp(join(tmpdir(), 'fridgemate-public-recipes-'));
+  temporaryDirectories.add(directory);
+  return directory;
+}
+
+afterEach(async () => {
   vi.unstubAllGlobals();
   if (originalFoodSafetyApiKey === undefined) {
     delete process.env.FOODSAFETY_API_KEY;
   } else {
     process.env.FOODSAFETY_API_KEY = originalFoodSafetyApiKey;
   }
+
+  await Promise.all(
+    [...temporaryDirectories].map((directory) => rm(directory, { force: true, recursive: true }))
+  );
+  temporaryDirectories.clear();
 });
 
 describe('export-public-recipes', () => {
@@ -94,6 +110,83 @@ describe('export-public-recipes', () => {
   it('uses a fixed repository output path and rejects non-primitive required fields', () => {
     expect(PUBLIC_RECIPES_OUTPUT_PATH).toBe(resolve(process.cwd(), 'src/data/publicRecipes.json'));
     expect(mapPublicRecipe({ ...READY_ROW, RCP_NM: { malicious: true } })).toBeNull();
+  });
+
+  it('reads a reviewed file through its verified file handle', async () => {
+    const workspaceRoot = await createTemporaryDirectory();
+    await writeFile(join(workspaceRoot, 'review.json'), JSON.stringify([READY_ROW]), 'utf8');
+
+    await expect(readReviewedRows('review.json', { workspaceRoot })).resolves.toEqual([READY_ROW]);
+  });
+
+  it('rejects a reviewed file reached through a symlinked directory', async () => {
+    const sandbox = await createTemporaryDirectory();
+    const workspaceRoot = join(sandbox, 'workspace');
+    const outsideDirectory = join(sandbox, 'outside');
+    await mkdir(workspaceRoot);
+    await mkdir(outsideDirectory);
+    await writeFile(join(outsideDirectory, 'review.json'), JSON.stringify([READY_ROW]), 'utf8');
+    await symlink(
+      outsideDirectory,
+      join(workspaceRoot, 'review-link'),
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
+
+    await expect(
+      readReviewedRows('review-link/review.json', { workspaceRoot })
+    ).rejects.toThrow('not a bounded regular file');
+  });
+
+  it('does not truncate an output reached through a symlinked directory', async () => {
+    const sandbox = await createTemporaryDirectory();
+    const workspaceRoot = join(sandbox, 'workspace');
+    const outsideDirectory = join(sandbox, 'outside');
+    const outsideOutput = join(outsideDirectory, 'publicRecipes.json');
+    await mkdir(workspaceRoot);
+    await mkdir(outsideDirectory);
+    await writeFile(outsideOutput, 'protected', 'utf8');
+    await symlink(
+      outsideDirectory,
+      join(workspaceRoot, 'data'),
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
+
+    await expect(
+      writeVerifiedPublicRecipeArtifact(
+        join(workspaceRoot, 'data', 'publicRecipes.json'),
+        'replacement',
+        { workspaceRoot }
+      )
+    ).rejects.toThrow('existing, unlinked regular repository file');
+    await expect(readFile(outsideOutput, 'utf8')).resolves.toBe('protected');
+  });
+
+  it('rejects hard-linked output files before writing', async () => {
+    const sandbox = await createTemporaryDirectory();
+    const workspaceRoot = join(sandbox, 'workspace');
+    const outsideOutput = join(sandbox, 'outside.json');
+    const outputDirectory = join(workspaceRoot, 'data');
+    const outputPath = join(outputDirectory, 'publicRecipes.json');
+    await mkdir(outputDirectory, { recursive: true });
+    await writeFile(outsideOutput, 'protected', 'utf8');
+    await link(outsideOutput, outputPath);
+
+    await expect(
+      writeVerifiedPublicRecipeArtifact(outputPath, 'replacement', { workspaceRoot })
+    ).rejects.toThrow('existing, unlinked regular repository file');
+    await expect(readFile(outsideOutput, 'utf8')).resolves.toBe('protected');
+  });
+
+  it('writes only after pinning an existing regular output file', async () => {
+    const workspaceRoot = await createTemporaryDirectory();
+    const outputDirectory = join(workspaceRoot, 'data');
+    const outputPath = join(outputDirectory, 'publicRecipes.json');
+    await mkdir(outputDirectory);
+    await writeFile(outputPath, 'old', 'utf8');
+
+    await writeVerifiedPublicRecipeArtifact(outputPath, 'replacement', { workspaceRoot });
+
+    await expect(readFile(outputPath, 'utf8')).resolves.toBe('replacement');
   });
 
   it('rejects an oversized network response before reading its body', async () => {

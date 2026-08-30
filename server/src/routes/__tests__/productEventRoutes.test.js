@@ -96,9 +96,11 @@ describe('product event collection policy', () => {
     );
   });
 
-  it('orders enabled policy, dynamic limiter, authentication, then persistence', () => {
+  it('orders policy, client limiter, optional auth, event limiter, then persistence', () => {
     expect(getRouteMiddleware().map((middleware) => middleware.name)).toEqual([
       'enforceProductEventCollectionPolicy',
+      'rateLimit',
+      'optionalAuth',
       'rateLimit',
       'requireProductEventAuthentication',
       'createProductEventHandler'
@@ -113,7 +115,9 @@ describe('product event collection policy', () => {
         return { allowed: true, retryAfterSeconds: 0 };
       }
     });
-    const rateLimit = getRouteMiddleware().find((middleware) => middleware.name === 'rateLimit');
+    const rateLimit = getRouteMiddleware()
+      .filter((middleware) => middleware.name === 'rateLimit')
+      .at(-1);
     const next = vi.fn();
 
     await rateLimit({ ip: '203.0.113.10' }, createResponse(), next);

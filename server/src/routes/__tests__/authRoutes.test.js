@@ -10,6 +10,37 @@ function findRoute(path) {
   return authRoutes.stack.find((layer) => layer.route?.path === path)?.route;
 }
 
+const EXPECTED_RATE_LIMITED_AUTH_ROUTES = [
+  {
+    path: '/signup',
+    middleware: ['enforcePublicSignupPolicy', 'authRateLimit', 'authRateLimit', 'signupHandler']
+  },
+  {
+    path: '/login',
+    middleware: ['authRateLimit', 'authRateLimit', 'loginHandler']
+  },
+  {
+    path: '/refresh',
+    middleware: ['authRateLimit', 'authRateLimit', 'refreshSessionHandler']
+  },
+  {
+    path: '/me',
+    middleware: ['authRateLimit', 'requireAuth', 'authRateLimit', 'getCurrentUserHandler']
+  },
+  {
+    path: '/data-export',
+    middleware: ['authRateLimit', 'requireAuth', 'authRateLimit', 'exportUserDataHandler']
+  },
+  {
+    path: '/account',
+    middleware: ['authRateLimit', 'requireAuth', 'authRateLimit', 'deleteUserAccountHandler']
+  },
+  {
+    path: '/logout',
+    middleware: ['authRateLimit', 'authRateLimit', 'logoutHandler']
+  }
+];
+
 function createResponse() {
   return {
     headers: {},
@@ -32,6 +63,14 @@ function createResponse() {
 describe('authRoutes refresh rate limits', () => {
   afterEach(() => {
     resetAuthSecurityStoreForTests();
+  });
+
+  it('keeps distributed rate limiters before every expensive auth handler', () => {
+    for (const expectedRoute of EXPECTED_RATE_LIMITED_AUTH_ROUTES) {
+      expect(findRoute(expectedRoute.path).stack.map((layer) => layer.handle.name)).toEqual(
+        expectedRoute.middleware
+      );
+    }
   });
 
   it('applies shared minute and hour budgets keyed by client address', async () => {
@@ -84,7 +123,7 @@ describe('authRoutes refresh rate limits', () => {
     expect(exportRoute.methods.post).toBe(true);
     expect(exportRoute.methods.get).toBeUndefined();
 
-    for (const layer of exportRoute.stack.slice(1, -1)) {
+    for (const layer of exportRoute.stack.filter((layer) => layer.handle.name === 'authRateLimit')) {
       await layer.handle(request, createResponse(), () => {});
     }
 
@@ -121,12 +160,20 @@ describe('authRoutes refresh rate limits', () => {
     expect(currentUserRoute.stack).toHaveLength(4);
 
     for (const request of requests) {
-      for (const layer of currentUserRoute.stack.slice(1, -1)) {
+      for (const layer of currentUserRoute.stack.filter(
+        (layer) => layer.handle.name === 'authRateLimit'
+      )) {
         await layer.handle(request, createResponse(), () => {});
       }
     }
 
     expect(calls).toEqual([
+      {
+        scope: 'auth-me-client-minute',
+        key: '203.0.113.10',
+        limit: 6_000,
+        windowMs: 60 * 1000
+      },
       {
         scope: 'auth-me-user-minute',
         key: 'user-1',
@@ -143,12 +190,6 @@ describe('authRoutes refresh rate limits', () => {
         scope: 'auth-me-user-minute',
         key: 'user-2',
         limit: 120,
-        windowMs: 60 * 1000
-      },
-      {
-        scope: 'auth-me-client-minute',
-        key: '203.0.113.10',
-        limit: 6_000,
         windowMs: 60 * 1000
       }
     ]);

@@ -1,7 +1,8 @@
 import {
   clearAuthCookies,
+  getAccessTokenFromRequest,
+  getBearerAccessTokenFromRequest,
   getRefreshTokenFromRequest,
-  getRequestAccessToken,
   setAuthCookies
 } from '../lib/cookies.js';
 import { recordAccountDeletionRevocationFailure } from '../lib/operationalTelemetry.js';
@@ -106,19 +107,31 @@ export async function logoutHandler(request, response, next) {
   clearAuthCookies(response);
 
   try {
-    const accessToken = getRequestAccessToken(request);
-    const accessPayload = accessToken
-      ? verifyAccessToken(accessToken, {
-          secret: serverConfig.jwtSecret,
-          issuer: serverConfig.jwtIssuer,
-          audience: serverConfig.jwtAudience
-        })
-      : null;
-
     const revocationOperations = [logoutUser(getRefreshTokenFromRequest(request))];
+    const verifiedAccessPayloads = [
+      getAccessTokenFromRequest(request),
+      getBearerAccessTokenFromRequest(request)
+    ].map((accessToken) =>
+      verifyAccessToken(accessToken, {
+        secret: serverConfig.jwtSecret,
+        issuer: serverConfig.jwtIssuer,
+        audience: serverConfig.jwtAudience
+      })
+    );
+    const accessRevocations = new Map();
 
-    if (accessPayload?.jti && accessPayload?.exp) {
-      revocationOperations.push(revokeToken(accessPayload.jti, accessPayload.exp));
+    for (const accessPayload of verifiedAccessPayloads) {
+      if (
+        typeof accessPayload?.jti === 'string' &&
+        accessPayload.jti &&
+        Number.isSafeInteger(accessPayload.exp)
+      ) {
+        accessRevocations.set(accessPayload.jti, accessPayload.exp);
+      }
+    }
+
+    for (const [jti, exp] of accessRevocations) {
+      revocationOperations.push(revokeToken(jti, exp));
     }
 
     const revocationResults = await Promise.allSettled(revocationOperations);
