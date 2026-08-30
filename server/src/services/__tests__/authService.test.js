@@ -1,17 +1,29 @@
 import { scryptSync } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { hashPassword } from '../../lib/password.js';
 
 const prismaMock = {
   user: {
     findUnique: vi.fn(),
     create: vi.fn(),
-    update: vi.fn()
+    update: vi.fn(),
+    deleteMany: vi.fn()
   },
   authSession: {
     create: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn()
+  },
+  ingredient: {
+    findMany: vi.fn()
+  },
+  importCorrection: {
+    findMany: vi.fn()
+  },
+  recommendationEvent: {
+    findMany: vi.fn(),
+    deleteMany: vi.fn()
   }
 };
 
@@ -226,5 +238,81 @@ describe('authService', () => {
         revokedAt: expect.any(Date)
       }
     });
+  });
+
+  it('exports only the authenticated user data without password or session secrets', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      createdAt: new Date('2026-08-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-08-02T00:00:00.000Z')
+    });
+    prismaMock.ingredient.findMany.mockResolvedValue([{ id: 'ingredient-1', userId: 'user-1' }]);
+    prismaMock.importCorrection.findMany.mockResolvedValue([{ id: 'correction-1' }]);
+    prismaMock.recommendationEvent.findMany.mockResolvedValue([{ id: 'event-1' }]);
+    const { exportUserData } = await import('../authService.js');
+
+    const result = await exportUserData('user-1');
+
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+    expect(prismaMock.ingredient.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'user-1' } })
+    );
+    expect(result).toMatchObject({
+      schemaVersion: 1,
+      account: { id: 'user-1', email: 'user@example.com' },
+      ingredients: [{ id: 'ingredient-1', userId: 'user-1' }],
+      importCorrections: [{ id: 'correction-1' }],
+      recommendationEvents: [{ id: 'event-1' }]
+    });
+    expect(result.account).not.toHaveProperty('passwordHash');
+  });
+
+  it('requires the current password and deletes linked recommendation events before the user', async () => {
+    const passwordHash = await hashPassword('StrongPassphrase123!');
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      passwordHash
+    });
+    prismaMock.recommendationEvent.deleteMany.mockResolvedValue({ count: 2 });
+    prismaMock.user.deleteMany.mockResolvedValue({ count: 1 });
+    const { deleteUserAccount } = await import('../authService.js');
+
+    await expect(deleteUserAccount('user-1', 'StrongPassphrase123!')).resolves.toBeUndefined();
+
+    expect(prismaMock.recommendationEvent.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' }
+    });
+    expect(prismaMock.user.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'user-1' }
+    });
+    expect(prismaMock.recommendationEvent.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
+      prismaMock.user.deleteMany.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('does not delete any account data when the current password is wrong', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      passwordHash: await hashPassword('StrongPassphrase123!')
+    });
+    const { deleteUserAccount } = await import('../authService.js');
+
+    await expect(deleteUserAccount('user-1', 'WrongPassphrase123!')).rejects.toMatchObject({
+      status: 403,
+      message: 'Current password is incorrect.'
+    });
+    expect(prismaMock.recommendationEvent.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.user.deleteMany).not.toHaveBeenCalled();
   });
 });

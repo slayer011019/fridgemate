@@ -1,9 +1,10 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   buildUserStorageScope,
-  GUEST_STORAGE_SCOPE,
+  GUEST_STORAGE_SCOPE
 } from '../features/auth/authStorage';
 import {
+  deleteAccountWithSession,
   loginWithSession,
   logoutSession,
   refreshStoredSession,
@@ -24,6 +25,7 @@ const defaultGuestImportPrompt = {
 
 const defaultAuthContext = {
   backendEnabled: isBackendEnabled(),
+  deleteAccount: async () => ({ localCleanupComplete: false }),
   dismissGuestImport: () => {},
   error: '',
   guestImportPrompt: defaultGuestImportPrompt,
@@ -137,6 +139,19 @@ export function AuthProvider({ children }) {
     [backendEnabled]
   );
 
+  const deleteAccount = useCallback(
+    async (password) =>
+      deleteAccountWithSession(password, {
+        backendEnabled,
+        user,
+        setSession,
+        setGuestImportPrompt,
+        setError,
+        defaultGuestImportPrompt
+      }),
+    [backendEnabled, user]
+  );
+
   const importGuestIngredients = useCallback(
     async () =>
       importGuestIngredientsForUser({
@@ -162,6 +177,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
       backendEnabled,
+      deleteAccount,
       dismissGuestImport,
       error,
       guestImportPrompt,
@@ -178,6 +194,7 @@ export function AuthProvider({ children }) {
     }),
     [
       backendEnabled,
+      deleteAccount,
       dismissGuestImport,
       error,
       guestImportPrompt,

@@ -3,6 +3,8 @@ import { configureServerRuntime } from '../../config.js';
 import { createAccessToken } from '../../lib/token.js';
 
 const serviceMocks = vi.hoisted(() => ({
+  deleteUserAccount: vi.fn(),
+  exportUserData: vi.fn(),
   logoutUser: vi.fn()
 }));
 
@@ -11,6 +13,8 @@ const revocationMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../services/authService.js', () => ({
+  deleteUserAccount: serviceMocks.deleteUserAccount,
+  exportUserData: serviceMocks.exportUserData,
   getCurrentUser: vi.fn(),
   loginUser: vi.fn(),
   logoutUser: serviceMocks.logoutUser,
@@ -45,6 +49,7 @@ function createRequest() {
 function createResponse() {
   const response = {
     headers: {},
+    json: vi.fn(),
     send: vi.fn(),
     setHeader(name, value) {
       this.headers[name] = value;
@@ -55,7 +60,7 @@ function createResponse() {
   return response;
 }
 
-describe('authController logoutHandler', () => {
+describe('authController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     configureServerRuntime({
@@ -69,6 +74,8 @@ describe('authController logoutHandler', () => {
       REFRESH_TOKEN_COOKIE_NAME: '__Host-fridgemate_refresh'
     });
     serviceMocks.logoutUser.mockResolvedValue(undefined);
+    serviceMocks.deleteUserAccount.mockResolvedValue(undefined);
+    serviceMocks.exportUserData.mockResolvedValue({ schemaVersion: 1 });
     revocationMocks.revokeToken.mockResolvedValue(undefined);
   });
 
@@ -147,5 +154,55 @@ describe('authController logoutHandler', () => {
     expect(revocationMocks.revokeToken).not.toHaveBeenCalled();
     expect(response.status).toHaveBeenCalledWith(204);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('exports only the service-produced user archive as an attachment', async () => {
+    const response = createResponse();
+    const next = vi.fn();
+    const request = { auth: { userId: 'user-1' } };
+    const { exportUserDataHandler } = await import('../authController.js');
+
+    await exportUserDataHandler(request, response, next);
+
+    expect(serviceMocks.exportUserData).toHaveBeenCalledWith('user-1');
+    expect(response.headers['Content-Disposition']).toMatch(/^attachment; filename="fridgemate-data-\d{4}-\d{2}-\d{2}\.json"$/);
+    expect(response.json).toHaveBeenCalledWith({ schemaVersion: 1 });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('expires cookies only after password-confirmed account deletion succeeds', async () => {
+    const response = createResponse();
+    const next = vi.fn();
+    const request = {
+      auth: { userId: 'user-1' },
+      body: { password: 'StrongPassphrase123!' }
+    };
+    const { deleteUserAccountHandler } = await import('../authController.js');
+
+    await deleteUserAccountHandler(request, response, next);
+
+    expect(serviceMocks.deleteUserAccount).toHaveBeenCalledWith('user-1', 'StrongPassphrase123!');
+    expect(response.headers['Set-Cookie']).toHaveLength(4);
+    expect(response.status).toHaveBeenCalledWith(204);
+    expect(response.send).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('keeps the current cookies when account deletion is rejected', async () => {
+    const deletionError = Object.assign(new Error('Current password is incorrect.'), { status: 403 });
+    serviceMocks.deleteUserAccount.mockRejectedValue(deletionError);
+    const response = createResponse();
+    const next = vi.fn();
+    const { deleteUserAccountHandler } = await import('../authController.js');
+
+    await deleteUserAccountHandler(
+      { auth: { userId: 'user-1' }, body: { password: 'wrong-password' } },
+      response,
+      next
+    );
+
+    expect(response.headers['Set-Cookie']).toBeUndefined();
+    expect(response.status).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(deletionError);
   });
 });

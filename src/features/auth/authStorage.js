@@ -110,3 +110,11 @@ export function setGuestImportDecision(userId, decision) {
 
   writeStorageValue(getGuestImportDecisionKey(userId), decision);
 }
+
+export function clearGuestImportDecision(userId) {
+  if (!userId) {
+    return;
+  }
+
+  removeStorageValue(getGuestImportDecisionKey(userId));
+}

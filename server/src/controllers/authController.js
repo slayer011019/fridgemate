@@ -1,7 +1,15 @@
 import { clearAuthCookies, getAccessTokenFromRequest, getRefreshTokenFromRequest, setAuthCookies } from '../lib/cookies.js';
 import { verifyAccessToken } from '../lib/token.js';
 import { serverConfig } from '../config.js';
-import { getCurrentUser, loginUser, logoutUser, refreshUserSession, signupUser } from '../services/authService.js';
+import {
+  deleteUserAccount,
+  exportUserData,
+  getCurrentUser,
+  loginUser,
+  logoutUser,
+  refreshUserSession,
+  signupUser
+} from '../services/authService.js';
 import { revokeToken } from '../middleware/revokedTokenStore.js';
 
 export async function signupHandler(request, response, next) {
@@ -45,6 +53,29 @@ export async function getCurrentUserHandler(request, response, next) {
   try {
     const user = await getCurrentUser(request.auth.userId);
     response.json(user);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function exportUserDataHandler(request, response, next) {
+  try {
+    const exportData = await exportUserData(request.auth.userId);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="fridgemate-data-${new Date().toISOString().slice(0, 10)}.json"`
+    );
+    response.json(exportData);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteUserAccountHandler(request, response, next) {
+  try {
+    await deleteUserAccount(request.auth.userId, request.body?.password);
+    clearAuthCookies(response);
+    response.status(204).send();
   } catch (error) {
     next(error);
   }

@@ -267,3 +267,105 @@ export async function getCurrentUser(userId) {
 
   return serializeUser(user);
 }
+
+export async function exportUserData(userId) {
+  return withUserDatabaseScope(userId, async (database) => {
+    const user = await database.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!user) {
+      throw createHttpError(401, 'The current session is no longer valid.');
+    }
+
+    const ingredients = await database.ingredient.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
+    });
+    const importCorrections = await database.importCorrection.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        sourceKey: true,
+        sourceText: true,
+        correctedName: true,
+        category: true,
+        storageType: true,
+        usageCount: true,
+        lastUsedAt: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+    const recommendationEvents = await database.recommendationEvent.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        recipeId: true,
+        eventType: true,
+        sessionId: true,
+        rank: true,
+        score: true,
+        matchRate: true,
+        missingIngredientCount: true,
+        urgentMatchCount: true,
+        canMakeNow: true,
+        source: true,
+        metadata: true,
+        createdAt: true
+      }
+    });
+
+    return {
+      schemaVersion: 1,
+      generatedAt: new Date().toISOString(),
+      account: user,
+      ingredients,
+      importCorrections,
+      recommendationEvents
+    };
+  });
+}
+
+export async function deleteUserAccount(userId, password) {
+  const normalizedPassword = String(password || '');
+
+  if (!normalizedPassword || normalizedPassword.length > 128) {
+    throw createHttpError(400, 'Current password is required.');
+  }
+
+  return withUserDatabaseScope(userId, async (database) => {
+    const user = await database.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw createHttpError(401, 'The current session is no longer valid.');
+    }
+
+    const passwordCheck = await verifyPassword(normalizedPassword, user.passwordHash);
+
+    if (!passwordCheck.matches) {
+      throw createHttpError(403, 'Current password is incorrect.');
+    }
+
+    await database.recommendationEvent.deleteMany({
+      where: { userId }
+    });
+    const deletedUser = await database.user.deleteMany({
+      where: { id: userId }
+    });
+
+    if (deletedUser.count !== 1) {
+      throw createHttpError(409, 'The account could not be deleted. Please try again.');
+    }
+  });
+}

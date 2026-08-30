@@ -1,9 +1,15 @@
+import { useState } from 'react';
+import { exportUserData } from '../api/authApi';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../hooks/useAuth';
 import { useIngredients } from '../hooks/useIngredients';
 
 function AccountPage() {
-  const { dismissGuestImport, error, guestImportPrompt, importGuestIngredients, logout, user } = useAuth();
+  const { deleteAccount, dismissGuestImport, error, guestImportPrompt, importGuestIngredients, logout, user } = useAuth();
+  const [privacyStatus, setPrivacyStatus] = useState('');
+  const [privacyError, setPrivacyError] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
   const {
     hasUnsyncedChanges,
     lastSyncedAt,
@@ -27,6 +33,46 @@ function AccountPage() {
         timeStyle: 'short'
       }).format(new Date(lastSyncedAt))
     : '아직 동기화하지 않았습니다.';
+
+  const handleDataExport = async () => {
+    setPrivacyError('');
+    setPrivacyStatus('내 데이터를 준비하고 있습니다...');
+
+    try {
+      const exportData = await exportUserData();
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = `fridgemate-data-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(downloadUrl);
+      setPrivacyStatus('내 데이터 파일을 내려받았습니다.');
+    } catch (nextError) {
+      setPrivacyStatus('');
+      setPrivacyError(nextError.message || '내 데이터를 내려받지 못했습니다.');
+    }
+  };
+
+  const handleAccountDeletion = async (event) => {
+    event.preventDefault();
+
+    if (!window.confirm('계정과 서버에 저장된 데이터를 영구 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) {
+      return;
+    }
+
+    setPrivacyError('');
+    setPrivacyStatus('계정과 데이터를 삭제하고 있습니다...');
+
+    try {
+      await deleteAccount(deletePassword);
+    } catch (nextError) {
+      setPrivacyStatus('');
+      setPrivacyError(nextError.message || '계정을 삭제하지 못했습니다.');
+    }
+  };
 
   return (
     <div className="section-shell">
@@ -52,6 +98,66 @@ function AccountPage() {
             {'\uB85C\uADF8\uC544\uC6C3'}
           </button>
         </div>
+      </section>
+
+      <section className="card space-y-4">
+        <div>
+          <p className="kicker">개인정보 관리</p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-900">내 데이터 내려받기와 계정 삭제</h3>
+          <p className="mt-2 text-sm leading-6 muted">
+            서버에 저장된 계정 정보, 재료, 가져오기 교정 기록, 계정에 연결된 추천 이벤트를 JSON 파일로 받을 수
+            있습니다. 인증 토큰과 비밀번호 해시는 포함하지 않습니다.
+          </p>
+        </div>
+
+        {privacyStatus ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            {privacyStatus}
+          </div>
+        ) : null}
+        {privacyError ? (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{privacyError}</div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-3">
+          <button className="btn-secondary" onClick={handleDataExport} type="button">
+            내 데이터 내려받기
+          </button>
+          <button
+            className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+            onClick={() => setShowDeleteForm((current) => !current)}
+            type="button"
+          >
+            계정 삭제
+          </button>
+        </div>
+
+        {showDeleteForm ? (
+          <form className="space-y-3 rounded-lg border border-rose-200 bg-rose-50/60 p-4" onSubmit={handleAccountDeletion}>
+            <div>
+              <label className="text-sm font-semibold text-slate-900" htmlFor="account-delete-password">
+                현재 비밀번호
+              </label>
+              <input
+                autoComplete="current-password"
+                className="input mt-2 w-full"
+                id="account-delete-password"
+                maxLength={128}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                required
+                type="password"
+                value={deletePassword}
+              />
+            </div>
+            <p className="text-sm leading-6 text-rose-800">
+              서버의 계정 및 연결 데이터와 이 기기에 남은 해당 계정의 재료 캐시를 삭제합니다. 삭제 후 복구할 수
+              없습니다.
+            </p>
+            <button className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800" type="submit">
+              영구 삭제 확인
+            </button>
+          </form>
+        ) : null}
       </section>
 
       <section className="card space-y-4">

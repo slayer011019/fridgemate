@@ -56,6 +56,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added authenticated self-service JSON data export and password-confirmed account deletion with scoped RLS delete policies, attempt limits, cookie expiry, and current-device account-cache cleanup.
 - Added weekly Dependabot updates, pinned-action CodeQL analysis, production dependency audits, and full-history Gitleaks scanning for pushes, pull requests, and scheduled security checks.
 - Added a rate-limited, authenticated `/api/recipes/recommendations/semantic` endpoint behind `SEMANTIC_RECIPE_API_ENABLED`, with bounded inputs, rule fallback, and the existing impression/click event path.
 - Added candidate-pool recall and production-equivalent 70/30 reranking metrics to the recipe search evaluator without changing the retrieval model or vector dimensions.
