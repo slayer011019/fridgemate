@@ -75,7 +75,8 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] With `app.current_user_id` unset, direct runtime-role reads of `Ingredient` and `ImportCorrection` return no rows; with user A set locally in a transaction, user B rows remain inaccessible.
 - [ ] `GET /api/health` returns only `{ "status": "ok" }` and does not expose database state.
 - [ ] Verify database connectivity through authenticated functional smoke tests and private platform telemetry.
-- [ ] Update any external uptime or Cloudflare Health Check assertion that previously parsed `db` or `timestamp`; the public contract is now only `status: ok`.
+- [x] The scheduled GitHub Actions uptime check validates the public `{status: "ok"}` contract every 15 minutes without parsing removed `db` or `timestamp` fields.
+- [ ] Enable GitHub Actions failure notifications for the repository owner, and add a separate paging channel or Cloudflare Health Check if near-real-time alerts are required.
 
 ## Migration History Integrity
 

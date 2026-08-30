@@ -1,0 +1,31 @@
+name: Uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: production-uptime
+  cancel-in-progress: true
+
+jobs:
+  production-health:
+    name: Production health
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify the public health contract
+        env:
+          HEALTH_URL: https://api.xn--wh1bs8l5xa003adme.com/api/health
+        run: |
+          response="$(curl --silent --show-error --fail --retry 2 --retry-all-errors --connect-timeout 5 --max-time 10 "$HEALTH_URL")"
+          RESPONSE="$response" node -e '
+            const payload = JSON.parse(process.env.RESPONSE || "null");
+            const keys = payload && typeof payload === "object" ? Object.keys(payload) : [];
+            if (keys.length !== 1 || keys[0] !== "status" || payload.status !== "ok") {
+              throw new Error("Unexpected production health response contract.");
+            }
+          '
