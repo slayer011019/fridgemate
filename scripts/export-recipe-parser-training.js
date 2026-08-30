@@ -5,6 +5,7 @@ import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import { parseIngredientsText, repairMojibakeText } from './parse-recipe-ingredients.js';
+import { resolveReadOnlySupabaseKey } from './lib/supabaseReadOnlyKey.js';
 
 const SOURCE = 'MFDS_COOKRCP01';
 const DEFAULT_LIMIT = 100;
@@ -64,7 +65,7 @@ async function readRecipes({ supabase, limit }) {
       .range(from, to);
 
     if (error) {
-      throw error;
+      throw new Error('Supabase recipe read failed.');
     }
 
     if (!recipes?.length) break;
@@ -180,8 +181,8 @@ async function writeJsonl(filePath, examples) {
 async function run() {
   const options = parseArgs();
   const supabaseUrl = normalizeSupabaseUrl(requireEnv('SUPABASE_URL'));
-  const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  const anonKey = resolveReadOnlySupabaseKey();
+  const supabase = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false }
   });
 
@@ -217,12 +218,13 @@ export {
   buildParsedExample,
   buildSkippedExample,
   buildTrainingExamples,
-  parseArgs
+  parseArgs,
+  resolveReadOnlySupabaseKey
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   run().catch((error) => {
-    console.error(error.message || error);
+    console.error(error instanceof Error ? error.message : 'Recipe parser training export failed.');
     process.exitCode = 1;
   });
 }

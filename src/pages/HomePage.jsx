@@ -8,12 +8,23 @@ import { useHomePageModel } from '../hooks/useHomePageModel';
 import { isOcrEnabled } from '../utils/backendConfig';
 import { getCategoryLabel, getStorageLabel, joinIngredientLabels } from '../utils/displayText';
 import { getExpiryLabel, getRemainingDays } from '../utils/date';
+import { useMenuDecision } from '../hooks/useMenuDecision';
+import RecipeExternalLinks from '../components/RecipeExternalLinks';
 
 function HomePage() {
   const ocrEnabled = isOcrEnabled();
   const { trackEvent } = useAnalytics();
   const lastViewSignatureRef = useRef('');
   const { loading, summary, topRecommendations, upcomingItems, urgentCount } = useHomePageModel();
+  const {
+    cancelMenu,
+    completeMenu,
+    decision,
+    error: menuDecisionError,
+    recordExternalOpen,
+    retrySync,
+    syncing: menuDecisionSyncing
+  } = useMenuDecision();
   const isEmptyDashboard = !loading && summary.total === 0 && urgentCount === 0 && topRecommendations.length === 0;
   const summaryItems = [
     {
@@ -76,6 +87,46 @@ function HomePage() {
           </>
         }
       />
+
+      {decision && decision.status !== 'cancelled' ? (
+        <section className="border-y border-emerald-200 bg-emerald-50/70 px-4 py-5 sm:px-6" aria-labelledby="today-menu-title">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="kicker">오늘 선택한 메뉴</p>
+              <h2 id="today-menu-title" className="mt-1.5 text-xl font-semibold text-slate-950">
+                {decision.recipeName}
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {decision.status === 'completed' ? '오늘 먹은 메뉴로 기록했어요.' : '홈에서 바로 조리법을 확인하고 완료할 수 있어요.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {decision.status !== 'completed' ? (
+                <button className="btn-primary" disabled={menuDecisionSyncing} onClick={completeMenu} type="button">
+                  먹었어요
+                </button>
+              ) : null}
+              <button className="btn-secondary" disabled={menuDecisionSyncing} onClick={cancelMenu} type="button">
+                선택 취소
+              </button>
+              {decision.syncState === 'pending' || decision.syncState === 'error' ? (
+                <button className="btn-secondary" disabled={menuDecisionSyncing} onClick={retrySync} type="button">
+                  서버 저장 다시 시도
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <RecipeExternalLinks
+            recipeName={decision.recipeName}
+            onOpen={() => recordExternalOpen({
+              id: decision.recipeKey,
+              title: decision.recipeName,
+              _recommendationSource: decision.recommendationSource
+            }, { screen: 'home' })}
+          />
+          {menuDecisionError ? <p className="mt-3 text-sm font-medium text-rose-700">{menuDecisionError}</p> : null}
+        </section>
+      ) : null}
 
       <section className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {summaryItems.map((item) => (
@@ -177,6 +228,7 @@ function HomePage() {
           </div>
         </div>
       </section>
+
       <section className="card space-y-4">
         <div>
           <p className="kicker">처음 시작한다면</p>

@@ -38,6 +38,7 @@ npm run recipes:embed -- --backfill-missing --all --resume --batch-size=25 --api
 
 - The embedding API receives multiple public catalog texts per request, capped at 100 inputs and defaulting to 25.
 - HTTP 429, 5xx, and network failures retry with bounded exponential backoff; other 4xx responses fail immediately.
+- Each provider attempt is aborted after 60 seconds by default, including response-body parsing. `--request-timeout-ms` may lower the deadline or raise it only up to 120 seconds.
 - UUID keyset pagination replaces offset pagination, so a resumed run cannot skip the next catalog page.
 - `.local/recipe-embedding-backfill-state.json` stores only operation metadata and the last successfully committed recipe UUID. It contains no API key, database URL, recipe text, or vector.
 - The state file is updated after each successful upsert. A failed item is never recorded as successful, so `--resume` retries it safely.

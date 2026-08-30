@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import PantryStaplesPanel from '../components/PantryStaplesPanel';
@@ -8,6 +8,7 @@ import AdSenseSlot from '../components/ads/AdSenseSlot';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useDBRecommendations } from '../hooks/useDBRecommendations';
 import { useRecipesPageModel } from '../hooks/useRecipesPageModel';
+import { isExternalAiUiEnabled } from '../api/externalAiRequest';
 import { getPublicRecipePath, publicRecipeCatalog } from '../features/recipes/publicRecipeCatalog';
 import {
   getPublicRecipeLinkItems,
@@ -25,6 +26,7 @@ const publicRecipeLinksByDishType = Object.entries(
 function RecipesPage() {
   const { trackEvent } = useAnalytics();
   const lastViewSignatureRef = useRef('');
+  const [externalAiConsent, setExternalAiConsent] = useState(false);
   const {
     pantryStaples,
     pantryOwnership,
@@ -49,6 +51,12 @@ function RecipesPage() {
     ingredients,
     pantryItems: ownedPantryItems
   });
+
+  const handleExternalAiRequest = async () => {
+    if (!externalAiConsent) return;
+    setExternalAiConsent(false);
+    await dbRecommendationsState.requestExternalAiRecommendations();
+  };
 
   useEffect(() => {
     if (loading) {
@@ -83,7 +91,6 @@ function RecipesPage() {
   const handleRecommendationSelect = (group) => (recipe) => {
     trackEvent('recommendation_clicked', {
       screen: 'recipes',
-      recipe_name: recipe.title,
       group,
       score: recipe.score ?? null,
       missing_core_count: recipe.missingCore?.length ?? recipe.missingIngredients?.length ?? recipe.missingCount ?? 0
@@ -271,16 +278,64 @@ function RecipesPage() {
         emptyActionTo="/ingredients/new"
       />
 
+      {isExternalAiUiEnabled() && !dbRecommendationsState.hidden && !dbRecommendationsState.needsLogin ? (
+        <section className="rounded-lg border border-cyan-200 bg-cyan-50/70 p-4 sm:p-5" aria-labelledby="external-ai-title">
+          <h2 id="external-ai-title" className="text-base font-semibold text-slate-900">
+            외부 AI 유사도 검색은 선택 사항이에요
+          </h2>
+          <p id="external-ai-disclosure" className="mt-1.5 text-sm leading-6 text-slate-700">
+            실행하면 현재 활성 재료명을 바탕으로 만든 짧은 검색 문자열을 OpenAI에 한 번 전송해 레시피
+            유사도를 계산합니다. 수량, 정확한 유통기한, 메모, 이메일은 보내지 않습니다. 기본 추천은 이 기능을
+            사용하지 않아도 계속 이용할 수 있습니다. 자세한 내용은{' '}
+            <Link className="font-semibold text-brand-700 underline underline-offset-2" to="/privacy">
+              개인정보 처리 안내
+            </Link>
+            에서 확인할 수 있습니다.
+          </p>
+          <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 rounded-md bg-white p-3 text-sm text-slate-800">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-5 w-5 rounded border-slate-300 text-brand-700 focus:ring-brand-600"
+              checked={externalAiConsent}
+              onChange={(event) => setExternalAiConsent(event.target.checked)}
+            />
+            <span>이번 요청에 한해 위 항목을 OpenAI로 전송하는 데 동의합니다.</span>
+          </label>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn-primary min-h-11"
+              aria-describedby="external-ai-disclosure"
+              disabled={!externalAiConsent || dbRecommendationsState.loading || activeIngredientCount === 0}
+              onClick={handleExternalAiRequest}
+            >
+              {dbRecommendationsState.loading ? '추천을 찾는 중...' : 'OpenAI로 유사 레시피 찾기'}
+            </button>
+            {dbRecommendationsState.mode === 'semantic' ? (
+              <p className="text-sm text-cyan-900" role="status">외부 AI 유사도를 반영한 결과예요.</p>
+            ) : null}
+            {dbRecommendationsState.mode === 'rule-fallback' ? (
+              <p className="text-sm text-slate-700" role="status">외부 AI 결과를 사용할 수 없어 서버 기본 추천을 표시합니다.</p>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       <RecommendationRow
-        title={'AI 추천'}
-        description={'DB 레시피 카탈로그에서 현재 재료와 비슷한 후보를 찾아 보여줘요.'}
+        title={dbRecommendationsState.mode === 'semantic' ? '외부 AI 유사도 추천' : '서버 카탈로그 추천'}
+        description={
+          dbRecommendationsState.mode === 'semantic'
+            ? '명시적으로 요청한 OpenAI 유사도와 서버의 재료 점수를 함께 반영했어요.'
+            : '서버 레시피 카탈로그를 재료 점수로 정렬하며 외부 AI에는 전송하지 않아요.'
+        }
         recipes={dbRecommendationsState.recommendations}
         loading={dbRecommendationsState.loading}
         error={dbRecommendationsState.error}
         hidden={dbRecommendationsState.hidden}
         needsLogin={dbRecommendationsState.needsLogin}
         observeRef={dbRecommendationsState.rowRef}
-        source="hybrid"
+        source={dbRecommendationsState.mode === 'semantic' ? 'hybrid' : 'rule'}
+        loginMessage={'로그인하면 서버 카탈로그 추천을 볼 수 있어요'}
         onRecipeSelect={handleRecommendationSelect('ai')}
         emptyTitle={'AI 추천 후보가 아직 없어요'}
         emptyDescription={'DB 레시피 카탈로그에 매칭되는 후보가 생기면 이 행에 표시됩니다.'}

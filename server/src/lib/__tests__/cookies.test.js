@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { configureServerRuntime } from '../../config.js';
-import { clearAuthCookies, setAuthCookies } from '../cookies.js';
+import {
+  clearAuthCookies,
+  getBearerAccessTokenFromRequest,
+  getCookie,
+  getRequestAccessToken,
+  parseCookieHeader,
+  setAuthCookies
+} from '../cookies.js';
 
 function createResponse() {
   return {
@@ -44,5 +51,37 @@ describe('auth cookie migration', () => {
 
     expect(response.headers['Set-Cookie']).toHaveLength(4);
     expect(response.headers['Set-Cookie'].every((cookie) => cookie.includes('Max-Age=0'))).toBe(true);
+  });
+
+  it('uses a well-formed bearer token before the cookie token', () => {
+    const request = {
+      headers: {
+        authorization: 'Bearer bearer-token',
+        cookie: '__Host-fridgemate_access=cookie-token'
+      }
+    };
+
+    expect(getBearerAccessTokenFromRequest(request)).toBe('bearer-token');
+    expect(getRequestAccessToken(request)).toBe('bearer-token');
+    expect(getBearerAccessTokenFromRequest({ headers: { authorization: 'Bearer one extra' } })).toBe('');
+  });
+
+  it('parses cookie names into a Map without assigning remote property names onto an object', () => {
+    const cookies = parseCookieHeader(
+      '__proto__=polluted; constructor=shadowed; safe-cookie=encoded%20value; invalid name=ignored'
+    );
+
+    expect(cookies).toBeInstanceOf(Map);
+    expect(cookies.get('__proto__')).toBe('polluted');
+    expect(cookies.get('constructor')).toBe('shadowed');
+    expect(cookies.get('safe-cookie')).toBe('encoded value');
+    expect(cookies.has('invalid name')).toBe(false);
+    expect(Object.prototype.polluted).toBeUndefined();
+    expect(getCookie({ headers: { cookie: 'safe-cookie=token' } }, 'safe-cookie')).toBe('token');
+  });
+
+  it('fails closed on oversized or malformed cookie headers', () => {
+    expect(parseCookieHeader(`name=${'a'.repeat(8192)}`).size).toBe(0);
+    expect(parseCookieHeader('name=%E0%A4%A').size).toBe(0);
   });
 });

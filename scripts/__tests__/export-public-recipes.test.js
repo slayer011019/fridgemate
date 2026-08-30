@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { mapPublicRecipe, parseArgs } from '../export-public-recipes.js';
+import { resolve } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  PUBLIC_RECIPES_OUTPUT_PATH,
+  exportPublicRecipes,
+  mapPublicRecipe,
+  parseArgs
+} from '../export-public-recipes.js';
 
 const READY_ROW = {
   RCP_SEQ: '42',
@@ -21,6 +27,16 @@ const READY_ROW = {
   MANUAL02: '재료를 끓인다.',
   RCP_NA_TIP: '소금은 적게 사용한다.'
 };
+const originalFoodSafetyApiKey = process.env.FOODSAFETY_API_KEY;
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  if (originalFoodSafetyApiKey === undefined) {
+    delete process.env.FOODSAFETY_API_KEY;
+  } else {
+    process.env.FOODSAFETY_API_KEY = originalFoodSafetyApiKey;
+  }
+});
 
 describe('export-public-recipes', () => {
   it('maps only source-backed recipe fields and upgrades MFDS image URLs to HTTPS', () => {
@@ -52,10 +68,50 @@ describe('export-public-recipes', () => {
         ATT_FILE_NO_MK: 'https://attacker.example/image-large.jpg'
       })
     ).toBeNull();
+
+    expect(
+      mapPublicRecipe({
+        ...READY_ROW,
+        ATT_FILE_NO_MAIN: 'https://www.foodsafetykorea.go.kr.attacker.example/image-small.jpg',
+        ATT_FILE_NO_MK: 'https://user@www.foodsafetykorea.go.kr/image-large.jpg'
+      })
+    ).toBeNull();
   });
 
-  it('caps exports and requires an explicit write flag', () => {
-    expect(parseArgs(['--limit=9999'])).toEqual({ write: false, limit: 500 });
-    expect(parseArgs(['--limit=25', '--write'])).toEqual({ write: true, limit: 25 });
+  it('caps previews and requires a separate reviewed file before writing', () => {
+    expect(parseArgs(['--limit=9999'])).toEqual({ printReview: false, writeFrom: '', limit: 500 });
+    expect(parseArgs(['--limit=25', '--print-review'])).toEqual({
+      printReview: true,
+      writeFrom: '',
+      limit: 25
+    });
+    expect(parseArgs(['--write-from=review/public-recipes.json'])).toMatchObject({
+      writeFrom: 'review/public-recipes.json'
+    });
+    expect(() => parseArgs(['--write'])).toThrow('Direct network-to-file export is disabled');
+  });
+
+  it('uses a fixed repository output path and rejects non-primitive required fields', () => {
+    expect(PUBLIC_RECIPES_OUTPUT_PATH).toBe(resolve(process.cwd(), 'src/data/publicRecipes.json'));
+    expect(mapPublicRecipe({ ...READY_ROW, RCP_NM: { malicious: true } })).toBeNull();
+  });
+
+  it('rejects an oversized network response before reading its body', async () => {
+    const readBody = vi.fn();
+    process.env.FOODSAFETY_API_KEY = 'test-key';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        headers: { get: () => String(20 * 1024 * 1024 + 1) },
+        body: null,
+        text: readBody,
+        ok: true
+      })
+    );
+
+    await expect(
+      exportPublicRecipes({ limit: 1, printReview: false, writeFrom: '' })
+    ).rejects.toThrow('response exceeded the safe size limit');
+    expect(readBody).not.toHaveBeenCalled();
   });
 });

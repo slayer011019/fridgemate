@@ -114,6 +114,10 @@ SELECT
   (SELECT COUNT(*) FROM "Ingredient") AS ingredients,
   (SELECT COUNT(*) FROM "ImportCorrection") AS import_corrections,
   (SELECT COUNT(*) FROM "RecommendationEvent") AS recommendation_events,
+  (SELECT COUNT(*) FROM "MenuDecision") AS menu_decisions,
+  (SELECT COUNT(*) FROM "PantryOwnership") AS pantry_ownership,
+  (SELECT COUNT(*) FROM "UserPreference") AS user_preferences,
+  (SELECT COUNT(*) FROM "ProductEvent") AS product_events,
   (SELECT COUNT(*) FROM recipes) AS recipes,
   (SELECT COUNT(*) FROM recipe_ingredients) AS recipe_ingredients,
   (SELECT COUNT(*) FROM recipe_embeddings) AS recipe_embeddings;
@@ -132,6 +136,10 @@ WHERE namespace.nspname = 'public'
     'Ingredient',
     'ImportCorrection',
     'RecommendationEvent',
+    'MenuDecision',
+    'PantryOwnership',
+    'UserPreference',
+    'ProductEvent',
     'recipes',
     'recipe_ingredients'
   )

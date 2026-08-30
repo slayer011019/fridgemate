@@ -8,6 +8,11 @@ import {
   buildUnitAlternation,
   normalizeUnit
 } from './lib/unitNormalizer.js';
+import { resolveReadOnlySupabaseKey } from './lib/supabaseReadOnlyKey.js';
+import {
+  parseWriteIntent,
+  requireConfirmedSupabaseWrite
+} from './lib/supabaseWriteGuard.js';
 
 const SOURCE = 'MFDS_COOKRCP01';
 
@@ -23,8 +28,7 @@ const FRACTIONS = {
   '⅞': 0.875,
 };
 
-const HTML_TAG_PATTERN = /<[^>]*>/g;
-const BR_TAG_PATTERN = /<br\s*\/?>/gi;
+const SAFE_INGREDIENT_MARKUP_TAGS = new Set(['b', 'br', 'div', 'em', 'i', 'p', 'span', 'strong']);
 const SERVING_INFO_PATTERN = /^\d+\s*인분(?:\s*기준)?$/;
 const METADATA_LINE_PATTERN = /^(?:\d+\s*인분(?:\s*기준)?|기준)$/;
 const UNIT_ALTERNATION = buildUnitAlternation();
@@ -64,12 +68,77 @@ function escapeRegExp(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function requireEnv(name) {
-  const value = process.env[name]?.trim();
+function requireEnv(name, env = process.env) {
+  const value = env[name]?.trim();
   if (!value) {
     throw new Error(`${name} is required.`);
   }
   return value;
+}
+
+function parsePositiveIntegerOption(value, optionName) {
+  if (!/^\d+$/.test(value || '')) {
+    throw new Error(`${optionName} must be a positive integer.`);
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`${optionName} must be a positive integer.`);
+  }
+
+  return parsed;
+}
+
+function parseParserArgs(argv = process.argv.slice(2)) {
+  const writeIntent = parseWriteIntent(argv);
+  const isAll = argv.includes('--all');
+  const limitArgs = argv.filter((arg) => arg.startsWith('--limit='));
+
+  if (limitArgs.length > 1) {
+    throw new Error('--limit must be provided at most once.');
+  }
+  if (isAll && limitArgs.length > 0) {
+    throw new Error('--all and --limit cannot be used together.');
+  }
+
+  const limit = isAll
+    ? 0
+    : (limitArgs.length > 0
+      ? parsePositiveIntegerOption(limitArgs[0].slice('--limit='.length), '--limit')
+      : 10);
+
+  return {
+    ...writeIntent,
+    isAll,
+    limit
+  };
+}
+
+function normalizeSupabaseUrl(url) {
+  return url.replace(/\/rest\/v1\/?$/, '');
+}
+
+function resolveParserSupabaseAccess(options, env = process.env) {
+  const supabaseUrlRaw = requireEnv('SUPABASE_URL', env);
+
+  if (options.execute) {
+    const target = requireConfirmedSupabaseWrite({
+      confirmProjectRef: options.confirmProjectRef,
+      execute: options.execute,
+      supabaseUrl: supabaseUrlRaw
+    });
+    return {
+      access: 'write',
+      supabaseKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY', env),
+      supabaseUrl: target.supabaseUrl
+    };
+  }
+
+  return {
+    access: 'read-only',
+    supabaseKey: resolveReadOnlySupabaseKey(env),
+    supabaseUrl: normalizeSupabaseUrl(supabaseUrlRaw)
+  };
 }
 
 function parseFraction(text) {
@@ -114,18 +183,84 @@ function parseFraction(text) {
   return hasMatch ? total : null;
 }
 
-function stripHtml(text) {
-  return repairMojibakeText(text)
-    .replace(BR_TAG_PATTERN, '\n')
-    .replace(HTML_TAG_PATTERN, '')
-    .trim();
+function findMarkupTagEnd(text, startIndex) {
+  let quote = '';
+
+  for (let index = startIndex + 1; index < text.length; index += 1) {
+    const character = text[index];
+
+    if (quote) {
+      if (character === quote) quote = '';
+      continue;
+    }
+
+    if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === '<') {
+      return -1;
+    } else if (character === '>') {
+      return index;
+    }
+  }
+
+  return -1;
 }
 
-function normalizeIngredientsText(text) {
-  return repairMojibakeText(text)
-    .replace(BR_TAG_PATTERN, '\n')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n');
+function parseIngredientMarkupTag(tag) {
+  let content = tag.slice(1, -1).trim();
+  if (!content) return null;
+  if (content.startsWith('/')) content = content.slice(1).trimStart();
+
+  let nameEnd = 0;
+  while (nameEnd < content.length) {
+    const character = content[nameEnd];
+    const codePoint = character.codePointAt(0);
+    const isDigit = codePoint >= 48 && codePoint <= 57;
+    const isUppercaseLetter = codePoint >= 65 && codePoint <= 90;
+    const isLowercaseLetter = codePoint >= 97 && codePoint <= 122;
+    if (!isDigit && !isUppercaseLetter && !isLowercaseLetter) break;
+    nameEnd += 1;
+  }
+
+  const name = content.slice(0, nameEnd).toLowerCase();
+  if (!SAFE_INGREDIENT_MARKUP_TAGS.has(name)) return null;
+  return name;
+}
+
+function normalizeIngredientMarkup(text) {
+  const input = repairMojibakeText(text);
+  let output = '';
+  let hadMarkup = false;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+
+    if (character !== '<') {
+      if (character === '\r') {
+        output += '\n';
+        if (input[index + 1] === '\n') index += 1;
+      } else {
+        output += character;
+      }
+      continue;
+    }
+
+    const tagEnd = findMarkupTagEnd(input, index);
+    if (tagEnd === -1) return { text: '', hadMarkup, unsafe: true };
+
+    const tagName = parseIngredientMarkupTag(input.slice(index, tagEnd + 1));
+    if (!tagName) return { text: '', hadMarkup, unsafe: true };
+
+    output += tagName === 'br' ? '\n' : ' ';
+    hadMarkup = true;
+    index = tagEnd;
+  }
+
+  return {
+    text: output,
+    hadMarkup,
+    unsafe: false
+  };
 }
 
 function splitRespectingParens(text) {
@@ -242,9 +377,12 @@ function extractQuantity(text) {
 
 function parseIngredientChunk(chunk) {
   const originalChunk = String(chunk || '').trim();
-  const raw_text = stripHtml(originalChunk);
+  const normalizedMarkup = normalizeIngredientMarkup(originalChunk);
+  if (normalizedMarkup.unsafe) return { skip: true, reason: 'unsafe_html' };
+
+  const raw_text = normalizedMarkup.text.trim();
   if (!raw_text) {
-    return HTML_TAG_PATTERN.test(originalChunk) ? { skip: true, reason: 'html_tag_only' } : null;
+    return normalizedMarkup.hadMarkup ? { skip: true, reason: 'html_tag_only' } : null;
   }
   if (NOISE_CHARS.test(raw_text)) return null;
 
@@ -433,7 +571,12 @@ function dedupeRecipeIngredientRows(rows) {
 function parseIngredientsText(ingredientsText, recipeName) {
   if (!ingredientsText) return { chunks: [], skipped: [] };
 
-  const lines = normalizeIngredientsText(ingredientsText).split(/\n+/);
+  const normalizedMarkup = normalizeIngredientMarkup(ingredientsText);
+  if (normalizedMarkup.unsafe) {
+    return { chunks: [], skipped: [{ line: String(ingredientsText), reason: 'unsafe_html' }] };
+  }
+
+  const lines = normalizedMarkup.text.split(/\n+/);
   const normalizedRecipeName = repairMojibakeText(recipeName);
   const chunks = [];
   const skipped = [];
@@ -462,27 +605,16 @@ function parseIngredientsText(ingredientsText, recipeName) {
 }
 
 async function run() {
-  const args = process.argv.slice(2);
-  const isAll = args.includes('--all');
-  const isDryRun = args.includes('--dry-run');
-  const limitArg = args.find(a => a.startsWith('--limit='));
-  const limit = isAll ? 0 : (limitArg ? parseInt(limitArg.split('=')[1], 10) : 10);
+  const options = parseParserArgs();
+  const { execute, isAll, isDryRun, limit } = options;
+  const { supabaseKey, supabaseUrl } = resolveParserSupabaseAccess(options);
 
-  let supabaseUrl = requireEnv('SUPABASE_URL');
-  const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
-
-  if (supabaseUrl.endsWith('/rest/v1/')) {
-    supabaseUrl = supabaseUrl.replace('/rest/v1/', '');
-  } else if (supabaseUrl.endsWith('/rest/v1')) {
-    supabaseUrl = supabaseUrl.replace('/rest/v1', '');
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false }
   });
 
   console.log('=== Recipe Ingredients Parser ===');
-  console.log(`Mode: ${isDryRun ? 'dry-run' : 'upsert'}${isAll ? ' (all)' : (limit > 0 ? ` (limit: ${limit})` : '')}`);
+  console.log(`Mode: ${isDryRun ? 'dry-run' : 'execute'}${isAll ? ' (all)' : ` (limit: ${limit})`}`);
 
   let allRecipes = [];
   const PAGE_SIZE = 1000;
@@ -504,7 +636,7 @@ async function run() {
     const { data: recipes, error: fetchError } = await query;
 
     if (fetchError) {
-      throw fetchError;
+      throw new Error('Supabase recipe read failed.');
     }
 
     if (!recipes || recipes.length === 0) break;
@@ -582,6 +714,10 @@ async function run() {
       continue;
     }
 
+    if (!execute) {
+      throw new Error('Database writes require the explicit --execute flag.');
+    }
+
     const { error: upsertError } = await supabase
       .from('recipe_ingredients')
       .upsert(dedupedPayload.rows, {
@@ -589,7 +725,7 @@ async function run() {
       });
 
     if (upsertError) {
-      console.error(`Error upserting for recipe ${recipe.id} (${recipe.name}):`, upsertError.message);
+      console.error(`Supabase ingredient upsert failed for recipe ${recipe.id}.`);
       const duplicateKeys = rowsToUpsert
         .map(row => buildRecipeIngredientPayloadKey(row))
         .filter((key, index, keys) => keys.indexOf(key) !== index);
@@ -652,12 +788,15 @@ export {
   parseFraction,
   parseIngredientChunk,
   parseIngredientsText,
-  repairMojibakeText
+  parseParserArgs,
+  normalizeIngredientMarkup,
+  repairMojibakeText,
+  resolveParserSupabaseAccess
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   run().catch(err => {
-    console.error(err);
-    process.exit(1);
+    console.error(err instanceof Error ? err.message : 'Recipe ingredient parsing failed.');
+    process.exitCode = 1;
   });
 }

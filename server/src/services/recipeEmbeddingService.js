@@ -1,4 +1,5 @@
 import { recordAiUsage } from '../lib/operationalTelemetry.js';
+import { requestExternalAiJson } from '../lib/externalAiRequest.js';
 
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-small';
 const DEFAULT_EMBEDDING_DIMENSIONS = 1536;
@@ -8,13 +9,14 @@ function getEmbeddingConfig(options = {}) {
     apiKey: options.apiKey ?? process.env.OPENAI_API_KEY ?? '',
     model: options.model ?? process.env.RECIPE_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL,
     dimensions: Number(options.dimensions ?? process.env.RECIPE_EMBEDDING_DIMENSIONS ?? DEFAULT_EMBEDDING_DIMENSIONS),
-    fetchImpl: options.fetchImpl ?? globalThis.fetch
+    fetchImpl: options.fetchImpl ?? globalThis.fetch,
+    timeoutMs: options.timeoutMs
   };
 }
 
 /**
  * @param {string} embeddingText
- * @param {{ apiKey?: string, model?: string, dimensions?: number, fetchImpl?: typeof fetch }} [options]
+ * @param {{ apiKey?: string, model?: string, dimensions?: number, fetchImpl?: typeof fetch, timeoutMs?: number }} [options]
  * @returns {Promise<number[]>}
  */
 export async function generateRecipeEmbedding(embeddingText, options = {}) {
@@ -32,7 +34,7 @@ export async function generateRecipeEmbedding(embeddingText, options = {}) {
  * Generates a bounded batch of recipe embeddings without logging inputs or vectors.
  *
  * @param {string[]} embeddingTexts
- * @param {{ apiKey?: string, model?: string, dimensions?: number, fetchImpl?: typeof fetch }} [options]
+ * @param {{ apiKey?: string, model?: string, dimensions?: number, fetchImpl?: typeof fetch, timeoutMs?: number }} [options]
  * @returns {Promise<number[][]>}
  */
 export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
@@ -48,7 +50,7 @@ export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
     throw new Error('Recipe embedding batches are limited to 100 inputs.');
   }
 
-  const { apiKey, model, dimensions, fetchImpl } = getEmbeddingConfig(options);
+  const { apiKey, model, dimensions, fetchImpl, timeoutMs } = getEmbeddingConfig(options);
   const onUsage = options.onUsage || recordAiUsage;
   const startedAt = Date.now();
   const emitUsage = (metrics) => {
@@ -75,32 +77,34 @@ export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
     throw new Error('fetch is not available for recipe embeddings.');
   }
 
-  let response;
+  let payload;
+  let status = 0;
 
   try {
-    response = await fetchImpl('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        input: inputs,
-        dimensions
-      })
+    const result = await requestExternalAiJson({
+      provider: 'OpenAI recipe embeddings',
+      url: 'https://api.openai.com/v1/embeddings',
+      fetchImpl,
+      timeoutMs,
+      init: {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          input: inputs,
+          dimensions
+        })
+      }
     });
+    payload = result.payload;
+    status = result.status;
   } catch (error) {
-    emitUsage({ success: false, status: 0 });
+    emitUsage({ success: false, status: error?.status || 0 });
     throw error;
   }
-
-  if (!response.ok) {
-    emitUsage({ success: false, status: response.status });
-    throw new Error(`Recipe embedding request failed with status ${response.status}.`);
-  }
-
-  const payload = await response.json();
   const embeddings = Array.isArray(payload?.data)
     ? [...payload.data]
         .sort((left, right) => Number(left?.index || 0) - Number(right?.index || 0))
@@ -118,7 +122,7 @@ export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
   ) {
     emitUsage({
       success: false,
-      status: response.status,
+      status,
       promptTokens: payload?.usage?.prompt_tokens,
       totalTokens: payload?.usage?.total_tokens
     });
@@ -127,7 +131,7 @@ export async function generateRecipeEmbeddings(embeddingTexts, options = {}) {
 
   emitUsage({
     success: true,
-    status: response.status,
+    status,
     promptTokens: payload?.usage?.prompt_tokens,
     totalTokens: payload?.usage?.total_tokens
   });

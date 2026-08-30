@@ -1,8 +1,11 @@
 import * as authApi from '../../api/authApi';
 import * as indexedDb from '../../db/indexedDB';
+import { clearScopeState } from '../ingredients/ingredientsScopeState';
+import { clearImportCorrections } from '../../utils/import/importLearning';
 import {
   buildUserStorageScope,
   clearGuestImportDecision,
+  clearAccountFeatureStorage,
   clearPendingLogout,
   clearSessionHint,
   clearStoredAuthSession,
@@ -18,6 +21,8 @@ export const LOGOUT_PENDING_MESSAGE =
   '이 기기에서는 로그아웃했지만 서버 처리 결과를 확인하지 못했습니다. 연결이 복구되면 로그아웃 상태를 다시 확인합니다.';
 export const LOGOUT_FAILED_MESSAGE =
   '이 기기 화면에서는 로그아웃했지만 서버 처리와 재시도 상태를 확인하지 못했습니다. 브라우저를 닫고 연결 복구 후 다시 로그인해주세요.';
+export const LOCAL_DATA_CLEANUP_FAILED_MESSAGE =
+  '이 기기의 계정 데이터 일부를 지우지 못했습니다. 이 브라우저의 FridgeMate 사이트 데이터를 직접 삭제해주세요.';
 
 export function createUnavailableAuthError() {
   return new Error('Authentication is unavailable while the app is running in local-only mode.');
@@ -114,8 +119,64 @@ export async function loginWithSession(credentials, { backendEnabled, setSession
   return nextSession;
 }
 
+export async function clearLocalUserData(userId) {
+  if (!userId) {
+    return false;
+  }
+
+  let localCleanupComplete = true;
+  const storageScope = buildUserStorageScope(userId);
+
+  for (const cleanupDatabase of [
+    () => indexedDb.clearIngredients({ scope: storageScope }),
+    () => indexedDb.clearMenuDecisions({ scope: storageScope }),
+    () => indexedDb.deleteDatabase({ scope: storageScope })
+  ]) {
+    try {
+      await cleanupDatabase();
+    } catch {
+      localCleanupComplete = false;
+    }
+  }
+
+  [
+    () => clearGuestImportDecision(userId),
+    () => clearAccountFeatureStorage(userId),
+    () => clearImportCorrections(storageScope),
+    () => clearScopeState(storageScope)
+  ].forEach((cleanupStorage) => {
+    try {
+      if (cleanupStorage() === false) {
+        localCleanupComplete = false;
+      }
+    } catch {
+      localCleanupComplete = false;
+    }
+  });
+
+  return localCleanupComplete;
+}
+
+function buildLogoutResult(ok, pending, clearLocalData, localCleanupComplete) {
+  if (!clearLocalData) {
+    return { ok, pending };
+  }
+
+  return { ok, pending, localCleanupComplete };
+}
+
+function buildLogoutError(baseMessage, clearLocalData, localCleanupComplete) {
+  if (!clearLocalData || localCleanupComplete) {
+    return baseMessage;
+  }
+
+  return [baseMessage, LOCAL_DATA_CLEANUP_FAILED_MESSAGE].filter(Boolean).join(' ');
+}
+
 export async function logoutSession({
   backendEnabled,
+  clearLocalData = false,
+  user,
   setSession,
   setGuestImportPrompt,
   setError,
@@ -124,31 +185,33 @@ export async function logoutSession({
   if (!backendEnabled) {
     clearPendingLogout();
     persistSession(null, setSession);
+    const localCleanupComplete = clearLocalData ? await clearLocalUserData(user?.id) : true;
     setGuestImportPrompt(defaultGuestImportPrompt);
-    setError('');
-    return { ok: true, pending: false };
+    setError(buildLogoutError('', clearLocalData, localCleanupComplete));
+    return buildLogoutResult(true, false, clearLocalData, localCleanupComplete);
   }
 
   const logoutFenced = markLogoutPending();
   persistSession(null, setSession);
+  const localCleanupComplete = clearLocalData ? await clearLocalUserData(user?.id) : true;
 
   try {
     await authApi.logout();
     clearPendingLogout();
     persistSession(null, setSession);
     setGuestImportPrompt(defaultGuestImportPrompt);
-    setError('');
-    return { ok: true, pending: false };
+    setError(buildLogoutError('', clearLocalData, localCleanupComplete));
+    return buildLogoutResult(true, false, clearLocalData, localCleanupComplete);
   } catch {
     setGuestImportPrompt(defaultGuestImportPrompt);
 
     if (logoutFenced) {
-      setError(LOGOUT_PENDING_MESSAGE);
-      return { ok: false, pending: true };
+      setError(buildLogoutError(LOGOUT_PENDING_MESSAGE, clearLocalData, localCleanupComplete));
+      return buildLogoutResult(false, true, clearLocalData, localCleanupComplete);
     }
 
-    setError(LOGOUT_FAILED_MESSAGE);
-    return { ok: false, pending: false };
+    setError(buildLogoutError(LOGOUT_FAILED_MESSAGE, clearLocalData, localCleanupComplete));
+    return buildLogoutResult(false, false, clearLocalData, localCleanupComplete);
   }
 }
 
@@ -169,14 +232,7 @@ export async function deleteAccountWithSession(
 
   await authApi.deleteAccount(password);
 
-  let localCleanupComplete = true;
-
-  try {
-    await indexedDb.clearIngredients({ scope: buildUserStorageScope(user.id) });
-    clearGuestImportDecision(user.id);
-  } catch {
-    localCleanupComplete = false;
-  }
+  const localCleanupComplete = await clearLocalUserData(user.id);
 
   clearPendingLogout();
   persistSession(null, setSession);

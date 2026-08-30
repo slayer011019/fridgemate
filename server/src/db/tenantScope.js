@@ -1,5 +1,20 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma.js';
 import { serverConfig } from '../config.js';
+
+export const TENANT_RLS_TABLE_NAMES = Object.freeze([
+  'User',
+  'AuthSession',
+  'Ingredient',
+  'ImportCorrection',
+  'RecommendationEvent',
+  'MenuDecision',
+  'PantryOwnership',
+  'UserPreference',
+  'ProductEvent'
+]);
+
+const tenantRlsTableNamesSql = Prisma.join(TENANT_RLS_TABLE_NAMES);
 
 export function assertSafeTenantDatabaseContext(context, { production = false } = {}) {
   if (!production) {
@@ -44,7 +59,8 @@ export async function withDatabaseScope(
           INNER JOIN pg_namespace AS tenant_schema
             ON tenant_schema.oid = tenant_table.relnamespace
           WHERE tenant_schema.nspname = 'public'
-            AND tenant_table.relname IN ('Ingredient', 'ImportCorrection')
+            AND tenant_table.relkind IN ('r', 'p')
+            AND tenant_table.relname::text IN (${tenantRlsTableNamesSql})
             AND pg_get_userbyid(tenant_table.relowner) = current_user
         ) AS "ownsTenantTables"
     `;

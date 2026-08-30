@@ -55,8 +55,11 @@ Authenticated users can:
 
 - push only pending local ingredient changes to the server
 - pull the complete server sync state, including deletion tombstones, into the device cache
+- explicitly save today's menu, pantry ownership, and lightweight recommendation preferences
 
-Sync remains an explicit account-page action. Each record uses a stable `clientId`; local and server copies are merged with newest-`updatedAt` wins. IndexedDB persists `pendingCreate`, `pendingUpdate`, and `pendingDelete`, while normal UI reads hide records with `deletedAt`. The server keeps soft-deleted rows as tombstones so an older device cannot recreate a deleted ingredient. Clean local records absent from the complete server state are removed, while unsent local records are retained.
+Sync remains an explicit account-page action. Each record uses a stable `clientId`; active local and server copies are merged with newest-`updatedAt` wins. Deletion is terminal until an explicit restore protocol exists, so a tombstone wins over an active copy even when the active device clock is newer. IndexedDB persists `pendingCreate`, `pendingUpdate`, and `pendingDelete`, while normal UI reads hide records with `deletedAt`. At deletion time both IndexedDB and the server discard ingredient name, category, storage, quantity, purchase/expiry dates, memo, consumed state, and creation time. Only identity (`id`, `clientId`, server `userId`), ordering (`updatedAt`, `deletedAt`), and local `syncState` remain. Clean local records absent from the complete server state are removed, while unsent local records are retained.
+
+Minimal tombstones are not physically purged in phase 1. They remain indefinitely to prevent resurrection until a server-issued generation/checkpoint protocol can prove that every client has crossed the deletion boundary. The nullable-schema/active-row CHECK migration is safe to apply before the scrub-aware server, but legacy tombstone payload cleanup is deliberately a separate dry-run-first bounded maintenance command after every old server instance has drained. The command is manual, not recurring enforcement.
 
 The server keeps its existing value when timestamps are equal, making retries and equal-time conflicts deterministic. Sync timestamps more than five minutes ahead of server time are rejected before the transaction starts so one incorrect device clock cannot pin a record in the future. This is a safety bound, not a logical-clock replacement.
 
@@ -81,10 +84,19 @@ AI/DB row:
 
 Recommendation events:
 
-- impressions and clicks are posted to `/api/recommendation-events`
-- authenticated events are associated with the user when a valid token exists
-- anonymous backend-mode events can still store session-level data
+- impressions, clicks, selections, dismissals, external opens, and completions are posted to `/api/recommendation-events`
+- deployment and consent flags must both allow collection, and server persistence is authenticated-only
+- `clientEventId` makes retries idempotent while `catalogRecipeId` links only verified catalog UUIDs
 - export scripts produce JSONL or CSV datasets for future ranking work
+
+Daily menu and personalization:
+
+- IndexedDB v2 adds a scope-isolated `menuDecisions` store; guests never need an account
+- authenticated button actions write through the API and mirror successful results locally
+- network and 5xx failures remain pending, while 4xx failures remain visible and never become clean
+- PostgreSQL enforces one menu per user/Korean date and one row per user/client ID
+- pantry ownership, lightweight preferences, and product events remain user-scoped through forced RLS
+- product events accept only bounded primitive properties and reject identity-, token-, and secret-like keys
 
 Semantic recipe retrieval groundwork:
 
@@ -100,6 +112,7 @@ Semantic recipe retrieval groundwork:
 - the explicit semantic endpoint is authenticated, rate-limited, and disabled by default through `SEMANTIC_RECIPE_API_ENABLED`; vector failure returns bounded rule-ranked production candidates
 - the fixed and Korean home-meal fixtures report raw vector Hit@5, candidate-pool recall, and the same 70/30 structured/vector reranking used by the service
 - recommendation event keys use `catalog:<uuid>` for production recipes and `local:<id>` for bundled recipes
+- semantic outcome logs contain only mode, result count, and latency; they never include ingredients, query text, users, prompts, or vectors
 
 ## Security Boundaries
 

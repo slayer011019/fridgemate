@@ -7,12 +7,16 @@ import { AnalyticsProvider } from './hooks/useAnalytics';
 import { AuthProvider } from './hooks/useAuth';
 import { IngredientsProvider } from './hooks/useIngredients';
 import { PantryStaplesProvider } from './hooks/usePantryStaples';
+import { MenuDecisionProvider } from './hooks/useMenuDecision';
+import { UserPreferencesProvider } from './hooks/useUserPreferences';
+import { createSentryPrivacyOptions } from './utils/sentryPrivacy';
 import './index.css';
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     environment: import.meta.env.MODE,
+    ...createSentryPrivacyOptions({ origin: globalThis.location.origin }),
   });
 }
 
@@ -22,9 +26,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <AnalyticsProvider>
           <PantryStaplesProvider>
-            <IngredientsProvider>
-              <App />
-            </IngredientsProvider>
+            <UserPreferencesProvider>
+              <MenuDecisionProvider>
+                <IngredientsProvider>
+                  <App />
+                </IngredientsProvider>
+              </MenuDecisionProvider>
+            </UserPreferencesProvider>
           </PantryStaplesProvider>
         </AnalyticsProvider>
       </AuthProvider>

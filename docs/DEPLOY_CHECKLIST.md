@@ -5,7 +5,7 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 ## Scope Gate
 
 - [ ] Do not add new OCR taxonomy/classifier work for this release.
-- [ ] Treat completed MFDS recipe seeding as data preparation only; do not add pgvector or recommendation UI work for this release.
+- [x] Treat the completed 1,166-row recipe embedding backfill as finished; do not rerun it during application deployment.
 - [ ] Keep existing OCR parser behavior and tests intact.
 - [ ] Treat local IndexedDB as the working copy.
 - [ ] Keep server writes limited to the account-page manual sync button.
@@ -16,6 +16,22 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] `npm run test:run`
 - [ ] `npm run build`
 - [ ] `npm run test:e2e`
+- [ ] `npm run prisma:validate`
+
+## Isolated Semantic Staging
+
+- [ ] Create a separate Supabase project; do not clone production users or tenant data.
+- [ ] Apply every repository migration to staging with staging owner credentials.
+- [ ] Import only public catalog and embedding tables in FK order.
+- [ ] Confirm staging has 1,166 current embeddings, zero missing/stale/duplicate/orphan rows, and `vector(1536)`.
+- [ ] Create staging-only KV, Hyperdrive, Worker, Durable Object namespace, JWT secret, and OpenAI secret.
+- [ ] Deploy from an ignored `wrangler.staging.jsonc` derived from `wrangler.staging.example.jsonc`.
+- [ ] Keep AdSense and GA disabled on `staging.오늘뭐먹지.com`.
+- [ ] Confirm fixed reranked Hit@5 >= 7/10 and home-meal reranked Hit@5 >= 14/20 with recall@100 >= 18/20.
+- [ ] Confirm healthy requests report semantic/hybrid and controlled vector failure reports rule-fallback/rule.
+- [ ] Confirm missing auth is 401, invalid input is 400, and rate-limit exhaustion is 429.
+- [ ] Inspect logs and confirm no credentials, user IDs, ingredients, prompts, query text, or vectors are present.
+- [ ] Follow [the staging runbook](STAGING_SEMANTIC_RUNBOOK.md) and record the rollback flag procedure before production activation.
 
 ## Vercel Frontend
 
@@ -43,8 +59,9 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 ## Cloudflare Workers API
 
 - [ ] The `HYPERDRIVE` binding points to the Supabase PostgreSQL database.
-- [ ] The `AUTH_KV` binding exists for logout revocation state.
+- [ ] The `AUTH_RATE_LIMITER` Durable Object binding exists for strongly consistent logout revocation and rate-limit state.
 - [ ] The `AUTH_RATE_LIMITER` Durable Object binding and `AuthRateLimiter` SQLite export are present.
+- [ ] A deployment with the `AUTH_RATE_LIMITER` binding intentionally removed fails closed instead of falling back to isolate memory.
 - [ ] `DIRECT_URL` is available only in the trusted environment that applies Prisma migrations.
 - [ ] `JWT_SECRET` is at least 32 characters.
 - [ ] `JWT_EXPIRES_IN=15m` or another intentional short access-token value.
@@ -57,11 +74,17 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Production cookie names use `__Host-` prefixes and users are notified that the cutover requires one sign-in.
 - [ ] Cookie-authenticated `POST`, `PUT`, `PATCH`, and `DELETE` requests with a missing or untrusted `Origin`/`Referer` return `403`.
 - [ ] Login and signup IP throttles distinguish test clients by `CF-Connecting-IP` instead of the Worker adapter's internal peer address.
+- [ ] Expired auth rate-limit Durable Object rows are removed by alarms and do not accumulate indefinitely.
+- [ ] If a legacy Node/Redis deployment ever stored raw auth keys, remove them with a one-time access-controlled cleanup that logs counts only; runtime requests must use opaque SHA-256 Redis keys exclusively and must never probe raw email, IP, or JTI keys.
 - [ ] `/api/recipes/ai-suggest` returns `429` after 20 requests per user or 60 requests per client address in one hour.
 - [ ] Both import-correction embedding endpoints share item-weighted user and client budgets and return `429` with `Retry-After` when a budget is exhausted.
 - [ ] Keep `SEMANTIC_RECIPE_API_ENABLED=false` through deployment, verify all 1,166 embeddings are current, then enable it in staging and confirm `/api/recipes/recommendations/semantic` returns semantic results, bounded rule fallback, and `429` at its user/client limits.
+- [ ] During the first 24 production hours, count `semantic_recommendation` modes, latency, API errors, and aggregate `ai_usage`; turn the flag off for elevated failures or unexpected fallback growth.
 - [ ] `/api/recommendation-events` rejects unknown/oversized fields and returns `429` after 120 requests per user/client address in one minute.
 - [ ] `npm run worker:dry-run` completes before deployment.
+- [x] The primary domain enforces CSP, frame denial, MIME sniffing protection, a strict referrer policy, and camera/geolocation/microphone denial without breaking home, login, import, or recipe routes.
+- [x] Cloudflare browser RUM is disabled so analytics requests do not run before the app's explicit consent choice.
+- [x] AI crawler policy allows OAI-SearchBot, PerplexityBot, and Claude-SearchBot while blocking GPTBot, CCBot, and Google-Extended case-insensitively; exact, lowercase, and mixed-case production `curl` probes were reverified on 2026-08-30.
 - [ ] `API_SLOW_REQUEST_MS` is intentional, error responses include `x-request-id`, and platform logs contain no query strings, request bodies, user IDs, prompts, or vectors.
 - [ ] If `AI_USAGE_LOGGING_ENABLED=true`, configure the current `RECIPE_EMBEDDING_PRICE_PER_MILLION_TOKENS` only when cost estimates are desired and verify token/count metrics in private platform telemetry.
 - [ ] Optional v2/lab only: AI and embedding keys.
@@ -85,6 +108,8 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [x] Before the 2026-08-30 deployment, confirm `npx prisma migrate status` reported only `20260826000000_add_ingredient_sync_tombstones` as pending.
 - [x] Review and explicitly accept the catalog-alignment and import-security checksum caveat in `docs/RECIPE_EMBEDDING_OPERATIONS.md`; their executed SQL is recovered but lost original comments/formatting prevent an exact historical checksum match.
 - [x] Apply `20260826000000_add_ingredient_sync_tombstones` after reconciling the repository and production migration histories.
+- [x] Apply `20260830170000_bound_auth_session_history`, confirm only excess inactive history is pruned, and verify no account exceeds 8 active or 24 total sessions.
+- [x] Before the next deployment, confirm the repository SQL for `20260830140000` through `20260830170000` exactly matches the production `_prisma_migrations.checksum` values and that all four entries are finished without rollback.
 - [x] Re-run `npx prisma migrate status` after deployment and confirm the production schema is up to date.
 
 ## Authentication
@@ -105,6 +130,27 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Importing guest ingredients copies them into the authenticated local scope.
 - [ ] Importing guest ingredients does not upload to the server automatically.
 - [ ] Dismissing the prompt keeps guest data separate.
+- [ ] Selecting a guest menu and importing it after login creates at most one menu for the Korean date and removes the guest copy after successful server storage.
+
+## Daily Menu And Personalization
+
+- [ ] Review and apply `20260830140000_add_menu_decisions_and_feedback` to staging only.
+- [ ] Confirm the safe historical recipe-key backfill links only real catalog UUIDs and leaves local/unmatched keys nullable.
+- [ ] Confirm `MenuDecision` unique user/date and user/client indexes, both FKs, RLS, and account-delete cascade.
+- [ ] Review and apply `20260830150000_add_personalization_and_product_events` to staging only.
+- [ ] Confirm pantry, preference, and product-event RLS prevents user A from reading or changing user B data.
+- [ ] Confirm a repeated menu PUT is idempotent and replacing a completed menu returns it to selected.
+- [ ] Confirm network/5xx keeps menu state pending and a 4xx response never appears clean.
+- [ ] Confirm repeated recommendation/product `clientEventId` values do not create duplicate events.
+- [ ] Confirm account export includes the new data and account deletion removes server rows plus account-scoped local caches.
+- [ ] Review and apply `20260830180000_bound_event_retention`; confirm both event tables have `(createdAt, id)` indexes and that the migration itself deletes no rows.
+- [ ] Run `npm run events:prune-retention` with the trusted maintenance URL and review only aggregate counts. Until a separately reviewed least-privilege scheduler exists, record each explicitly host-confirmed manual `--apply` run; do not treat the script itself as recurring enforcement.
+- [ ] Confirm each retention run stays within its configured batch, maximum-delete, and runtime limits, and that no IDs, routes, properties, recipe names, or session values appear in its logs.
+- [ ] Review and apply only `20260830190000_prepare_ingredient_tombstone_scrubbing`; confirm it makes payload columns nullable, validates the active-row CHECK, and performs no tombstone update or delete.
+- [ ] Deploy the scrub-aware server after the prepare migration, wait until all old server/Worker instances have drained, and only then deploy the frontend that sends minimal tombstones.
+- [ ] After the new server is stable, run `npm run ingredients:scrub-tombstones` with `DIRECT_URL` or `INGREDIENT_TOMBSTONE_SCRUB_DATABASE_URL` and review the aggregate-only dry-run.
+- [ ] Apply the scrub with the exact `--confirm-database-host`, confirm every batch/max-update/runtime bound, and rerun while `mayHaveMore` is true or `remainingEligibleCount` is nonzero. This is a manual backfill, not recurring enforcement.
+- [ ] Verify the scrub changes no `id`, `clientId`, `userId`, `updatedAt`, or `deletedAt`, hard-deletes no row, and exposes no ingredient payload or identifiers in logs.
 
 ## Manual Ingredient Sync
 
@@ -113,11 +159,12 @@ FridgeMate deployment verification checklist for Vercel, Cloudflare Workers, Sup
 - [ ] Delete ingredient while authenticated; confirm no immediate `DELETE /api/ingredients/:id`.
 - [ ] Account-page sync sends `POST /api/ingredients/sync`.
 - [x] Apply `20260826000000_add_ingredient_sync_tombstones` before deploying the API that reads `deletedAt`.
-- [ ] Confirm `GET /api/ingredients/sync` returns only the authenticated user's active records and tombstones.
+- [ ] Confirm `GET /api/ingredients/sync` returns only the authenticated user's active records and minimal tombstones (`id`, `clientId`, `userId`, `updatedAt`, `deletedAt`) with no ingredient business payload.
 - [ ] Confirm backup sends only pending changes and preserves a newer change made on another device.
 - [ ] Reload after sync and confirm data remains available.
 - [ ] Delete locally, sync, reload, and confirm deleted item remains deleted.
 - [ ] Reconnect an older device after deletion and confirm its stale active copy does not restore the item.
+- [ ] Repeat with the stale active copy carrying a later device timestamp and confirm the tombstone still wins because restore is not yet supported.
 - [ ] Confirm an equal-`updatedAt` retry keeps the existing server value.
 - [ ] Confirm a timestamp more than five minutes ahead of server time returns `400` without partially applying the batch.
 - [ ] Direct API update/delete requests return the same `404` for missing ingredient IDs and IDs owned by another user.

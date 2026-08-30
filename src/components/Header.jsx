@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { isOcrEnabled } from '../utils/backendConfig';
+import { isOcrEnabled, isPublicSignupEnabled } from '../utils/backendConfig';
 
 const navItems = [
   { label: '\uD648', shortLabel: '\uD648', icon: '\u2302', to: '/', match: (pathname) => pathname === '/' },
@@ -19,6 +19,7 @@ const navItems = [
 function Header() {
   const location = useLocation();
   const ocrEnabled = isOcrEnabled();
+  const publicSignupEnabled = isPublicSignupEnabled();
   const { isAuthenticated, logout, user } = useAuth();
   const visibleNavItems = ocrEnabled ? navItems : navItems.filter((item) => item.to !== '/import');
 
@@ -46,7 +47,7 @@ function Header() {
                   <NavLink className="btn-secondary min-h-[2.25rem] px-3 py-2" to="/account">
                     {'\uACC4\uC815'}
                   </NavLink>
-                  <button className="btn-primary min-h-[2.25rem] px-3 py-2" onClick={logout} type="button">
+                  <button className="btn-primary min-h-[2.25rem] px-3 py-2" onClick={() => logout()} type="button">
                     {'\uB85C\uADF8\uC544\uC6C3'}
                   </button>
                 </>
@@ -55,9 +56,11 @@ function Header() {
                   <NavLink className="btn-secondary min-h-[2.25rem] px-3 py-2" to="/login">
                     {'\uB85C\uADF8\uC778'}
                   </NavLink>
-                  <NavLink className="btn-primary min-h-[2.25rem] px-3 py-2" to="/signup">
-                    {'\uD68C\uC6D0\uAC00\uC785'}
-                  </NavLink>
+                  {publicSignupEnabled ? (
+                    <NavLink className="btn-primary min-h-[2.25rem] px-3 py-2" to="/signup">
+                      {'\uD68C\uC6D0\uAC00\uC785'}
+                    </NavLink>
+                  ) : null}
                 </>
               )}
             </div>

@@ -2,6 +2,7 @@ import {
   classifyRecipeIngredientType,
   normalizeRecipeIngredientByRule
 } from '../../../src/features/recipes/recipeImport.js';
+import { requestExternalAiJson } from '../lib/externalAiRequest.js';
 
 const LOW_CONFIDENCE_THRESHOLD = 0.7;
 const ALLOWED_TYPES = new Set(['main', 'seasoning', 'garnish', 'liquid', 'optional', 'unknown']);
@@ -82,31 +83,31 @@ async function normalizeWithAnthropic(rawIngredients = [], options = {}) {
     throw new Error('LLM normalization is not configured.');
   }
 
-  const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: options.model ?? process.env.RECIPE_NORMALIZATION_MODEL ?? 'claude-sonnet-4-20250514',
-      max_tokens: 1800,
-      temperature: 0,
-      messages: [
-        {
-          role: 'user',
-          content: buildNormalizationPrompt(rawIngredients)
-        }
-      ]
-    })
+  const { payload } = await requestExternalAiJson({
+    provider: 'Anthropic recipe normalization',
+    url: 'https://api.anthropic.com/v1/messages',
+    fetchImpl,
+    timeoutMs: options.timeoutMs,
+    init: {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: options.model ?? process.env.RECIPE_NORMALIZATION_MODEL ?? 'claude-sonnet-4-20250514',
+        max_tokens: 1800,
+        temperature: 0,
+        messages: [
+          {
+            role: 'user',
+            content: buildNormalizationPrompt(rawIngredients)
+          }
+        ]
+      })
+    }
   });
-
-  if (!response.ok) {
-    throw new Error(`LLM normalization request failed with status ${response.status}.`);
-  }
-
-  const payload = await response.json();
   const text = Array.isArray(payload?.content)
     ? payload.content
         .filter((part) => part?.type === 'text')
@@ -119,7 +120,7 @@ async function normalizeWithAnthropic(rawIngredients = [], options = {}) {
 
 /**
  * @param {import('../../../src/features/recipes/recipeImport.js').ParsedRecipeIngredient[]} rawIngredients
- * @param {{ llmClient?: Function, fetchImpl?: typeof fetch, apiKey?: string, model?: string }} [options]
+ * @param {{ llmClient?: Function, fetchImpl?: typeof fetch, apiKey?: string, model?: string, timeoutMs?: number }} [options]
  * @returns {Promise<import('../../../src/features/recipes/recipeImport.js').NormalizedIngredient[]>}
  */
 export async function normalizeIngredientsWithLLM(rawIngredients = [], options = {}) {

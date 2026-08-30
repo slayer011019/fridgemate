@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ANALYTICS_ID_STORAGE_KEY,
+  ANALYTICS_SESSION_ID_STORAGE_KEY,
+  ANALYTICS_SESSION_STARTED_STORAGE_KEY,
+  setAnalyticsConsent
+} from '../analyticsConsent';
+import {
   buildAnalyticsPayload,
   getAnonymousAnalyticsId,
   getAnalyticsSessionId,
@@ -9,12 +15,23 @@ import {
   recordAnalyticsEvent
 } from '../analytics';
 
+const { saveProductEventMock } = vi.hoisted(() => ({
+  saveProductEventMock: vi.fn()
+}));
+
+vi.mock('../../api/productEventsApi', () => ({
+  saveProductEvent: saveProductEventMock
+}));
+
 describe('analytics utilities', () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.__FRIDGEMATE_ANALYTICS_EVENTS__ = [];
     vi.restoreAllMocks();
+    saveProductEventMock.mockReset().mockResolvedValue(null);
+    setAnalyticsConsent('granted');
   });
 
   it('reuses stored anonymous and session ids', () => {
@@ -47,11 +64,48 @@ describe('analytics utilities', () => {
     expect(payload.event_name).toBe('ingredient_created');
     expect(payload.route).toBe('/ingredients/new');
     expect(payload.user_mode).toBe('authenticated');
-    expect(payload.user_id).toBe('user-123');
+    expect(payload).not.toHaveProperty('user_id');
     expect(payload.creation_method).toBe('manual');
     expect(payload.analytics_id).toBeTruthy();
     expect(payload.session_id).toBeTruthy();
     expect(payload.occurred_at).toBeTruthy();
+  });
+
+  it('does not let caller properties override or reintroduce protected envelope fields', () => {
+    const payload = buildAnalyticsPayload({
+      eventName: 'page_view',
+      route: '/ingredients/private-record-id/edit?from=home',
+      isAuthenticated: true,
+      properties: {
+        analytics_id: 'caller-analytics-id',
+        api_mode: 'caller-api-mode',
+        app_version: 'caller-version',
+        client_event_id: 'caller-event-id',
+        device_type: 'caller-device',
+        event_name: 'caller_event',
+        network_state: 'caller-network',
+        occurred_at: 'not-a-date',
+        page_path: '/private/path?token=secret',
+        page_title: 'Private ingredient title',
+        route: '/private/override',
+        session_id: 'caller-session-id',
+        user_id: 'caller-user-id',
+        user_mode: 'guest',
+        source_screen: 'header'
+      }
+    });
+
+    expect(payload.event_name).toBe('page_view');
+    expect(payload.route).toBe('/ingredients/private-record-id/edit?from=home');
+    expect(payload.user_mode).toBe('authenticated');
+    expect(payload.client_event_id).not.toBe('caller-event-id');
+    expect(payload.analytics_id).not.toBe('caller-analytics-id');
+    expect(payload.session_id).not.toBe('caller-session-id');
+    expect(payload.occurred_at).not.toBe('not-a-date');
+    expect(payload).not.toHaveProperty('user_id');
+    expect(payload).not.toHaveProperty('page_path');
+    expect(payload).not.toHaveProperty('page_title');
+    expect(payload.source_screen).toBe('header');
   });
 
   it('stores recorded events on window for local inspection', () => {
@@ -68,6 +122,51 @@ describe('analytics utilities', () => {
     expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__).toHaveLength(1);
     expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__[0].event_name).toBe('session_started');
     expect(dispatchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([null, 'denied'])('does not create or record identifiers when consent is %s', (consent) => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    if (consent) setAnalyticsConsent(consent);
+
+    expect(getAnonymousAnalyticsId()).toBeNull();
+    expect(getAnalyticsSessionId()).toBeNull();
+    expect(
+      buildAnalyticsPayload({ eventName: 'page_view', route: '/', isAuthenticated: false })
+    ).toBeNull();
+    expect(recordAnalyticsEvent({ event_name: 'page_view' })).toBeNull();
+    expect(window.localStorage.getItem(ANALYTICS_ID_STORAGE_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(ANALYTICS_SESSION_ID_STORAGE_KEY)).toBeNull();
+    expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__).toHaveLength(0);
+    expect(saveProductEventMock).not.toHaveBeenCalled();
+  });
+
+  it('clears analytics identifiers and the session marker when consent is withdrawn', () => {
+    getAnonymousAnalyticsId();
+    getAnalyticsSessionId();
+    markSessionStartedTracked();
+    window.__FRIDGEMATE_ANALYTICS_EVENTS__ = [
+      { analytics_id: 'private-analytics-id', session_id: 'private-session-id' }
+    ];
+
+    setAnalyticsConsent('denied');
+
+    expect(window.localStorage.getItem(ANALYTICS_ID_STORAGE_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(ANALYTICS_SESSION_ID_STORAGE_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(ANALYTICS_SESSION_STARTED_STORAGE_KEY)).toBeNull();
+    expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__).toEqual([]);
+  });
+
+  it('does not persist or emit identifiers without a secure random source', () => {
+    vi.stubGlobal('crypto', undefined);
+
+    expect(getAnonymousAnalyticsId()).toBeNull();
+    expect(getAnalyticsSessionId()).toBeNull();
+    expect(
+      buildAnalyticsPayload({ eventName: 'page_view', route: '/', isAuthenticated: false })
+    ).toBeNull();
+    expect(window.localStorage.getItem(ANALYTICS_ID_STORAGE_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(ANALYTICS_SESSION_ID_STORAGE_KEY)).toBeNull();
   });
 
   it('groups expiry dates into KPI-friendly buckets', () => {

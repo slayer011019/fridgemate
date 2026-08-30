@@ -17,6 +17,9 @@ describe('requestTelemetry', () => {
   it('groups routes without retaining query values or record identifiers', () => {
     expect(getRequestGroup('/api/ingredients/private-record?token=secret')).toBe('/api/ingredients');
     expect(getRequestGroup('/health?verbose=true')).toBe('/health');
+    expect(getRequestGroup('/api/victim@example.com?token=secret')).toBe('/api/unknown');
+    expect(getRequestGroup('/victim@example.com?token=secret')).toBe('/unknown');
+    expect(getRequestGroup('/api')).toBe('/api');
   });
 
   it('adds a request id and logs failure metadata without URLs or messages', () => {
@@ -62,6 +65,48 @@ describe('requestTelemetry', () => {
     expect(logged).not.toContain('private-record');
     expect(logged).not.toContain('secret');
     expect(logged).not.toContain('private-pass');
+  });
+
+  it('records a nested error code without logging nested messages', () => {
+    const request = { telemetry: { failure: null } };
+    const privateCause = Object.assign(new Error('private database detail'), {
+      code: 'INGREDIENT_QUOTA_LOCK'
+    });
+
+    markRequestFailure(request, new Error('outer error', { cause: privateCause }));
+
+    expect(request.telemetry.failure).toEqual({
+      errorName: 'Error',
+      errorCode: 'INGREDIENT_QUOTA_LOCK'
+    });
+    expect(JSON.stringify(request.telemetry.failure)).not.toContain('private database detail');
+  });
+
+  it('does not let an unknown request path inject personal data into telemetry', () => {
+    const logger = { error: vi.fn(), info: vi.fn(), warn: vi.fn() };
+    const now = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(125);
+    const response = createResponse(404);
+    const middleware = createRequestTelemetry({
+      createRequestId: () => 'request-unknown',
+      logger,
+      now,
+      slowRequestMs: 1500
+    });
+
+    middleware(
+      { method: 'GET', originalUrl: '/api/victim@example.com?token=secret' },
+      response,
+      vi.fn()
+    );
+    response.emit('finish');
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[server] api telemetry',
+      expect.objectContaining({ requestGroup: '/api/unknown', status: 404 })
+    );
+    const logged = JSON.stringify(logger.warn.mock.calls);
+    expect(logged).not.toContain('victim@example.com');
+    expect(logged).not.toContain('secret');
   });
 
   it('logs slow successful requests without recording ordinary successful traffic', () => {

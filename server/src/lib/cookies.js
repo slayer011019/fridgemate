@@ -3,6 +3,27 @@ import { serverConfig } from '../config.js';
 
 const LEGACY_ACCESS_TOKEN_COOKIE_NAME = 'fridgemate_access';
 const LEGACY_REFRESH_TOKEN_COOKIE_NAME = 'fridgemate_refresh';
+const MAX_COOKIE_HEADER_LENGTH = 8192;
+const MAX_COOKIE_NAME_LENGTH = 256;
+const MAX_COOKIE_VALUE_LENGTH = 4096;
+const COOKIE_NAME_SPECIAL_CHARACTERS = new Set("!#$%&'*+-.^_`|~");
+
+function isValidCookieName(name) {
+  if (!name || name.length > MAX_COOKIE_NAME_LENGTH) return false;
+
+  for (const character of name) {
+    const codePoint = character.codePointAt(0);
+    const isDigit = codePoint >= 48 && codePoint <= 57;
+    const isUppercaseLetter = codePoint >= 65 && codePoint <= 90;
+    const isLowercaseLetter = codePoint >= 97 && codePoint <= 122;
+
+    if (!isDigit && !isUppercaseLetter && !isLowercaseLetter && !COOKIE_NAME_SPECIAL_CHARACTERS.has(character)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 function serializeCookie(name, value, options = {}) {
   const parts = [`${name}=${encodeURIComponent(value)}`];
@@ -29,7 +50,10 @@ function serializeCookie(name, value, options = {}) {
 }
 
 export function parseCookieHeader(headerValue) {
-  return String(headerValue || '')
+  const header = String(headerValue || '');
+  if (header.length > MAX_COOKIE_HEADER_LENGTH) return new Map();
+
+  return header
     .split(';')
     .map((entry) => entry.trim())
     .filter(Boolean)
@@ -41,28 +65,40 @@ export function parseCookieHeader(headerValue) {
       }
 
       const name = entry.slice(0, separatorIndex).trim();
+      const encodedValue = entry.slice(separatorIndex + 1).trim();
       let value = '';
 
+      if (!isValidCookieName(name) || encodedValue.length > MAX_COOKIE_VALUE_LENGTH) {
+        return cookies;
+      }
+
       try {
-        value = decodeURIComponent(entry.slice(separatorIndex + 1).trim());
+        value = decodeURIComponent(encodedValue);
       } catch {
         return cookies;
       }
 
-      if (name) {
-        cookies[name] = value;
-      }
+      cookies.set(name, value);
 
       return cookies;
-    }, {});
+    }, new Map());
 }
 
 export function getCookie(request, name) {
-  return parseCookieHeader(request.headers.cookie)[name] || '';
+  return parseCookieHeader(request.headers?.cookie).get(name) || '';
 }
 
 export function getAccessTokenFromRequest(request) {
   return getCookie(request, serverConfig.accessTokenCookieName);
+}
+
+export function getBearerAccessTokenFromRequest(request) {
+  const [scheme, token, extra] = String(request.headers?.authorization || '').trim().split(/\s+/);
+  return scheme?.toLowerCase() === 'bearer' && token && !extra ? token : '';
+}
+
+export function getRequestAccessToken(request) {
+  return getBearerAccessTokenFromRequest(request) || getAccessTokenFromRequest(request);
 }
 
 export function getRefreshTokenFromRequest(request) {

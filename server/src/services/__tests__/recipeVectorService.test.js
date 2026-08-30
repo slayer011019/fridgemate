@@ -1,7 +1,26 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { serverConfig } from '../../config.js';
+import {
+  EXTERNAL_AI_ACTIONS,
+  EXTERNAL_AI_DISCLOSURE_VERSION
+} from '../../lib/externalAiPrivacy.js';
 import { buildRecipeVectorQueryText, searchSimilarRecipesByVector } from '../recipeVectorService.js';
 
+const originalExternalAiGate = serverConfig.externalAiDataProcessingEnabled;
+const externalAi = {
+  action: EXTERNAL_AI_ACTIONS.semanticRecipes,
+  disclosureVersion: EXTERNAL_AI_DISCLOSURE_VERSION,
+  userInitiated: true
+};
+
 describe('recipeVectorService', () => {
+  beforeEach(() => {
+    serverConfig.externalAiDataProcessingEnabled = true;
+  });
+
+  afterEach(() => {
+    serverConfig.externalAiDataProcessingEnabled = originalExternalAiGate;
+  });
   it('builds a fridge ingredient query text for vector search', () => {
     expect(buildRecipeVectorQueryText([{ name: '순두부' }, { name: '계란' }, { name: '새우' }])).toBe(
       '검색재료: 계란, 두부, 새우'
@@ -31,6 +50,7 @@ describe('recipeVectorService', () => {
       prismaClient,
       model: 'test-model',
       dimensions: 3,
+      externalAi,
       generateEmbedding: async () => [0.1, 0.2, 0.3]
     });
 
@@ -58,9 +78,35 @@ describe('recipeVectorService', () => {
       searchSimilarRecipesByVector('query', 20, {
         prismaClient,
         dimensions: 3,
+        externalAi,
         generateEmbedding: async () => [0.1, 0.2]
       })
     ).rejects.toThrow('Recipe query embedding must include 3 dimensions.');
     expect(prismaClient.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it('fails before embedding when the request-specific signal is absent', async () => {
+    const generateEmbedding = vi.fn();
+
+    await expect(
+      searchSimilarRecipesByVector('query', 20, {
+        prismaClient: { $queryRawUnsafe: vi.fn() },
+        generateEmbedding
+      })
+    ).rejects.toMatchObject({ status: 403 });
+    expect(generateEmbedding).not.toHaveBeenCalled();
+  });
+
+  it('rejects likely sensitive query text at the provider boundary', async () => {
+    const generateEmbedding = vi.fn();
+
+    await expect(
+      searchSimilarRecipesByVector('검색재료: victim@example.com', 20, {
+        prismaClient: { $queryRawUnsafe: vi.fn() },
+        externalAi,
+        generateEmbedding
+      })
+    ).rejects.toMatchObject({ status: 400 });
+    expect(generateEmbedding).not.toHaveBeenCalled();
   });
 });

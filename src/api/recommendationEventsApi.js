@@ -1,6 +1,9 @@
 import { ApiClientError, requestJson } from './apiClient';
 import { isBackendEnabled } from '../utils/backendConfig';
 import { getAnalyticsSessionId } from '../utils/analytics';
+import { getAnalyticsConsent } from '../utils/analyticsConsent';
+import { getRecipeKey } from '../features/recipes/recipeIdentity';
+import { createSecureId } from '../utils/secureId';
 
 export class RecommendationEventsApiError extends ApiClientError {
   constructor(message, options = {}) {
@@ -17,16 +20,8 @@ function enqueueEventRequest(request) {
   return queuedRequest;
 }
 
-function getRecipeId(recipe = {}) {
-  const rawId = String(
-    recipe.recipeId || recipe.id || recipe.sourceRecipeId || recipe.title || recipe.name || ''
-  ).trim();
-
-  if (!rawId || /^(?:catalog|local):/u.test(rawId)) return rawId;
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(rawId)) {
-    return `catalog:${rawId}`;
-  }
-  return `local:${rawId}`;
+function createClientEventId() {
+  return createSecureId('event');
 }
 
 export function buildRecommendationEventPayload(recipe = {}, eventType, options = {}) {
@@ -35,7 +30,8 @@ export function buildRecommendationEventPayload(recipe = {}, eventType, options 
 
   return {
     eventType,
-    recipeId: getRecipeId(recipe),
+    recipeId: getRecipeKey(recipe),
+    clientEventId: options.clientEventId || createClientEventId(),
     sessionId: getAnalyticsSessionId(),
     rank: options.rank ?? recipe._recommendationRank ?? null,
     score: recipe.score ?? recipe.finalScore ?? null,
@@ -46,19 +42,20 @@ export function buildRecommendationEventPayload(recipe = {}, eventType, options 
     source: options.source || recipe._recommendationSource || null,
     metadata: {
       recipeName: recipe.title || recipe.name || null,
-      group: options.group || null
+      group: options.group || null,
+      screen: options.screen || null
     }
   };
 }
 
 export function saveRecommendationEvent(recipe, eventType, options = {}) {
-  if (!isBackendEnabled()) {
+  if (!isBackendEnabled() || getAnalyticsConsent() !== 'granted') {
     return Promise.resolve(null);
   }
 
   const payload = buildRecommendationEventPayload(recipe, eventType, options);
 
-  if (!payload.recipeId) {
+  if (!payload.recipeId || !payload.clientEventId || !payload.sessionId) {
     return Promise.resolve(null);
   }
 
@@ -72,7 +69,7 @@ export function saveRecommendationEvent(recipe, eventType, options = {}) {
         },
         body: JSON.stringify(payload)
       },
-      { authMode: 'auto', errorClass: RecommendationEventsApiError }
+      { authMode: 'required', errorClass: RecommendationEventsApiError }
     )
   );
 }

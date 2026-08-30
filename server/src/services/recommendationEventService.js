@@ -1,10 +1,11 @@
-import { withDatabaseScope, withUserDatabaseScope } from '../db/tenantScope.js';
+import { withUserDatabaseScope } from '../db/tenantScope.js';
 import { createHttpError } from '../lib/httpError.js';
 
-const VALID_EVENT_TYPES = new Set(['impression', 'click']);
+const VALID_EVENT_TYPES = new Set(['impression', 'click', 'select', 'dismiss', 'external_open', 'complete']);
 const ROOT_FIELDS = new Set([
   'eventType',
   'recipeId',
+  'clientEventId',
   'sessionId',
   'rank',
   'score',
@@ -15,9 +16,11 @@ const ROOT_FIELDS = new Set([
   'source',
   'metadata'
 ]);
-const METADATA_FIELDS = new Set(['recipeName', 'group']);
+const METADATA_FIELDS = new Set(['recipeName', 'group', 'screen']);
 const VALID_SOURCES = new Set(['rule', 'hybrid']);
 const VALID_GROUPS = new Set(['ready', 'buyOneMore', 'useSoon']);
+const VALID_SCREENS = new Set(['home', 'recipes']);
+const CATALOG_RECIPE_KEY_PATTERN = /^catalog:([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu;
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -103,7 +106,8 @@ function normalizeMetadata(value) {
   rejectUnknownFields(value, METADATA_FIELDS, 'metadata');
   const metadata = {
     recipeName: optionalString(value.recipeName, { name: 'metadata.recipeName', maxLength: 200 }),
-    group: optionalEnum(value.group, { name: 'metadata.group', values: VALID_GROUPS })
+    group: optionalEnum(value.group, { name: 'metadata.group', values: VALID_GROUPS }),
+    screen: optionalEnum(value.screen, { name: 'metadata.screen', values: VALID_SCREENS })
   };
 
   return Object.values(metadata).some((item) => item !== null) ? metadata : null;
@@ -118,12 +122,17 @@ export function normalizeRecommendationEventPayload(body = {}) {
   const eventType = requiredString(body.eventType, { name: 'eventType', maxLength: 16 });
 
   if (!VALID_EVENT_TYPES.has(eventType)) {
-    throw createHttpError(400, 'eventType must be "impression" or "click".');
+    throw createHttpError(400, 'eventType is not supported.');
   }
 
   return {
     eventType,
     recipeId: requiredString(body.recipeId, { name: 'recipeId', maxLength: 200 }),
+    clientEventId: optionalString(body.clientEventId, {
+      name: 'clientEventId',
+      maxLength: 128,
+      pattern: /^[A-Za-z0-9-]+$/
+    }),
     sessionId: optionalString(body.sessionId, {
       name: 'sessionId',
       maxLength: 128,
@@ -151,25 +160,52 @@ export function normalizeRecommendationEventPayload(body = {}) {
 }
 
 export async function createRecommendationEvent({ userId = null, body = {} } = {}) {
-  const data = normalizeRecommendationEventPayload(body);
   const normalizedUserId = typeof userId === 'string' && userId.trim() ? userId.trim() : null;
+
+  if (!normalizedUserId) {
+    throw createHttpError(401, 'Authentication is required.');
+  }
+
+  const data = normalizeRecommendationEventPayload(body);
   const operation = async (database) => {
-    const user = normalizedUserId
-      ? await database.user.findUnique({
-          where: { id: normalizedUserId },
-          select: { id: true }
-        })
+    const user = await database.user.findUnique({
+      where: { id: normalizedUserId },
+      select: { id: true }
+    });
+
+    if (!user) {
+      throw createHttpError(401, 'Authentication is required.');
+    }
+
+    const catalogRecipeId = CATALOG_RECIPE_KEY_PATTERN.exec(data.recipeId)?.[1] || null;
+    const catalogRecipe = catalogRecipeId
+      ? await database.recipe.findUnique({ where: { id: catalogRecipeId }, select: { id: true } })
       : null;
 
-    return database.recommendationEvent.create({
-      data: {
-        ...data,
-        userId: user?.id || null
+    try {
+      return await database.recommendationEvent.create({
+        data: {
+          ...data,
+          catalogRecipeId: catalogRecipe?.id || null,
+          userId: user.id
+        }
+      });
+    } catch (error) {
+      if (data.clientEventId && error?.code === 'P2002') {
+        const existingEvent = await database.recommendationEvent.findUnique({
+          where: {
+            userId_clientEventId: {
+              userId: user.id,
+              clientEventId: data.clientEventId
+            }
+          }
+        });
+
+        if (existingEvent) return existingEvent;
       }
-    });
+      throw error;
+    }
   };
 
-  return normalizedUserId
-    ? withUserDatabaseScope(normalizedUserId, operation)
-    : withDatabaseScope({}, operation);
+  return withUserDatabaseScope(normalizedUserId, operation);
 }

@@ -15,7 +15,9 @@ function buildHeaders(headers = {}) {
   return { ...headers };
 }
 
-async function tryRefreshAuthSession() {
+let inFlightAuthRefresh = null;
+
+async function performAuthSessionRefresh() {
   try {
     const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
       method: 'POST',
@@ -25,6 +27,16 @@ async function tryRefreshAuthSession() {
   } catch {
     return false;
   }
+}
+
+function tryRefreshAuthSession() {
+  if (!inFlightAuthRefresh) {
+    inFlightAuthRefresh = performAuthSessionRefresh().finally(() => {
+      inFlightAuthRefresh = null;
+    });
+  }
+
+  return inFlightAuthRefresh;
 }
 
 export async function requestJson(

@@ -1,4 +1,4 @@
-import { createContext, createElement, useCallback, useContext, useEffect, useMemo } from 'react';
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ingredientCache } from '../features/ingredients/ingredientRepository';
 import { useAuth } from './useAuth';
@@ -8,6 +8,10 @@ import {
   markSessionStartedTracked,
   recordAnalyticsEvent
 } from '../utils/analytics';
+import {
+  ANALYTICS_CONSENT_UPDATED_EVENT,
+  getAnalyticsConsent
+} from '../utils/analyticsConsent';
 
 const AnalyticsContext = createContext({
   trackEvent: () => null
@@ -15,34 +19,39 @@ const AnalyticsContext = createContext({
 
 export function AnalyticsProvider({ children }) {
   const location = useLocation();
-  const { isAuthenticated, loading, storageScope, user } = useAuth();
+  const { isAuthenticated, loading, storageScope } = useAuth();
+  const [analyticsConsent, setAnalyticsConsentState] = useState(getAnalyticsConsent);
+
+  useEffect(() => {
+    const handleConsentUpdate = () => setAnalyticsConsentState(getAnalyticsConsent());
+    window.addEventListener(ANALYTICS_CONSENT_UPDATED_EVENT, handleConsentUpdate);
+    return () => window.removeEventListener(ANALYTICS_CONSENT_UPDATED_EVENT, handleConsentUpdate);
+  }, []);
 
   const trackEvent = useCallback(
     (eventName, properties = {}) => {
+      if (analyticsConsent !== 'granted') return null;
+
       const payload = buildAnalyticsPayload({
         eventName,
         route: location.pathname,
         isAuthenticated,
-        userId: user?.id,
         properties
       });
 
       return recordAnalyticsEvent(payload);
     },
-    [isAuthenticated, location.pathname, user?.id]
+    [analyticsConsent, isAuthenticated, location.pathname]
   );
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || analyticsConsent !== 'granted') return;
 
-    trackEvent('page_view', {
-      page_path: `${location.pathname}${location.search}`,
-      page_title: typeof document === 'undefined' ? '' : document.title
-    });
-  }, [loading, location.pathname, location.search, trackEvent]);
+    trackEvent('page_view');
+  }, [analyticsConsent, loading, location.pathname, trackEvent]);
 
   useEffect(() => {
-    if (loading || hasTrackedSessionStarted()) {
+    if (loading || analyticsConsent !== 'granted' || hasTrackedSessionStarted()) {
       return;
     }
 
@@ -77,7 +86,7 @@ export function AnalyticsProvider({ children }) {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, loading, location.pathname, storageScope, trackEvent]);
+  }, [analyticsConsent, isAuthenticated, loading, location.pathname, storageScope, trackEvent]);
 
   const value = useMemo(
     () => ({

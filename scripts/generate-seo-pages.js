@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { createServer } from 'vite';
+import { cleanGeneratedSeo, removeCanonicalLinks } from './lib/seoHtmlSecurity.js';
 
 const outputDirectory = resolve(process.cwd(), 'dist');
 const templatePath = resolve(outputDirectory, 'index.html');
@@ -43,16 +44,6 @@ function setTagAttribute(html, tagPattern, attribute, value) {
 
 function appendHeadTags(html, tags) {
   return html.replace('</head>', `${tags}\n  </head>`);
-}
-
-function cleanGeneratedSeo(html) {
-  return html
-    .replace(/\s*<meta[^>]+data-seo-generated[^>]*>/gi, '')
-    .replace(/\s*<script[^>]+data-seo-structured-data[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(
-      /<div id="root"><!--seo-prerender-start-->[\s\S]*?<!--seo-prerender-end--><\/div>/i,
-      '<div id="root"></div>'
-    );
 }
 
 function applyMetadata(html, metadata) {
@@ -129,7 +120,7 @@ function renderPublicDocument(template, markup, metadata, schemas) {
 
 function renderFunctionalDocument(template, metadata) {
   let html = applyMetadata(template, metadata);
-  html = html.replace(/\s*<link[^>]+rel=["']canonical["'][^>]*>/i, '');
+  html = removeCanonicalLinks(html);
   return html;
 }
 
