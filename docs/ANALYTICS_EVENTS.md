@@ -236,7 +236,6 @@ FridgeMate의 초기 사업 KPI를 제품 이벤트로 연결하기 위한 추�
 
 속성:
 - `screen`
-- `recipe_name`
 - `group`
   - `ready`
   - `buy_one_more`
@@ -253,7 +252,6 @@ FridgeMate의 초기 사업 KPI를 제품 이벤트로 연결하기 위한 추�
 - 추천 흐름에서 부족 재료를 shopping 의사결정으로 넘길 때
 
 속성:
-- `recipe_name`
 - `missing_item_count`
 
 용도:
@@ -419,6 +417,11 @@ FridgeMate의 초기 사업 KPI를 제품 이벤트로 연결하기 위한 추�
 - authenticated 사용자는 서버 `userId`를 우선 사용한다.
 - 로그인 전후 연결이 필요하면 `analytics_id`와 `userId`를 alias 처리할 수 있게 설계한다.
 - 초기 구현은 콘솔/메모리/서버 로그 어느 방식이든 가능하지만, 이벤트 shape은 이 문서를 기준으로 유지한다.
+- 계정 연결 ProductEvent 원본은 서버 `createdAt` 기준 90일, RecommendationEvent 원본은 180일 보존하는 것을 운영 정책으로 한다. 계정 삭제는 이 기간보다 우선해 즉시 연결 행을 삭제한다.
+- 현재 인증 전용 수집 경로에서 생성되지 않는 `RecommendationEvent.userId IS NULL` legacy 행은 bounded retention 작업으로 제거한다. 스키마의 nullable 제약은 실제 데이터 검증 전까지 유지한다.
+- `npm run events:prune-retention`은 삭제 없는 미리보기이며, 실제 삭제에는 `--apply`와 정확한 `--confirm-database-host`가 모두 필요하다. 배포 API 자격 증명이 아닌 forced tenant RLS를 우회할 수 있는 trusted maintenance 연결에서만 실행한다.
+- 현재 구현은 수동 운영 명령까지이며 반복 scheduler는 아직 없다. 따라서 실제 90일/180일 집행은 승인된 수동 실행에 의존하고, 수집을 운영 활성화하기 전 별도로 최소권한 scheduler를 검토해야 한다.
+- 추천 학습 export는 기본 최근 180일이며 `--since`/`--until`을 지정해도 180일을 넘길 수 없다. 내보낸 파일은 원본 DB TTL과 별개이므로 목적 달성 후 운영자가 삭제한다.
 
 ## Recommended First Implementation Slice
 

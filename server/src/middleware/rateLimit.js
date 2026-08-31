@@ -42,6 +42,9 @@ export function createRateLimit({ scope, limit, windowMs, key, cost = () => 1, m
 
       next();
     } catch (error) {
+      if (error && typeof error === 'object' && !error.code) {
+        error.code = `RATE_LIMIT_${String(scope).toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`;
+      }
       next(error);
     }
   };

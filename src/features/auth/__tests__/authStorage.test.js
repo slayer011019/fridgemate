@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildUserStorageScope,
+  clearAccountFeatureStorage,
   clearPendingLogout,
   clearSessionHint,
   clearStoredAuthSession,
@@ -69,5 +70,20 @@ describe('authStorage', () => {
   it('builds clear storage scopes', () => {
     expect(buildUserStorageScope('user-1')).toBe('user:user-1');
     expect(GUEST_STORAGE_SCOPE).toBe('guest');
+  });
+
+  it('clears only the deleted account feature keys', () => {
+    window.localStorage.setItem('fridgemate-pantry-ownership:v2:user:user-1', '{}');
+    window.localStorage.setItem('fridgemate-user-preferences:v1:user:user-1', '{}');
+    window.localStorage.setItem('fridgemate-dismissed-recipes:v1:user:user-1:2026-08-30', '[]');
+    window.localStorage.setItem('fridgemate-pantry-ownership:v2:user:user-2', '{"keep":true}');
+    window.localStorage.setItem('unrelated', 'keep');
+
+    expect(clearAccountFeatureStorage('user-1')).toBe(true);
+    expect(window.localStorage.getItem('fridgemate-pantry-ownership:v2:user:user-1')).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-user-preferences:v1:user:user-1')).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-dismissed-recipes:v1:user:user-1:2026-08-30')).toBeNull();
+    expect(window.localStorage.getItem('fridgemate-pantry-ownership:v2:user:user-2')).toBe('{"keep":true}');
+    expect(window.localStorage.getItem('unrelated')).toBe('keep');
   });
 });

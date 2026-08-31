@@ -5,6 +5,7 @@ async function createTestServer(port, apiUrl) {
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl),
       'import.meta.env.VITE_ENABLE_OCR': JSON.stringify('true'),
+      'import.meta.env.VITE_ENABLE_REMOTE_IMPORT_LEARNING': JSON.stringify(apiUrl ? 'true' : 'false'),
       'import.meta.env.VITE_GA_MEASUREMENT_ID': JSON.stringify('G-E2ETEST')
     },
     server: {

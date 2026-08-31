@@ -26,11 +26,28 @@ export function isIngredientDeleted(ingredient) {
   return Boolean(ingredient?.deletedAt);
 }
 
+export function compactIngredientTombstone(ingredient, overrides = {}) {
+  const normalized = { ...ingredient, ...overrides };
+  const id = normalized.id || normalized.clientId;
+  const tombstone = {
+    id,
+    clientId: normalized.clientId || id,
+    updatedAt: normalized.updatedAt || normalized.deletedAt,
+    deletedAt: normalized.deletedAt,
+    syncState: normalized.syncState || SYNC_STATE.CLEAN
+  };
+
+  if (Object.hasOwn(normalized, 'userId')) {
+    tombstone.userId = normalized.userId;
+  }
+
+  return tombstone;
+}
+
 function normalizeSyncIngredient(ingredient, overrides = {}) {
   if (!ingredient) return null;
   const id = ingredient.id || ingredient.clientId;
-
-  return {
+  const normalized = {
     ...ingredient,
     id,
     clientId: ingredient.clientId || id,
@@ -39,6 +56,8 @@ function normalizeSyncIngredient(ingredient, overrides = {}) {
     lastSyncedAt: ingredient.lastSyncedAt || ingredient.updatedAt || null,
     ...overrides
   };
+
+  return isIngredientDeleted(normalized) ? compactIngredientTombstone(normalized) : normalized;
 }
 
 export function markIngredientAsSynced(ingredient) {
@@ -65,6 +84,13 @@ export function resolveIngredientConflict({ localIngredient = null, remoteIngred
   if (!localIngredient) return markIngredientAsSynced(remoteIngredient);
   if (!remoteIngredient) {
     return isPendingSyncState(localIngredient.syncState) ? normalizeSyncIngredient(localIngredient) : null;
+  }
+
+  const localDeleted = isIngredientDeleted(localIngredient);
+  const remoteDeleted = isIngredientDeleted(remoteIngredient);
+  if (remoteDeleted && !localDeleted) return markIngredientAsSynced(remoteIngredient);
+  if (localDeleted && !remoteDeleted) {
+    return markIngredientAsPending(localIngredient, SYNC_STATE.PENDING_DELETE);
   }
 
   const localUpdatedAt = getComparableTimestamp(localIngredient.updatedAt);
@@ -103,7 +129,13 @@ export async function syncIngredientSnapshot({
     const remoteWon =
       localIngredient &&
       remoteIngredient &&
-      getComparableTimestamp(remoteIngredient.updatedAt) > getComparableTimestamp(localIngredient.updatedAt);
+      (
+        (isIngredientDeleted(remoteIngredient) && !isIngredientDeleted(localIngredient))
+        || (
+          isIngredientDeleted(remoteIngredient) === isIngredientDeleted(localIngredient)
+          && getComparableTimestamp(remoteIngredient.updatedAt) > getComparableTimestamp(localIngredient.updatedAt)
+        )
+      );
     const resolvedIngredient = resolveIngredientConflict({ localIngredient, remoteIngredient });
 
     if (!resolvedIngredient) return;

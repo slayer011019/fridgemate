@@ -6,16 +6,26 @@ import { importCorrectionRoutes } from './routes/importCorrectionRoutes.js';
 import { recommendationEventRoutes } from './routes/recommendationEventRoutes.js';
 import { recipeRoutes } from './routes/recipeRoutes.js';
 import { healthRoutes } from './routes/healthRoutes.js';
+import { menuDecisionRoutes } from './routes/menuDecisionRoutes.js';
+import { pantryOwnershipRoutes, userPreferenceRoutes } from './routes/personalizationRoutes.js';
+import { productEventRoutes } from './routes/productEventRoutes.js';
 import { isAllowedOrigin } from './config.js';
 import { prismaRequestScope } from './db/prisma.js';
-import { optionalAuth } from './middleware/optionalAuth.js';
 import { requireAuth } from './middleware/requireAuth.js';
+import {
+  authenticatedApiClientRateLimit,
+  authenticatedApiUserRateLimit
+} from './middleware/authenticatedApiRateLimit.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
 import { createRequestTelemetry, markRequestFailure } from './middleware/requestTelemetry.js';
+import { securityHeaders } from './middleware/securityHeaders.js';
 
 export function createApp() {
   const app = express();
 
+  app.disable('etag');
+  app.disable('x-powered-by');
+  app.use(securityHeaders);
   app.use(createRequestTelemetry());
   app.use(
     cors({
@@ -46,10 +56,25 @@ export function createApp() {
   app.use('/health', healthRoutes);
   app.use('/api/health', healthRoutes);
   app.use('/api/auth', authRoutes);
-  app.use('/api/ingredients', requireAuth, ingredientRoutes);
-  app.use('/api/import', requireAuth, importCorrectionRoutes);
-  app.use('/api/recipes', requireAuth, recipeRoutes);
-  app.use('/api/recommendation-events', optionalAuth, recommendationEventRoutes);
+
+  // A client budget runs before token/revocation checks, then a narrower user budget
+  // runs after authentication. Both use FridgeMate's shared Redis/DO-backed store.
+  // CodeQL does not model that custom middleware, so the targeted suppressions below
+  // are paired with middleware-order and denial tests in appRateLimits.test.js.
+  // codeql[js/missing-rate-limiting]
+  app.use('/api/ingredients', authenticatedApiClientRateLimit, requireAuth, authenticatedApiUserRateLimit, ingredientRoutes);
+  // codeql[js/missing-rate-limiting]
+  app.use('/api/menu-decisions', authenticatedApiClientRateLimit, requireAuth, authenticatedApiUserRateLimit, menuDecisionRoutes);
+  // codeql[js/missing-rate-limiting]
+  app.use('/api/pantry-ownership', authenticatedApiClientRateLimit, requireAuth, authenticatedApiUserRateLimit, pantryOwnershipRoutes);
+  // codeql[js/missing-rate-limiting]
+  app.use('/api/user-preferences', authenticatedApiClientRateLimit, requireAuth, authenticatedApiUserRateLimit, userPreferenceRoutes);
+  // codeql[js/missing-rate-limiting]
+  app.use('/api/import', authenticatedApiClientRateLimit, requireAuth, authenticatedApiUserRateLimit, importCorrectionRoutes);
+  // codeql[js/missing-rate-limiting]
+  app.use('/api/recipes', authenticatedApiClientRateLimit, requireAuth, authenticatedApiUserRateLimit, recipeRoutes);
+  app.use('/api/recommendation-events', recommendationEventRoutes);
+  app.use('/api/product-events', productEventRoutes);
 
   app.use('/api', (request, response) => {
     response.status(404).json({

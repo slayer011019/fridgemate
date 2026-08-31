@@ -1,5 +1,9 @@
-const IMPORT_CORRECTIONS_STORAGE_KEY = 'fridgemate-import-corrections';
+const LEGACY_IMPORT_CORRECTIONS_STORAGE_KEY = 'fridgemate-import-corrections';
 const MAX_CORRECTION_COUNT = 300;
+
+function storageKey(scope = 'guest') {
+  return `fridgemate-import-corrections:v2:${scope}`;
+}
 
 function normalizeKeyPart(value) {
   return String(value || '')
@@ -15,7 +19,7 @@ function getBrowserStorage() {
   return window.localStorage;
 }
 
-function readCorrectionMap() {
+function readCorrectionMap(scope = 'guest') {
   const storage = getBrowserStorage();
 
   if (!storage) {
@@ -23,21 +27,49 @@ function readCorrectionMap() {
   }
 
   try {
-    const rawValue = storage.getItem(IMPORT_CORRECTIONS_STORAGE_KEY);
+    const rawValue =
+      storage.getItem(storageKey(scope)) ||
+      (scope === 'guest' ? storage.getItem(LEGACY_IMPORT_CORRECTIONS_STORAGE_KEY) : null);
     return rawValue ? JSON.parse(rawValue) : {};
   } catch {
     return {};
   }
 }
 
-function writeCorrectionMap(correctionMap) {
+function writeCorrectionMap(correctionMap, scope = 'guest') {
   const storage = getBrowserStorage();
 
   if (!storage) {
     return;
   }
 
-  storage.setItem(IMPORT_CORRECTIONS_STORAGE_KEY, JSON.stringify(correctionMap));
+  storage.setItem(storageKey(scope), JSON.stringify(correctionMap));
+}
+
+export function clearImportCorrections(scope = 'guest') {
+  const storage = getBrowserStorage();
+
+  if (!storage) {
+    return true;
+  }
+
+  const keys = [storageKey(scope)];
+
+  if (scope === 'guest') {
+    keys.push(LEGACY_IMPORT_CORRECTIONS_STORAGE_KEY);
+  }
+
+  let cleanupComplete = true;
+
+  keys.forEach((key) => {
+    try {
+      storage.removeItem(key);
+    } catch {
+      cleanupComplete = false;
+    }
+  });
+
+  return cleanupComplete;
 }
 
 export function getImportCorrectionKey(item) {
@@ -49,8 +81,8 @@ export function getImportCorrectionKey(item) {
   );
 }
 
-export function applyImportCorrections(items) {
-  const correctionMap = readCorrectionMap();
+export function applyImportCorrections(items, scope = 'guest') {
+  const correctionMap = readCorrectionMap(scope);
 
   return items.map((item) => {
     const correctionKey = getImportCorrectionKey(item);
@@ -72,8 +104,8 @@ export function applyImportCorrections(items) {
   });
 }
 
-export function saveImportCorrections(items) {
-  const correctionMap = readCorrectionMap();
+export function saveImportCorrections(items, scope = 'guest') {
+  const correctionMap = readCorrectionMap(scope);
   const nextMap = { ...correctionMap };
 
   items.forEach((item) => {
@@ -95,5 +127,5 @@ export function saveImportCorrections(items) {
     .sort((left, right) => String(right[1].updatedAt).localeCompare(String(left[1].updatedAt)))
     .slice(0, MAX_CORRECTION_COUNT);
 
-  writeCorrectionMap(Object.fromEntries(trimmedEntries));
+  writeCorrectionMap(Object.fromEntries(trimmedEntries), scope);
 }

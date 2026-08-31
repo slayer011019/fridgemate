@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { PUBLIC_ROUTES, getRouteMetadata } from '../src/utils/routeMetadata.js';
 import { PUBLIC_RECIPE_PATHS } from '../src/features/recipes/publicRecipeCatalog.js';
 import { getWebmasterVerificationTags } from '../src/utils/webmasterVerification.js';
+import { hasOnlySameOriginExecutableScripts } from './lib/seoHtmlSecurity.js';
 
 const outputDirectory = resolve(process.cwd(), 'dist');
 const routeOutputFiles = {
@@ -38,8 +39,8 @@ for (const pathname of PUBLIC_ROUTES) {
   assert(html.includes('<!--seo-prerender-start-->'), `${pathname} has no prerendered body marker`);
   assert(html.includes('application/ld+json'), `${pathname} has no structured data`);
   assert(
-    !html.includes('googletagmanager.com'),
-    `${pathname} loads Google Analytics before the visitor has granted consent`
+    hasOnlySameOriginExecutableScripts(html, metadata.canonical),
+    `${pathname} contains an inline or third-party executable script before consent`
   );
 }
 

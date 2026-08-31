@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildTrainingExamples, parseArgs } from '../export-recipe-parser-training.js';
+import {
+  buildTrainingExamples,
+  parseArgs,
+  resolveReadOnlySupabaseKey
+} from '../export-recipe-parser-training.js';
 
 const recipe = {
   id: 'recipe-1',
@@ -15,6 +19,25 @@ const recipe = {
 };
 
 describe('recipe parser training export', () => {
+  it('requires a dedicated anon key and rejects service-role credentials', () => {
+    expect(resolveReadOnlySupabaseKey({ SUPABASE_ANON_KEY: 'anon-read-key' })).toBe('anon-read-key');
+    expect(() =>
+      resolveReadOnlySupabaseKey({ SUPABASE_SERVICE_ROLE_KEY: 'service-only' })
+    ).toThrow(/SUPABASE_ANON_KEY is required/i);
+    expect(() => resolveReadOnlySupabaseKey({ SUPABASE_ANON_KEY: 'sb_secret_example' })).toThrow(
+      /must not contain service-role/i
+    );
+
+    const serviceRoleJwt = [
+      Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url'),
+      Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url'),
+      'signature'
+    ].join('.');
+    expect(() => resolveReadOnlySupabaseKey({ SUPABASE_ANON_KEY: serviceRoleJwt })).toThrow(
+      /must not contain service-role/i
+    );
+  });
+
   it('builds parsed and skipped JSONL-ready examples', () => {
     const examples = buildTrainingExamples(recipe);
 

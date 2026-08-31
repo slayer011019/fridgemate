@@ -4,7 +4,8 @@
   "main": "server/src/worker.js",
   "compatibility_date": "2026-08-24",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
+  "workers_dev": false,
+  "preview_urls": false,
   "routes": [
     {
       "pattern": "api.xn--wh1bs8l5xa003adme.com/*",
@@ -12,12 +13,6 @@
     }
   ],
   "observability": { "enabled": true },
-  "kv_namespaces": [
-    {
-      "binding": "AUTH_KV",
-      "id": "3164069f15a04b56848f27d3f2153be0"
-    }
-  ],
   "durable_objects": {
     "bindings": [
       {
@@ -46,11 +41,18 @@
     "REFRESH_TOKEN_COOKIE_NAME": "__Host-fridgemate_refresh",
     "AUTH_COOKIE_SECURE": "true",
     "AUTH_COOKIE_SAME_SITE": "Lax",
+    "PUBLIC_SIGNUP_ENABLED": "false",
     "JWT_EXPIRES_IN": "15m",
     "REFRESH_TOKEN_EXPIRES_IN": "30d",
     "RECIPE_EMBEDDING_MODEL": "text-embedding-3-small",
     "RECIPE_EMBEDDING_DIMENSIONS": "1536",
     "AI_USAGE_LOGGING_ENABLED": "true",
+    "SEMANTIC_RECIPE_API_ENABLED": "false",
+    "EXTERNAL_AI_DATA_PROCESSING_ENABLED": "false",
+    "RECOMMENDATION_EVENTS_ENABLED": "false",
+    "PRODUCT_EVENTS_ENABLED": "false",
+    "IMPORT_CORRECTION_LEARNING_ENABLED": "false",
+    "IMPORT_CORRECTION_EMBEDDING_ENABLED": "false",
     "API_SLOW_REQUEST_MS": "1500"
   }
 }

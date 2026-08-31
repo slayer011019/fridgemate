@@ -5,6 +5,28 @@ const MAX_PASSWORD_LENGTH = 128;
 const MAX_EMAIL_LENGTH = 254;
 const COMMON_PASSWORD_PATTERNS = ['password', '123456', 'qwerty', 'letmein', 'admin'];
 const SPECIAL_CHARACTER_PATTERN = /[^A-Za-z0-9]/;
+const WHITESPACE_PATTERN = /\s/u;
+
+function isValidEmailAddress(email) {
+  const atIndex = email.indexOf('@');
+
+  if (atIndex <= 0 || atIndex !== email.lastIndexOf('@') || atIndex === email.length - 1) {
+    return false;
+  }
+
+  const localPart = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
+  if (localPart.startsWith('.') || localPart.endsWith('.') || localPart.includes('..')) return false;
+
+  const domainLabels = domain.split('.');
+  if (domainLabels.length < 2 || domainLabels.some((label) => !label)) return false;
+
+  for (const character of email) {
+    if (WHITESPACE_PATTERN.test(character)) return false;
+  }
+
+  return true;
+}
 
 export function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -18,12 +40,16 @@ export function normalizeAuthInput(input = {}) {
 }
 
 export function assertValidSignupInput({ email, password }) {
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email) {
     throw createHttpError(400, 'A valid email address is required.');
   }
 
   if (email.length > MAX_EMAIL_LENGTH) {
     throw createHttpError(400, 'Email address is too long.');
+  }
+
+  if (!isValidEmailAddress(email)) {
+    throw createHttpError(400, 'A valid email address is required.');
   }
 
   if (password.length < MIN_PASSWORD_LENGTH) {

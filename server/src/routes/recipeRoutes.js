@@ -8,11 +8,26 @@ import { createRateLimit, getClientAddress } from '../middleware/rateLimit.js';
 
 export const recipeRoutes = Router();
 
+export function getRecipeComputationRateLimitCost(request, defaultCost = 1) {
+  const ingredients = Array.isArray(request.body?.availableIngredients)
+    ? request.body.availableIngredients
+    : request.body?.ingredients;
+  const itemCount = Array.isArray(ingredients) ? ingredients.length : 0;
+  return itemCount > 0
+    ? Math.min(50, Math.ceil(itemCount / 10))
+    : defaultCost;
+}
+
+export function getSemanticRecommendationRateLimitCost(request) {
+  return getRecipeComputationRateLimitCost(request, 5);
+}
+
 const aiSuggestUserRateLimit = createRateLimit({
   scope: 'ai-suggest-user',
   limit: 20,
   windowMs: 60 * 60 * 1000,
   key: (request) => `user:${request.auth.userId}`,
+  cost: getRecipeComputationRateLimitCost,
   message: 'Too many AI suggestion requests. Please try again later.'
 });
 
@@ -21,6 +36,7 @@ const aiSuggestClientRateLimit = createRateLimit({
   limit: 60,
   windowMs: 60 * 60 * 1000,
   key: getClientAddress,
+  cost: getRecipeComputationRateLimitCost,
   message: 'Too many AI suggestion requests. Please try again later.'
 });
 
@@ -29,6 +45,7 @@ const semanticRecommendationUserRateLimit = createRateLimit({
   limit: 30,
   windowMs: 60 * 60 * 1000,
   key: (request) => `user:${request.auth.userId}`,
+  cost: getSemanticRecommendationRateLimitCost,
   message: 'Too many semantic recommendation requests. Please try again later.'
 });
 
@@ -37,6 +54,7 @@ const semanticRecommendationClientRateLimit = createRateLimit({
   limit: 60,
   windowMs: 60 * 60 * 1000,
   key: getClientAddress,
+  cost: getSemanticRecommendationRateLimitCost,
   message: 'Too many semantic recommendation requests. Please try again later.'
 });
 

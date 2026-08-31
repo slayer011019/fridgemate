@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildAiUsageEvent,
+  recordAccountDeletionRevocationFailure,
   recordAiUsage,
-  recordRecommendationFallback
+  recordRecommendationFallback,
+  recordSemanticRecommendationOutcome
 } from '../operationalTelemetry.js';
 
 describe('operationalTelemetry', () => {
@@ -82,5 +84,44 @@ describe('operationalTelemetry', () => {
       errorCode: 'DB_DOWN'
     });
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('private-pass');
+  });
+
+  it('records account-deletion revocation failures without identifiers or raw messages', () => {
+    const logger = { warn: vi.fn() };
+    const event = recordAccountDeletionRevocationFailure(
+      {
+        name: 'RevocationStoreError',
+        code: 'AUTH_STORE_DOWN',
+        message: 'token access-token-1 for user-1 failed'
+      },
+      { logger }
+    );
+
+    expect(event).toEqual({
+      event: 'account_deletion_revocation_failure',
+      errorName: 'RevocationStoreError',
+      errorCode: 'AUTH_STORE_DOWN'
+    });
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('access-token-1');
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('user-1');
+  });
+
+  it('records only aggregate semantic mode, count, and latency', () => {
+    const logger = { info: vi.fn() };
+    const event = recordSemanticRecommendationOutcome({
+      mode: 'semantic',
+      recommendationCount: 10,
+      durationMs: 321,
+      ingredients: ['private ingredient'],
+      vector: [0.1]
+    }, { logger });
+
+    expect(event).toEqual({
+      event: 'semantic_recommendation',
+      mode: 'semantic',
+      recommendationCount: 10,
+      durationMs: 321
+    });
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain('private ingredient');
   });
 });

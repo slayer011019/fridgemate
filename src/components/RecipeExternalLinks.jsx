@@ -1,6 +1,6 @@
 import { generateRecipeSearchLinks } from '../features/recipes/recipeSearchLinks.js';
 
-function RecipeExternalLinks({ title, recipeName, searchLinks }) {
+function RecipeExternalLinks({ title, recipeName, searchLinks, onOpen }) {
   const resolvedRecipeName = String(recipeName || title || '').trim();
   const links = searchLinks || generateRecipeSearchLinks(resolvedRecipeName);
 
@@ -14,6 +14,7 @@ function RecipeExternalLinks({ title, recipeName, searchLinks }) {
         href={links.manRecipe}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => onOpen?.('manRecipe')}
         className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-500 hover:bg-brand-50 hover:text-brand-700"
       >
         만개의레시피
@@ -22,6 +23,7 @@ function RecipeExternalLinks({ title, recipeName, searchLinks }) {
         href={links.youtube}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => onOpen?.('youtube')}
         className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-500 hover:bg-brand-50 hover:text-brand-700"
       >
         유튜브
@@ -30,6 +32,7 @@ function RecipeExternalLinks({ title, recipeName, searchLinks }) {
         href={links.naver}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => onOpen?.('naver')}
         className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-500 hover:bg-brand-50 hover:text-brand-700"
       >
         네이버

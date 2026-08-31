@@ -6,6 +6,7 @@ dist/
 .env.*
 !.env.example
 !.env.production
+!.env.staging.example
 
 # Logs
 *.log
@@ -19,6 +20,7 @@ pnpm-debug.log*
 .vite/
 .wrangler-state/
 .wrangler/
+wrangler.staging.jsonc
 supabase/.temp/
 coverage/
 
@@ -47,6 +49,22 @@ server/.env.*
 prisma/*.db
 prisma/*.db-journal
 
+# Local database backups may contain credentials, password hashes, and personal data.
+# Generate them outside the repository; these patterns are only a final safety net.
+.local-backups/
+backups/
+*.dump
+*.dump.gz
+*.dump.zst
+*.backup
+*.sql.gz
+*.sql.zst
+roles.sql
+schema.sql
+data.sql
+history_schema.sql
+history_data.sql
+
 # Tesseract.js OCR 임시 파일
 *.traineddata
 tesseract-cache/
@@ -61,6 +79,7 @@ playwright/.cache/
 # 번들 분석
 stats.html
 bundle-stats.json
+*.cpuprofile
 # Local code review graph
 .code-review-graph/
 

@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import AnalyticsConsentBanner from '../AnalyticsConsentBanner';
 import {
   ANALYTICS_CONSENT_STORAGE_KEY,
+  ANALYTICS_ID_STORAGE_KEY,
+  ANALYTICS_SESSION_ID_STORAGE_KEY,
   getAnalyticsConsent,
   openAnalyticsConsentSettings
 } from '../../utils/analyticsConsent';
@@ -11,6 +13,7 @@ import {
 describe('AnalyticsConsentBanner', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
     document.head.querySelectorAll('script[data-fridgemate-ga]').forEach((script) => script.remove());
     delete window.dataLayer;
     delete window.gtag;
@@ -42,11 +45,16 @@ describe('AnalyticsConsentBanner', () => {
     expect(document.head.querySelector('script[data-fridgemate-ga]')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
+    window.localStorage.setItem(ANALYTICS_ID_STORAGE_KEY, 'analytics-id');
+    window.sessionStorage.setItem(ANALYTICS_SESSION_ID_STORAGE_KEY, 'session-id');
+
     openAnalyticsConsentSettings();
     expect(await screen.findByText('현재 설정: 이용 분석 허용')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '필수 기능만' }));
 
     expect(window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY)).toBe('denied');
+    expect(window.localStorage.getItem(ANALYTICS_ID_STORAGE_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(ANALYTICS_SESSION_ID_STORAGE_KEY)).toBeNull();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

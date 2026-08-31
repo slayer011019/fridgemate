@@ -42,6 +42,20 @@ The export command creates future training data:
 npm run export:recommendation-training -- --format=jsonl --output=data/training/recommendation-training.jsonl
 ```
 
+The export is bounded to the latest 180 server-created days by default. Operators can provide an explicit `--since` and `--until` window, but the script rejects ranges wider than 180 days and future end times.
+
+### Import Correction Embeddings
+
+Import-correction learning and its embedding path are independently disabled by default. Historical correction rows do not contain evidence of a disclosed, per-request external-AI action, so bulk embedding execution is intentionally disabled even when feature flags and provider keys are configured. The inspection path rebuilds text from bounded, privacy-checked correction fields and never falls back to a legacy raw embedding string.
+
+The command is read-only and supports dry-run inspection only:
+
+```bash
+npm run import-corrections:backfill
+```
+
+Passing `--execute` always fails before a database read, provider request, or write. Rows that resemble an email address, phone number, resident identifier, card number, URL, or street address are also rejected during the dry-run review. A future migration would need trustworthy per-record consent evidence and a newly reviewed execution design; operator flags must not be used to invent that consent. The current import screen does not automatically request correction embeddings.
+
 ### Recipe Embedding Groundwork
 
 Recipe embeddings convert stable recipe text into vectors for future semantic candidate search. This is storage and retrieval infrastructure, not model training.
@@ -56,7 +70,7 @@ Current boundaries:
 - final ordering should remain rule-based, using owned ingredient match, expiration urgency, missing ingredient count, and existing recommendation score
 - ranking model training should wait until recommendation events are plentiful enough for offline evaluation
 
-The August 2026 read-only production baseline found 993 current embeddings for 1,146 recipes, with no duplicate keys or orphans. The historical ten-recipe ingredient-query check returned 2/10 in the top five; the newly fixed fixture reproduced 3/10 against old vectors. Classification-aware text improved the full in-memory re-embedding evaluation to Hit@1 5/10, Hit@5 6/10, and MRR@5 0.55. Because the agreed Hit@5 gate is 7/10, production backfill remains No-Go.
+The initial August 2026 baseline found 993 old embeddings for 1,146 recipes and failed the retrieval gate. That state is now historical: the catalog contains 1,166 recipes and all 1,166 vectors are current, with no missing, stale, duplicate, or orphan rows. Final stored-vector evaluation reached fixed-fixture reranked Hit@5 9/10 and Korean home-meal candidate recall@100 19/20 with reranked Hit@5 15/20. Production activation remains behind `SEMANTIC_RECIPE_API_ENABLED` until isolated staging verifies API behavior and fallback.
 
 The embedding command defaults to dry-run. `--evaluate --execute` embeds public catalog text only in memory, never stores vectors, and records request counts and aggregate metrics. Production writes require an explicit `--backfill-missing` or `--backfill-stale` mode after the quality gate is approved.
 

@@ -1,5 +1,19 @@
 import { serverConfig } from '../config.js';
 
+const KNOWN_API_GROUPS = new Set([
+  'auth',
+  'health',
+  'import',
+  'ingredients',
+  'menu-decisions',
+  'pantry-ownership',
+  'product-events',
+  'recipes',
+  'recommendation-events',
+  'user-preferences'
+]);
+const KNOWN_ROOT_GROUPS = new Set(['health']);
+
 function createRequestId() {
   return globalThis.crypto.randomUUID();
 }
@@ -14,8 +28,36 @@ export function getRequestGroup(originalUrl = '/') {
   }
 
   const segments = pathname.split('/').filter(Boolean);
-  const groupLength = segments[0] === 'api' ? 2 : 1;
-  return segments.length ? `/${segments.slice(0, groupLength).join('/')}` : '/';
+
+  if (!segments.length) return '/';
+  if (segments[0] === 'api') {
+    if (!segments[1]) return '/api';
+    return KNOWN_API_GROUPS.has(segments[1]) ? `/api/${segments[1]}` : '/api/unknown';
+  }
+
+  return KNOWN_ROOT_GROUPS.has(segments[0]) ? `/${segments[0]}` : '/unknown';
+}
+
+function getNestedErrorCode(error) {
+  const queue = [error];
+  const seen = new Set();
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current || (typeof current !== 'object' && typeof current !== 'function') || seen.has(current)) {
+      continue;
+    }
+    seen.add(current);
+
+    if (current.code != null) return String(current.code).slice(0, 80);
+    queue.push(
+      current.cause,
+      current.originalError,
+      current.meta?.driverAdapterError?.cause
+    );
+  }
+
+  return null;
 }
 
 export function markRequestFailure(request, error) {
@@ -23,7 +65,7 @@ export function markRequestFailure(request, error) {
 
   request.telemetry.failure = {
     errorName: String(error?.name || 'Error').slice(0, 80),
-    errorCode: error?.code == null ? null : String(error.code).slice(0, 80)
+    errorCode: getNestedErrorCode(error)
   };
 }
 

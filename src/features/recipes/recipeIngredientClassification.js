@@ -107,9 +107,106 @@ const GARNISH_PATTERN = /(?:고명|장식용?|마무리용?|토핑)/u;
 const SEASONING_SECTION_PATTERN = /(?:양념장?|소스|조미료)/u;
 const MAIN_SECTION_PATTERN = /(?:주재료|필수재료|핵심재료)/u;
 const LIQUID_SECTION_PATTERN = /(?:육수|국물|액체)/u;
+const MAX_CLASSIFICATION_TEXT_LENGTH = 512;
+const QUANTITY_SUFFIX_UNITS = Object.freeze([
+  '작은술',
+  '큰술',
+  '마리',
+  '줄기',
+  '스푼',
+  'kg',
+  'mg',
+  'ml',
+  'mL',
+  'cm',
+  '개',
+  '모',
+  '컵',
+  '쪽',
+  '알',
+  '장',
+  '봉',
+  '줌',
+  'g',
+  'l',
+  'L',
+  'T',
+  't'
+]);
+const QUANTITY_FRACTIONS = new Set(['¼', '½', '¾', '⅓', '⅔', '⅛', '⅜', '⅝', '⅞']);
+
+function toBoundedClassificationText(value) {
+  const text = String(value || '');
+  return text.length <= MAX_CLASSIFICATION_TEXT_LENGTH ? text : '';
+}
+
+function stripParentheticalText(value) {
+  let depth = 0;
+  let output = '';
+
+  for (const character of value) {
+    if (character === '(') {
+      depth += 1;
+      if (depth === 1) output += ' ';
+      continue;
+    }
+
+    if (character === ')' && depth > 0) {
+      depth -= 1;
+      continue;
+    }
+
+    if (depth === 0) output += character;
+  }
+
+  return output;
+}
+
+function isAsciiDigit(character) {
+  const codePoint = character?.codePointAt(0) ?? -1;
+  return codePoint >= 48 && codePoint <= 57;
+}
+
+function isQuantityToken(value) {
+  let index = 0;
+
+  while (isAsciiDigit(value[index])) index += 1;
+  if (index === 0) return false;
+
+  while (index < value.length && './×xX'.includes(value[index])) {
+    index += 1;
+    const digitStart = index;
+    while (isAsciiDigit(value[index])) index += 1;
+    if (index === digitStart) return false;
+  }
+
+  if (QUANTITY_FRACTIONS.has(value[index])) index += 1;
+  return index === value.length;
+}
+
+function stripTrailingQuantityAndUnit(value) {
+  const text = value.trimEnd();
+  const unit = QUANTITY_SUFFIX_UNITS.find((candidate) => text.endsWith(candidate));
+  if (!unit) return text;
+
+  const amountEnd = text.slice(0, -unit.length).trimEnd().length;
+  let amountStart = amountEnd;
+
+  while (amountStart > 0) {
+    const character = text[amountStart - 1];
+    if (!isAsciiDigit(character) && !'./×xX'.includes(character) && !QUANTITY_FRACTIONS.has(character)) break;
+    amountStart -= 1;
+  }
+
+  const amount = text.slice(amountStart, amountEnd);
+  const separator = text[amountStart - 1];
+  if (!isQuantityToken(amount) || !separator || separator.trim() !== '') return text;
+
+  return text.slice(0, amountStart).trimEnd();
+}
 
 function normalizeSpaces(value) {
-  return String(value || '')
+  return toBoundedClassificationText(value)
     .replace(/<[^>]*>/gu, ' ')
     .replace(/\s+/gu, ' ')
     .trim();
@@ -136,12 +233,7 @@ function cleanSectionPrefix(value) {
  * @returns {string}
  */
 export function normalizeRecipeIngredientName(value) {
-  const cleaned = cleanSectionPrefix(value)
-    .replace(/\([^)]*\)?/gu, ' ')
-    .replace(
-      /\s+\d+(?:[./×xX]\d+)*(?:[¼½¾⅓⅔⅛⅜⅝⅞])?\s*(?:kg|g|mg|ml|mL|l|L|cm|개|마리|모|컵|큰술|작은술|줄기|쪽|알|장|봉|줌|스푼|T|t)\s*$/u,
-      ''
-    )
+  const cleaned = stripTrailingQuantityAndUnit(stripParentheticalText(cleanSectionPrefix(value)))
     .replace(/[①②③④⑤⑥⑦⑧⑨⑩]/gu, '')
     .trim();
   const matchedRule = NORMALIZE_RULES.find((rule) => rule.pattern.test(cleaned));

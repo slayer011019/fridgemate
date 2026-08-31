@@ -22,3 +22,31 @@ test('local-only mode keeps CRUD data in IndexedDB across reloads', async ({ pag
   await page.getByRole('button', { name: '삭제' }).click();
   await expect(page.getByText('우유')).toHaveCount(0);
 });
+
+test('guest menu selection survives a reload without a server account', async ({ page }) => {
+  await seedBrowserState(page, {
+    ingredients: [
+      {
+        id: 'egg-1',
+        name: '계란',
+        category: '기타',
+        storageType: '냉장',
+        quantity: '4개',
+        purchaseDate: '2026-08-30',
+        expiryDate: '2026-09-02',
+        consumed: false
+      }
+    ]
+  });
+  await gotoAndWait(page, '/recipes');
+
+  const firstCard = page.locator('article').filter({ has: page.getByRole('button', { name: '오늘 먹기' }) }).first();
+  const recipeName = (await firstCard.getByRole('heading').textContent())?.trim();
+  await firstCard.getByRole('button', { name: '오늘 먹기' }).click();
+  await expect(page.getByRole('button', { name: '선택됨' }).first()).toBeVisible();
+
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await gotoAndWait(page, '/');
+  await expect(page.getByRole('heading', { name: recipeName, exact: true })).toBeVisible();
+});

@@ -80,4 +80,31 @@ describe('recipeEmbeddingService', () => {
       expect.objectContaining({ success: false, status: 429, inputCount: 1 })
     );
   });
+
+  it('aborts stalled semantic embedding requests and records a bounded failure', async () => {
+    const onUsage = vi.fn();
+    const fetchImpl = vi.fn(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+        })
+    );
+
+    await expect(
+      generateRecipeEmbedding('감자', {
+        apiKey: 'test-key',
+        dimensions: 3,
+        fetchImpl,
+        onUsage,
+        timeoutMs: 1
+      })
+    ).rejects.toMatchObject({
+      message: 'OpenAI recipe embeddings request timed out.',
+      code: 'EXTERNAL_AI_TIMEOUT',
+      status: 0
+    });
+    expect(onUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, status: 0, inputCount: 1 })
+    );
+  });
 });

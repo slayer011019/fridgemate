@@ -8,8 +8,8 @@ export async function revokeToken(jti, exp) {
   await revokeAuthToken(jti, exp);
 }
 
-export async function isTokenRevoked(jti) {
-  return checkRevokedToken(jti);
+export async function isTokenRevoked(jti, exp) {
+  return checkRevokedToken(jti, exp);
 }
 
 export function clearRevokedTokens() {

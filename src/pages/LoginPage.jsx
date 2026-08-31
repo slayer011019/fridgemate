@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useAuth } from '../hooks/useAuth';
+import { isPublicSignupEnabled } from '../utils/backendConfig';
 
 const defaultForm = {
   email: '',
@@ -12,11 +13,13 @@ const defaultForm = {
 function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { backendEnabled, isAuthenticated, loading, login } = useAuth();
+  const { backendEnabled, error: authError, isAuthenticated, loading, login } = useAuth();
   const { trackEvent } = useAnalytics();
   const [form, setForm] = useState(defaultForm);
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const visibleError = formError || authError;
+  const publicSignupEnabled = isPublicSignupEnabled();
 
   if (isAuthenticated) {
     return <Navigate replace to="/account" />;
@@ -33,7 +36,7 @@ function LoginPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
-    setError('');
+    setFormError('');
 
     try {
       await login(form);
@@ -43,7 +46,7 @@ function LoginPage() {
       });
       navigate(location.state?.from?.pathname || '/account', { replace: true });
     } catch (nextError) {
-      setError(nextError.message || '\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.');
+      setFormError(nextError.message || '\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.');
     } finally {
       setSubmitting(false);
     }
@@ -65,7 +68,9 @@ function LoginPage() {
         </div>
       ) : null}
 
-      {error ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
+      {visibleError ? (
+        <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{visibleError}</div>
+      ) : null}
 
       <form className="card max-w-xl space-y-4" onSubmit={handleSubmit}>
         <div className="flex flex-wrap gap-2">
@@ -88,9 +93,11 @@ function LoginPage() {
           <button className="btn-primary" disabled={!backendEnabled || loading || submitting} type="submit">
             {submitting ? '\uB85C\uADF8\uC778 \uC911...' : '\uB85C\uADF8\uC778'}
           </button>
-          <Link className="btn-secondary" to="/signup">
-            {'\uD68C\uC6D0\uAC00\uC785'}
-          </Link>
+          {publicSignupEnabled ? (
+            <Link className="btn-secondary" to="/signup">
+              {'\uD68C\uC6D0\uAC00\uC785'}
+            </Link>
+          ) : null}
         </div>
       </form>
     </div>

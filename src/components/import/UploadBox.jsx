@@ -1,4 +1,50 @@
-function UploadBox({ imagePreviewUrl, fileName, disabled, onChange, onRunOcr }) {
+import { useEffect, useRef, useState } from 'react';
+
+const MAX_PREVIEW_DIMENSION = 1600;
+
+function UploadBox({ imageFile, fileName, disabled, onChange, onRunOcr }) {
+  const canvasRef = useRef(null);
+  const [previewedFile, setPreviewedFile] = useState(null);
+  const previewReady = Boolean(imageFile) && previewedFile === imageFile;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    let cancelled = false;
+
+    if (!canvas || !imageFile || typeof globalThis.createImageBitmap !== 'function') return undefined;
+
+    globalThis
+      .createImageBitmap(imageFile)
+      .then((bitmap) => {
+        if (cancelled) {
+          bitmap.close();
+          return;
+        }
+
+        const scale = Math.min(1, MAX_PREVIEW_DIMENSION / Math.max(bitmap.width, bitmap.height));
+        const width = Math.max(1, Math.round(bitmap.width * scale));
+        const height = Math.max(1, Math.round(bitmap.height * scale));
+        const context = canvas.getContext('2d', { alpha: false });
+        if (!context) {
+          bitmap.close();
+          return;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        context.drawImage(bitmap, 0, 0, width, height);
+        bitmap.close();
+        setPreviewedFile(imageFile);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewedFile(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imageFile]);
+
   return (
     <section className="card">
       <div className="grid gap-3.5 lg:grid-cols-[1fr_0.95fr] lg:items-start">
@@ -20,8 +66,8 @@ function UploadBox({ imagePreviewUrl, fileName, disabled, onChange, onRunOcr }) 
 
           <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-brand-100 bg-brand-50/40 px-4 py-6 text-center hover:border-brand-500 hover:bg-brand-50/70">
             <span className="text-sm font-semibold text-slate-800">{'\uC0AC\uC9C4 \uACE0\uB974\uAE30'}</span>
-            <span className="mt-1 text-xs muted">{'PNG, JPG, WEBP \uC8FC\uBB38 \uD654\uBA74 \u6216 \uC601\uC218\uC99D'}</span>
-            <input type="file" accept="image/*" className="hidden" onChange={onChange} />
+            <span className="mt-1 text-xs muted">{'PNG, JPG, WEBP · 최대 8MB · 총 1,200만 픽셀 이하'}</span>
+            <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={onChange} />
           </label>
 
           <div className="flex flex-wrap items-center gap-2.5">
@@ -39,17 +85,18 @@ function UploadBox({ imagePreviewUrl, fileName, disabled, onChange, onRunOcr }) 
         </div>
 
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          {imagePreviewUrl ? (
-            <img
-              src={imagePreviewUrl}
-              alt={'\uC5C5\uB85C\uB4DC\uD55C \uC2A4\uD06C\uB9B0\uC0F7 \uBBF8\uB9AC\uBCF4\uAE30'}
-              className="max-h-[20rem] w-full object-contain"
-            />
-          ) : (
+          <canvas
+            ref={canvasRef}
+            role="img"
+            aria-label={'\uC5C5\uB85C\uB4DC\uD55C \uC2A4\uD06C\uB9B0\uC0F7 \uBBF8\uB9AC\uBCF4\uAE30'}
+            hidden={!previewReady}
+            className={previewReady ? 'max-h-[20rem] w-full object-contain' : 'hidden'}
+          />
+          {!previewReady ? (
             <div className="flex min-h-[12.5rem] items-center justify-center bg-slate-50/70 px-5 text-center text-sm muted">
               {'\uC774\uBBF8\uC9C0\uB97C \uC62C\uB9AC\uBA74 \uC5EC\uAE30\uC5D0 \uBBF8\uB9AC\uBCF4\uAE30\uAC00 \uD45C\uC2DC\uB429\uB2C8\uB2E4.'}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </section>

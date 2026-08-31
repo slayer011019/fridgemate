@@ -6,13 +6,76 @@ import {
   isHeaderLine,
   normalizeRawText,
   normalizeIngredientName,
+  normalizeIngredientMarkup,
   parseFraction,
   parseIngredientChunk,
   parseIngredientsText,
-  repairMojibakeText
+  parseParserArgs,
+  repairMojibakeText,
+  resolveParserSupabaseAccess
 } from '../parse-recipe-ingredients.js';
 
 describe('MFDS recipe ingredient parser', () => {
+  it('defaults to a bounded dry run and requires an explicit execute mode', () => {
+    expect(parseParserArgs([])).toMatchObject({
+      execute: false,
+      isAll: false,
+      isDryRun: true,
+      limit: 10
+    });
+    expect(parseParserArgs(['--execute', '--confirm-project-ref=abcdefghijklmnopqrst'])).toMatchObject({
+      confirmProjectRef: 'abcdefghijklmnopqrst',
+      execute: true,
+      isDryRun: false
+    });
+    expect(() => parseParserArgs(['--execute', '--dry-run'])).toThrow(/cannot be used together/i);
+    expect(() => parseParserArgs(['--all', '--limit=10'])).toThrow(/cannot be used together/i);
+  });
+
+  it('uses anon access for dry runs and reads the writer key only for confirmed execution', () => {
+    const projectRef = 'abcdefghijklmnopqrst';
+    const supabaseUrl = `https://${projectRef}.supabase.co`;
+    const readOnlyEnv = new Proxy(
+      { SUPABASE_ANON_KEY: 'anon-read-key', SUPABASE_URL: supabaseUrl },
+      {
+        get(target, property) {
+          if (property === 'SUPABASE_SERVICE_ROLE_KEY') {
+            throw new Error('writer key must not be read during dry-run');
+          }
+          return Reflect.get(target, property);
+        }
+      }
+    );
+
+    expect(resolveParserSupabaseAccess(parseParserArgs([]), readOnlyEnv)).toEqual({
+      access: 'read-only',
+      supabaseKey: 'anon-read-key',
+      supabaseUrl
+    });
+
+    const writeEnv = new Proxy(
+      { SUPABASE_SERVICE_ROLE_KEY: 'writer-key', SUPABASE_URL: supabaseUrl },
+      {
+        get(target, property) {
+          if (property === 'SUPABASE_ANON_KEY') {
+            throw new Error('anon key must not be read during execute');
+          }
+          return Reflect.get(target, property);
+        }
+      }
+    );
+    const executeOptions = parseParserArgs([
+      '--execute',
+      `--confirm-project-ref=${projectRef}`
+    ]);
+
+    expect(resolveParserSupabaseAccess(executeOptions, writeEnv)).toEqual({
+      access: 'write',
+      supabaseKey: 'writer-key',
+      supabaseUrl
+    });
+  });
+
   it('dedupes recipe ingredient upsert rows by recipe id and normalized raw text', () => {
     const rows = [
       {
@@ -272,5 +335,22 @@ describe('MFDS recipe ingredient parser', () => {
   it('skips html-only and serving info lines', () => {
     expect(parseIngredientChunk('<br>')).toMatchObject({ skip: true, reason: 'html_tag_only' });
     expect(parseIngredientChunk('2인분 기준<br>')).toMatchObject({ skip: true, reason: 'metadata' });
+  });
+
+  it('parses allowlisted formatting tags and rejects overlapping or active markup', () => {
+    expect(normalizeIngredientMarkup('소금<br>후추')).toEqual({
+      text: '소금\n후추',
+      hadMarkup: true,
+      unsafe: false
+    });
+    expect(parseIngredientChunk('<<br>>소금 1g')).toMatchObject({ skip: true, reason: 'unsafe_html' });
+    expect(parseIngredientChunk('<script>alert(1)</script>소금 1g')).toMatchObject({
+      skip: true,
+      reason: 'unsafe_html'
+    });
+    expect(parseIngredientsText('소금 1g\n<img src=x onerror=alert(1)>', '요리')).toMatchObject({
+      chunks: [],
+      skipped: [expect.objectContaining({ reason: 'unsafe_html' })]
+    });
   });
 });

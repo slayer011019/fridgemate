@@ -1,6 +1,4 @@
 import { expect, test } from '@playwright/test';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   createIngredient,
   DEFAULT_USER,
@@ -10,8 +8,10 @@ import {
   waitForIngredientNames
 } from './support/testApp';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const mockReceiptPath = path.join(__dirname, 'fixtures', 'mock-receipt.svg');
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6OZsAAAAASUVORK5CYII=',
+  'base64'
+);
 
 async function clickServerBackupButton(page) {
   const backupButton = page.getByRole('button', { name: '서버에 백업하기' });
@@ -106,8 +106,36 @@ test('guest ingredients can be imported after login and synced manually', async 
     '감자'
   );
   expect(apiState.ingredients).toEqual([
-    expect.objectContaining({ name: '감자', deletedAt: expect.any(String) })
+    {
+      id: expect.any(String),
+      clientId: expect.any(String),
+      updatedAt: expect.any(String),
+      deletedAt: expect.any(String)
+    }
   ]);
+});
+
+test('menu selection keeps a pending copy after 5xx and succeeds on explicit retry', async ({ page }) => {
+  await seedBrowserState(page, {
+    session: { token: 'test-token', user: DEFAULT_USER },
+    scope: 'user:user-1',
+    ingredients: [createIngredient('egg-1', { name: '계란', expiryDate: '2026-09-02' })]
+  });
+  const apiState = await mockApiSession(page, { user: DEFAULT_USER, restoreSession: true });
+  apiState.backend.menuDecisionFailureStatus = 503;
+  await gotoAndWait(page, '/recipes');
+
+  const firstCard = page.locator('article').filter({ has: page.getByRole('button', { name: '오늘 먹기' }) }).first();
+  await firstCard.getByRole('button', { name: '오늘 먹기' }).click();
+  await gotoAndWait(page, '/');
+  await expect(page.getByRole('button', { name: '서버 저장 다시 시도' })).toBeVisible({
+    timeout: 10_000
+  });
+
+  apiState.backend.menuDecisionFailureStatus = null;
+  await page.getByRole('button', { name: '서버 저장 다시 시도' }).click();
+  await expect(page.getByRole('button', { name: '서버 저장 다시 시도' })).toHaveCount(0);
+  expect(apiState.backend.menuDecision).toMatchObject({ status: 'selected', userId: 'user-1' });
 });
 
 test('expired session clears stored auth and returns to login', async ({ page }) => {
@@ -236,7 +264,11 @@ test('import review and local save still work when correction embedding budget i
   await page.route('**/api/import/corrections', returnRateLimit);
   await gotoAndWait(page, '/import');
 
-  await page.getByLabel('사진 고르기').setInputFiles(mockReceiptPath);
+  await page.getByLabel('사진 고르기').setInputFiles({
+    name: 'mock-receipt.png',
+    mimeType: 'image/png',
+    buffer: ONE_PIXEL_PNG
+  });
   await page.getByRole('button', { name: '사진에서 재료 찾기' }).click();
 
   await expect(page.getByText('두부', { exact: true })).toBeVisible();
