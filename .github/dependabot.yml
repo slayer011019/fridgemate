@@ -60,6 +60,13 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      - dependency-name: '@prisma/client'
+        update-types:
+          - 'version-update:semver-major'
+      - dependency-name: 'prisma'
+        update-types:
+          - 'version-update:semver-major'
     commit-message:
       prefix: chore
       include: scope
