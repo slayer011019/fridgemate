@@ -16,6 +16,22 @@ updates:
         update-types:
           - minor
           - patch
+      prisma-major:
+        patterns:
+          - '@prisma/client'
+          - 'prisma'
+        update-types:
+          - major
+      eslint-major:
+        patterns:
+          - '@eslint/js'
+          - 'eslint'
+        update-types:
+          - major
+    ignore:
+      - dependency-name: 'eslint-plugin-react-hooks'
+        update-types:
+          - 'version-update:semver-minor'
     commit-message:
       prefix: chore
       include: scope
