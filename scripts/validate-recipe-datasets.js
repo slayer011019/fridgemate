@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import { writeFile } from 'node:fs/promises';
 import iconv from 'iconv-lite';
 import { parseIngredientsText } from './parse-recipe-ingredients.js';
 
@@ -10,7 +9,7 @@ const TARGET_MENUS = [
   '부대찌개', '콩나물무침', '시금치나물', '잔치국수', '수제비'
 ];
 
-const MFDS_BASE_URL = 'http://openapi.foodsafetykorea.go.kr/api';
+const MFDS_BASE_URL = 'https://openapi.foodsafetykorea.go.kr/api';
 const MFDS_SERVICE_ID = 'COOKRCP01';
 const MAFRA_API_BASE_URL = 'http://211.237.50.150:7080/openapi';
 const MAFRA_DOWNLOAD_URL = 'https://data.mafra.go.kr/opendata/data/getDataFile.do';
@@ -84,9 +83,7 @@ const ADJUDICATED_SIMILAR_NAMES = {
 };
 
 function parseArgs(argv = process.argv.slice(2)) {
-  const outputArg = argv.find((argument) => argument.startsWith('--output='));
   return {
-    output: outputArg ? outputArg.slice('--output='.length) : null,
     probeLimits: argv.includes('--probe-limits')
   };
 }
@@ -570,12 +567,7 @@ async function main() {
   };
 
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
-  if (options.output) {
-    await writeFile(options.output, serialized, 'utf8');
-    console.log(`Validation result written to ${options.output}`);
-  } else {
-    process.stdout.write(serialized);
-  }
+  process.stdout.write(serialized);
 }
 
 main().catch((error) => {

@@ -126,7 +126,7 @@
 검증 스크립트는 다음 명령으로 다시 실행한다. `.env`의 `FOODSAFETY_API_KEY`가 필요하며 인증키 값은 결과에 출력하지 않는다.
 
 ```bash
-npm run validate:recipe-datasets -- --probe-limits --output=recipe-dataset-validation.json
+npm run --silent validate:recipe-datasets -- --probe-limits > recipe-dataset-validation.json
 ```
 
 공식 출처:
