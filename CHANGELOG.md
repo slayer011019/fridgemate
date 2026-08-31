@@ -155,7 +155,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Changed
 
-- Grouped Prisma and ESLint major updates in Dependabot and temporarily held React Hooks plugin minor updates so dependency PRs cannot silently enable new lint policy or split coupled packages.
+- Held Prisma, ESLint, React, and Tailwind major updates plus React Hooks plugin minor updates in Dependabot so breaking migrations are handled explicitly instead of opening version-only PRs that fail CI.
 
 - Split browser routes into lazy chunks while keeping a synchronous SEO render entry, reducing the initial minified JavaScript chunk from about 623 KB to 160 KB and removing the Vite 500 KB warning.
 - Moved GitHub Actions CI and its official checkout, Node setup, and artifact upload actions to the Node.js 24 generation.
