@@ -223,6 +223,33 @@ describe('recommendation utilities', () => {
       expect(withPantry.score).toBeGreaterThan(withoutPantry.score);
       expect(withPantry.canMakeNow).toBe(true);
     });
+
+    it('uses home priority for ranking even when display scores are both capped at 100', () => {
+      const recipes = [
+        { ...MOCK_RECIPES[0], id: 'lower-home', title: '가나다 메뉴', homePriority: 20 },
+        { ...MOCK_RECIPES[0], id: 'higher-home', title: '하하하 메뉴', homePriority: 95 }
+      ];
+      const results = recommendRecipes({
+        recipes,
+        fridgeIngredients: [createIngredient('계란'), createIngredient('밥'), createIngredient('김치')]
+      });
+
+      expect(results.map((recipe) => recipe.id)).toEqual(['higher-home', 'lower-home']);
+      expect(results.every((recipe) => recipe.score === 100)).toBe(true);
+      expect(results[0].rankingScore).toBeGreaterThan(results[1].rankingScore);
+    });
+
+    it('filters an unrelated high-priority recipe before ranking when ingredients exist', () => {
+      const results = recommendRecipes({
+        recipes: [
+          { ...MOCK_RECIPES[0], id: 'matched', homePriority: 20 },
+          { ...MOCK_RECIPES[4], id: 'unrelated-popular', homePriority: 100 }
+        ],
+        fridgeIngredients: [createIngredient('계란'), createIngredient('밥')]
+      });
+
+      expect(results.map((recipe) => recipe.id)).toEqual(['matched']);
+    });
   });
 
   describe('recommendation grouping', () => {
