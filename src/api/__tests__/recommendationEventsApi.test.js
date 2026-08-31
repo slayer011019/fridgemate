@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { requestJsonMock } = vi.hoisted(() => ({
+const { analyticsConsentMock, getAnalyticsSessionIdMock, requestJsonMock } = vi.hoisted(() => ({
+  analyticsConsentMock: vi.fn(),
+  getAnalyticsSessionIdMock: vi.fn(),
   requestJsonMock: vi.fn()
 }));
 
@@ -14,13 +16,20 @@ vi.mock('../../utils/backendConfig', () => ({
 }));
 
 vi.mock('../../utils/analytics', () => ({
-  getAnalyticsSessionId: () => 'test-session'
+  getAnalyticsSessionId: getAnalyticsSessionIdMock
+}));
+
+vi.mock('../../utils/analyticsConsent', () => ({
+  getAnalyticsConsent: analyticsConsentMock
 }));
 
 import { buildRecommendationEventPayload, saveRecommendationEvent } from '../recommendationEventsApi';
 
 describe('recommendationEventsApi', () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
+    analyticsConsentMock.mockReset().mockReturnValue('granted');
+    getAnalyticsSessionIdMock.mockReset().mockReturnValue('test-session');
     requestJsonMock.mockReset();
   });
 
@@ -56,5 +65,28 @@ describe('recommendationEventsApi', () => {
     await firstRequest;
     await vi.waitFor(() => expect(requestJsonMock).toHaveBeenCalledTimes(2));
     await secondRequest;
+
+    expect(requestJsonMock).toHaveBeenLastCalledWith(
+      '/recommendation-events',
+      expect.any(Object),
+      expect.objectContaining({ authMode: 'required' })
+    );
+  });
+
+  it.each([null, 'denied'])('does not create identifiers or send when consent is %s', async (consent) => {
+    analyticsConsentMock.mockReturnValue(consent);
+
+    await expect(saveRecommendationEvent({ id: 'recipe-1' }, 'impression')).resolves.toBeNull();
+
+    expect(getAnalyticsSessionIdMock).not.toHaveBeenCalled();
+    expect(requestJsonMock).not.toHaveBeenCalled();
+  });
+
+  it('does not send an event when secure randomness is unavailable', async () => {
+    vi.stubGlobal('crypto', undefined);
+
+    await expect(saveRecommendationEvent({ id: 'recipe-1' }, 'impression')).resolves.toBeNull();
+
+    expect(requestJsonMock).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,8 @@ import { AnalyticsProvider } from './hooks/useAnalytics';
 import { AuthProvider } from './hooks/useAuth';
 import { IngredientsProvider } from './hooks/useIngredients';
 import { PantryStaplesProvider } from './hooks/usePantryStaples';
+import { MenuDecisionProvider } from './hooks/useMenuDecision';
+import { UserPreferencesProvider } from './hooks/useUserPreferences';
 
 export function render(pathname) {
   return renderToStaticMarkup(
@@ -12,9 +14,13 @@ export function render(pathname) {
       <AuthProvider>
         <AnalyticsProvider>
           <PantryStaplesProvider>
-            <IngredientsProvider>
-              <AppServer />
-            </IngredientsProvider>
+            <UserPreferencesProvider>
+              <MenuDecisionProvider>
+                <IngredientsProvider>
+                  <AppServer />
+                </IngredientsProvider>
+              </MenuDecisionProvider>
+            </UserPreferencesProvider>
           </PantryStaplesProvider>
         </AnalyticsProvider>
       </AuthProvider>

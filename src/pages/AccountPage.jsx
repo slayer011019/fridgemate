@@ -3,13 +3,18 @@ import { exportUserData } from '../api/authApi';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../hooks/useAuth';
 import { useIngredients } from '../hooks/useIngredients';
+import { useMenuDecision } from '../hooks/useMenuDecision';
+import PreferenceSettingsPanel from '../components/PreferenceSettingsPanel';
 
 function AccountPage() {
   const { deleteAccount, dismissGuestImport, error, guestImportPrompt, importGuestIngredients, logout, user } = useAuth();
   const [privacyStatus, setPrivacyStatus] = useState('');
   const [privacyError, setPrivacyError] = useState('');
+  const [exportPassword, setExportPassword] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [secureLogoutPending, setSecureLogoutPending] = useState(false);
+  const { guestDecisionAvailable, importGuestDecision, syncing: menuDecisionSyncing } = useMenuDecision();
   const {
     hasUnsyncedChanges,
     lastSyncedAt,
@@ -34,12 +39,13 @@ function AccountPage() {
       }).format(new Date(lastSyncedAt))
     : '아직 동기화하지 않았습니다.';
 
-  const handleDataExport = async () => {
+  const handleDataExport = async (event) => {
+    event.preventDefault();
     setPrivacyError('');
     setPrivacyStatus('내 데이터를 준비하고 있습니다...');
 
     try {
-      const exportData = await exportUserData();
+      const exportData = await exportUserData(exportPassword);
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const downloadUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -49,10 +55,29 @@ function AccountPage() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(downloadUrl);
+      setExportPassword('');
       setPrivacyStatus('내 데이터 파일을 내려받았습니다.');
     } catch (nextError) {
       setPrivacyStatus('');
       setPrivacyError(nextError.message || '내 데이터를 내려받지 못했습니다.');
+    }
+  };
+
+  const handleSecureLogout = async () => {
+    const unsyncedWarning = hasUnsyncedChanges
+      ? ' 아직 서버에 저장하지 않은 변경사항은 복구할 수 없습니다.'
+      : '';
+    const confirmed = window.confirm(
+      `이 계정의 재료 캐시, 오늘 메뉴, 팬트리·취향 설정, OCR 교정 기록을 이 기기에서 지우고 로그아웃할까요? 서버에 동기화된 데이터와 계정은 유지됩니다.${unsyncedWarning}`
+    );
+
+    if (!confirmed) return;
+
+    setSecureLogoutPending(true);
+    try {
+      await logout({ clearLocalData: true });
+    } finally {
+      setSecureLogoutPending(false);
     }
   };
 
@@ -94,10 +119,22 @@ function AccountPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button className="btn-primary" onClick={logout} type="button">
+          <button className="btn-primary" disabled={secureLogoutPending} onClick={() => logout()} type="button">
             {'\uB85C\uADF8\uC544\uC6C3'}
           </button>
+          <button
+            className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={secureLogoutPending}
+            onClick={handleSecureLogout}
+            type="button"
+          >
+            {secureLogoutPending ? '기기 데이터를 지우는 중...' : '이 기기 데이터도 지우고 로그아웃'}
+          </button>
         </div>
+        <p className="text-sm leading-6 muted">
+          공용 기기라면 두 번째 버튼을 사용하세요. 서버에 동기화된 데이터는 유지되지만, 아직 동기화하지 않은 변경은
+          이 기기에서 영구 삭제됩니다.
+        </p>
       </section>
 
       <section className="card space-y-4">
@@ -105,7 +142,7 @@ function AccountPage() {
           <p className="kicker">개인정보 관리</p>
           <h3 className="mt-2 text-xl font-semibold text-slate-900">내 데이터 내려받기와 계정 삭제</h3>
           <p className="mt-2 text-sm leading-6 muted">
-            서버에 저장된 계정 정보, 재료, 가져오기 교정 기록, 계정에 연결된 추천 이벤트를 JSON 파일로 받을 수
+            서버에 저장된 계정 정보, 재료, 오늘 메뉴, 팬트리, 취향 설정, 추천 및 제품 이벤트를 JSON 파일로 받을 수
             있습니다. 인증 토큰과 비밀번호 해시는 포함하지 않습니다.
           </p>
         </div>
@@ -119,10 +156,28 @@ function AccountPage() {
           <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{privacyError}</div>
         ) : null}
 
-        <div className="flex flex-wrap gap-3">
-          <button className="btn-secondary" onClick={handleDataExport} type="button">
+        <form className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4" onSubmit={handleDataExport}>
+          <div>
+            <label className="text-sm font-semibold text-slate-900" htmlFor="account-export-password">
+              내려받기 전 현재 비밀번호 확인
+            </label>
+            <input
+              autoComplete="current-password"
+              className="input mt-2 w-full"
+              id="account-export-password"
+              maxLength={128}
+              onChange={(event) => setExportPassword(event.target.value)}
+              required
+              type="password"
+              value={exportPassword}
+            />
+          </div>
+          <button className="btn-secondary" type="submit">
             내 데이터 내려받기
           </button>
+        </form>
+
+        <div className="flex flex-wrap gap-3">
           <button
             className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
             onClick={() => setShowDeleteForm((current) => !current)}
@@ -159,6 +214,8 @@ function AccountPage() {
           </form>
         ) : null}
       </section>
+
+      <PreferenceSettingsPanel />
 
       <section className="card space-y-4">
         <div>
@@ -256,6 +313,19 @@ function AccountPage() {
               {'\uAC8C\uC2A4\uD2B8 \uB370\uC774\uD130\uB294 \uADF8\uB300\uB85C \uB458\uB798\uC694'}
             </button>
           </div>
+        </section>
+      ) : null}
+
+      {guestDecisionAvailable ? (
+        <section className="card space-y-4 border border-emerald-200 bg-emerald-50/40">
+          <div>
+            <p className="kicker">게스트 오늘 메뉴 가져오기</p>
+            <h3 className="mt-2 text-xl font-semibold text-slate-900">로그인 전에 고른 오늘 메뉴를 이어갈까요?</h3>
+            <p className="mt-2 text-sm leading-6 muted">가져오기를 누를 때만 현재 계정 서버에 저장합니다.</p>
+          </div>
+          <button className="btn-primary" disabled={menuDecisionSyncing} onClick={importGuestDecision} type="button">
+            {menuDecisionSyncing ? '가져오는 중...' : '오늘 메뉴 가져오기'}
+          </button>
         </section>
       ) : null}
     </div>

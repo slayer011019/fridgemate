@@ -1,13 +1,11 @@
 import { createHttpError } from '../lib/httpError.js';
-import { getAccessTokenFromRequest } from '../lib/cookies.js';
+import { getRequestAccessToken } from '../lib/cookies.js';
 import { verifyAccessToken } from '../lib/token.js';
 import { serverConfig } from '../config.js';
 import { isTokenRevoked } from './revokedTokenStore.js';
 
 export async function requireAuth(request, _response, next) {
-  const authHeader = request.headers.authorization || '';
-  const [scheme, bearerToken] = authHeader.split(' ');
-  const token = scheme === 'Bearer' && bearerToken ? bearerToken : getAccessTokenFromRequest(request);
+  const token = getRequestAccessToken(request);
 
   if (!token) {
     next(createHttpError(401, 'Authentication is required.'));
@@ -25,7 +23,7 @@ export async function requireAuth(request, _response, next) {
     return;
   }
 
-  if (await isTokenRevoked(payload.jti)) {
+  if (await isTokenRevoked(payload.jti, payload.exp)) {
     next(createHttpError(401, 'Invalid or expired access token.'));
     return;
   }

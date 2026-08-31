@@ -5,7 +5,12 @@ import {
   pullIngredientsFromServerInRepository,
   pushIngredientsToServerInRepository
 } from './ingredientRepository';
-import { buildScopeOptions, createEmptySyncSummary, getScopeState } from './ingredientsScopeState';
+import {
+  buildScopeOptions,
+  createEmptySyncSummary,
+  getScopeState,
+  setStoredLastSyncedAt
+} from './ingredientsScopeState';
 import {
   getPendingIngredients,
   getVisibleIngredients,
@@ -331,13 +336,18 @@ export function createCrudActions({
       try {
         if (syncEnabled && previousIngredient) {
           const deletedAt = new Date().toISOString();
+          const tombstone = {
+            id: previousIngredient.id,
+            clientId: previousIngredient.clientId || previousIngredient.id,
+            updatedAt: deletedAt,
+            deletedAt
+          };
+          if (Object.hasOwn(previousIngredient, 'userId')) {
+            tombstone.userId = previousIngredient.userId;
+          }
           await saveLocalIngredient(
             markIngredientAsPending(
-              {
-                ...previousIngredient,
-                updatedAt: deletedAt,
-                deletedAt
-              },
+              tombstone,
               SYNC_STATE.PENDING_DELETE
             )
           );
@@ -430,7 +440,7 @@ export function createPushAction({
       await ingredientCache.replaceAll(nextSnapshot, buildScopeOptions(storageScope));
       commitIngredients(nextIngredients, storageScope);
       commitSyncSummary(syncSummary, storageScope);
-      window.localStorage.setItem('fridgemate-last-synced-at', now);
+      setStoredLastSyncedAt(storageScope, now);
       setLastSyncedAt(now);
       setSyncStatus(hasPendingChanges ? 'dirty' : 'synced');
       setHasUnsyncedChanges(hasPendingChanges);

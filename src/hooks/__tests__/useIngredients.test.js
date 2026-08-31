@@ -334,15 +334,18 @@ describe('useIngredients', () => {
 
       expect(result.current.ingredients).toEqual([]);
       expect(dbMocks.deleteIngredient).not.toHaveBeenCalled();
-      expect(dbMocks.saveIngredient).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'delete-local',
-          clientId: 'delete-local',
-          syncState: 'pendingDelete',
-          deletedAt: expect.any(String)
-        }),
-        { scope: 'user:user-1' }
+      const [savedTombstone, saveOptions] = dbMocks.saveIngredient.mock.calls.find(
+        ([savedIngredient]) => savedIngredient.id === 'delete-local'
       );
+      expect(savedTombstone).toEqual({
+        id: 'delete-local',
+        clientId: 'delete-local',
+        updatedAt: expect.any(String),
+        deletedAt: expect.any(String),
+        syncState: 'pendingDelete'
+      });
+      expect(savedTombstone.updatedAt).toBe(savedTombstone.deletedAt);
+      expect(saveOptions).toEqual({ scope: 'user:user-1' });
     });
   });
 
@@ -450,7 +453,8 @@ describe('useIngredients', () => {
       expect(apiMocks.pushIngredientsToServer).toHaveBeenCalledWith([
         expect.objectContaining({ id: 'sync-1', clientId: 'sync-1' })
       ]);
-      expect(window.localStorage.getItem('fridgemate-last-synced-at')).toBeTruthy();
+      expect(window.localStorage.getItem('fridgemate-last-synced-at:v2:user:user-1')).toBeTruthy();
+      expect(window.localStorage.getItem('fridgemate-last-synced-at')).toBeNull();
       expect(result.current.syncStatus).toBe('synced');
       expect(result.current.hasUnsyncedChanges).toBe(false);
       expect(dbMocks.replaceIngredients).toHaveBeenCalledWith(

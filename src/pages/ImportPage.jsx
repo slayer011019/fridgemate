@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getImportCorrectionSuggestions, saveImportCorrectionsRemote } from '../api/importCorrectionsApi';
+import { saveImportCorrectionsRemote } from '../api/importCorrectionsApi';
 import PageHeader from '../components/PageHeader';
 import OcrResultPanel from '../components/import/OcrResultPanel';
 import ParsedItemEditor from '../components/import/ParsedItemEditor';
@@ -18,6 +18,7 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { isBackendEnabled } from '../utils/backendConfig';
 import { applyImportCorrections, saveImportCorrections } from '../utils/import/importLearning';
 import { parseImportText } from '../utils/importParser';
+import { validateOcrImageFile } from '../utils/ocr/imageValidation';
 import { runOcrWithProvider } from '../utils/ocr/ocrService';
 
 const IMPORT_PAGE_COPY = {
@@ -41,10 +42,9 @@ function ImportEmptyPanel({ title, description }) {
 function ImportPage() {
   const navigate = useNavigate();
   const { ingredients, addIngredients, removeIngredient } = useIngredients();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, storageScope } = useAuth();
   const { trackEvent } = useAnalytics();
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [ocrResult, setOcrResult] = useState(null);
   const [showRawText, setShowRawText] = useState(false);
   const [status, setStatus] = useState('idle');
@@ -53,68 +53,43 @@ function ImportPage() {
   const [items, setItems] = useState([]);
   const [importMessage, setImportMessage] = useState('');
 
-  useEffect(() => {
-    if (!imageFile) {
-      setImagePreviewUrl('');
-      return undefined;
-    }
-
-    const nextUrl = URL.createObjectURL(imageFile);
-    setImagePreviewUrl(nextUrl);
-
-    return () => URL.revokeObjectURL(nextUrl);
-  }, [imageFile]);
-
   const rawText = ocrResult?.text || '';
   const parseResult = useMemo(() => parseImportText(ocrResult), [ocrResult]);
 
   useEffect(() => {
-    setItems(annotateDuplicateImportItems(applyImportCorrections(parseResult.candidates), ingredients));
-  }, [ingredients, parseResult]);
+    setItems(
+      annotateDuplicateImportItems(
+        applyImportCorrections(parseResult.candidates, storageScope),
+        ingredients
+      )
+    );
+  }, [ingredients, parseResult, storageScope]);
 
-  useEffect(() => {
-    if (status !== 'success' || !isBackendEnabled() || !isAuthenticated || !parseResult.candidates.length) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
-
-    getImportCorrectionSuggestions(parseResult.candidates, { signal: controller.signal })
-      .then((payload) => {
-        const suggestions = payload?.suggestions || {};
-
-        setItems((current) =>
-          current.map((item) => ({
-            ...item,
-            correctionSuggestions: suggestions[item.id] || []
-          }))
-        );
-      })
-      .catch((suggestionError) => {
-        if (suggestionError?.name !== 'AbortError') {
-          console.warn('[ImportPage] Failed to load import correction suggestions.', suggestionError);
-        }
-      });
-
-    return () => controller.abort();
-  }, [isAuthenticated, parseResult, status]);
-
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
+    const fileInput = event.currentTarget;
     const nextFile = event.target.files?.[0];
 
-    if (nextFile) {
-      trackEvent('ocr_upload_started', {
-        file_type: nextFile.type || 'unknown',
-        source_screen: 'import'
-      });
-    }
-
-    setImageFile(nextFile || null);
+    setImageFile(null);
     setOcrResult(null);
     setItems([]);
     setError('');
     setStatus('idle');
     setImportMessage('');
+
+    if (!nextFile) return;
+
+    try {
+      await validateOcrImageFile(nextFile);
+      trackEvent('ocr_upload_started', {
+        file_type: nextFile.type || 'unknown',
+        source_screen: 'import'
+      });
+      setImageFile(nextFile);
+    } catch (validationError) {
+      fileInput.value = '';
+      setStatus('error');
+      setError(validationError.message);
+    }
   };
 
   const runOcr = async () => {
@@ -188,7 +163,7 @@ function ImportPage() {
         edited_item_count: selectedRawItems.filter((item) => item.name !== item.originalName || item.quantity !== item.originalQuantity).length,
         deleted_item_count: items.length - selectedItems.length
       });
-      saveImportCorrections(selectedRawItems);
+      saveImportCorrections(selectedRawItems, storageScope);
       if (isBackendEnabled() && isAuthenticated) {
         saveImportCorrectionsRemote(selectedRawItems).catch((correctionError) => {
           console.warn('[ImportPage] Failed to save remote import corrections.', correctionError);
@@ -249,7 +224,7 @@ function ImportPage() {
       />
 
       <UploadBox
-        imagePreviewUrl={imagePreviewUrl}
+        imageFile={imageFile}
         fileName={imageFile?.name}
         disabled={!imageFile || status === 'processing'}
         onChange={handleFileChange}

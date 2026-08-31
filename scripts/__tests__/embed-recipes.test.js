@@ -345,6 +345,28 @@ describe('embed-recipes script', () => {
     expect(sleep).not.toHaveBeenCalled();
   });
 
+  it('aborts a stalled operator backfill request with a bounded error', async () => {
+    const fetchImpl = vi.fn(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+        })
+    );
+
+    await expect(
+      createEmbeddingBatch(
+        ['recipe'],
+        { apiKey: 'test-key', model: 'test-model', dimensions: 3 },
+        { fetchImpl, maxRetries: 0, requestTimeoutMs: 1 }
+      )
+    ).rejects.toMatchObject({
+      message: 'Recipe embedding request timed out.',
+      code: 'EXTERNAL_AI_TIMEOUT',
+      requestCount: 1,
+      retryCount: 0
+    });
+  });
+
   it('resumes with keyset pagination and persists the last successful recipe', async () => {
     const resumedAfter = '11111111-1111-4111-8111-111111111111';
     const nextId = '22222222-2222-4222-8222-222222222222';

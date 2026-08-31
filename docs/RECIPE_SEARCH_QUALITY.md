@@ -6,7 +6,9 @@ This check evaluates semantic recipe candidate retrieval without writing product
 
 A separate realistic fixture lives at `scripts/fixtures/recipe-search-home-meal-evaluation.json`. It keeps the UUID regression fixture intact and adds 20 source-backed recipes across soup, stew, rice, noodles, quick meals, side dishes, meat, seafood, and plant-forward meals. Each query uses only three to five plausible available ingredients, marks at least one expiring ingredient, and includes alias coverage such as `계란`/`달걀` and `파`/`대파`.
 
-## Baseline and Result
+## Historical Baseline And Limited Refresh
+
+The table below preserves the diagnosis that led to the final refresh. It is historical and is superseded by the full-catalog result at the end of this document.
 
 | Metric | Old production vectors | Classification-aware in-memory vectors | Stored production vectors after limited refresh |
 | --- | ---: | ---: | ---: |
@@ -20,7 +22,7 @@ A separate realistic fixture lives at `scripts/fixtures/recipe-search-home-meal-
 | Median missing seasoning count in evaluated Top 5 | not recorded | 1 | 1 |
 | Existing embedding missing rate | 13.35% | 13.35% | 12.48% |
 
-The agreed release gate is Hit@5 at least 7/10. The stored-vector result is **Go** for a separately approved, staged production backfill. The evaluation embedded ten fixture queries in one API request, read existing production vectors, and wrote no production rows. Semantic API publication remains a separate gate after catalog coverage and integrity verification.
+The agreed release gate was Hit@5 at least 7/10. This limited-refresh snapshot authorized the staged backfill that is now complete; it is not the current production state.
 
 ## Failure Diagnosis and Minimal Fix
 
@@ -80,13 +82,15 @@ npm run recipes:embed -- --evaluate --dry-run --stored-vectors --limit=1166 --fi
 npm run recipes:embed -- --evaluate --execute --stored-vectors --limit=1166 --fixture=scripts/fixtures/recipe-search-home-meal-evaluation.json --output=docs/recipe-search-home-meal-report.json
 ```
 
-This profile resolves targets by stable catalog `externalId`, reports Hit@5 rate, owned core-ingredient ratio, missing core/seasoning counts, and expiring ingredient matches, and uses a 70% Hit@5 gate. Its production score remains unmeasured until the catalog backfill stage receives separate DB/API approval.
+This profile resolves targets by stable catalog `externalId`, reports Hit@5 rate, owned core-ingredient ratio, missing core/seasoning counts, and expiring ingredient matches, and uses a 70% Hit@5 gate. The current measured result is recorded in `Final Full-Catalog Result` below.
 
 The stored-vector mode embeds only the ten fixture queries, evaluates them against matching model/dimension rows in `recipe_embeddings`, and runs inside a read-only transaction. The production run used ten inputs, one API request, about 135 estimated input tokens, and zero database writes.
 
 The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 API requests, and an estimated 38,125 input tokens. Cost is calculated as `estimated input tokens / 1,000,000 * the provider's current per-million-token embedding price`.
 
-## Backfill Plan After Go
+## Historical Backfill Record
+
+The numbered rollout below is retained as an audit trail. Every write phase is complete; do not treat the intermediate counts or approval notes as current instructions.
 
 1. Completed 2026-08-29: exported 993 `recipe_embeddings` rows, including vectors, to protected local storage and verified the compressed backup checksum.
 2. Completed preflight: `missing=153`, `stale=993`, `current=0`.
@@ -99,10 +103,10 @@ The final run used `text-embedding-3-small`, 1,536 dimensions, 1,156 inputs, 12 
 9. Completed under separate approval: the post-replacement fixed fixture passed at Hit@1 `8/10`, Hit@5 `9/10`, and MRR@5 `0.85`, using 10 API inputs, one request, and zero writes. The Korean home-meal fixture returned Hit@1 `2/20`, Hit@5 `2/20`, and MRR@5 `0.10`, using 20 API inputs, one request, and zero writes.
 10. Completed without API calls or writes: a fixture-scoped stale dry-run resolved all 20 Korean home-meal targets and found `current=2`, `stale=18`, `missing=0`, and `plannedInputs=18`. The stale/current split explains the quality result strongly enough that retrieval weights and fixture ground truth remain unchanged.
 11. Completed under separate approval: created and checksum-verified a fresh 1,166-row protected checkpoint, then replaced exactly the 18 stale Korean home-meal targets with one API request, no retries, no failures, and `--max-writes=18`. Full-catalog verification passed at `current=226`, `missing=0`, `stale=940`, and the fixture-only dry-run passed at `current=20`, `stale=0`, and `plannedInputs=0`.
-12. Under separate approval, rerun the fixed 10-query and Korean home-meal 20-query stored-vector gates without database writes before increasing stale replacement batches.
-13. Roll back by restoring the protected `recipe_embeddings` snapshot if stored-vector quality regresses.
+12. Completed: reran the fixed 10-query and Korean home-meal 20-query gates after full freshness.
+13. Completed: retained the protected `recipe_embeddings` snapshot as the rollback checkpoint.
 
-The in-memory, missing-row coverage, limited stale-row, integrity, fixed stored-vector quality, and realistic fixture freshness gates are satisfied. Every catalog recipe has a stored vector, and all 20 Korean home-meal fixture targets now use current embedding text. The realistic retrieval gate itself must still be rerun because its last `2/20` result measured 18 stale targets. Full freshness and semantic API release remain blocked until that evaluation is reviewed, the remaining 940 stale rows are replaced, integrity checks pass, and both stored-vector fixtures meet their gates. See `docs/RECIPE_EMBEDDING_OPERATIONS.md` for the production record.
+The rollout ended at 1,166 current rows with no missing, stale, duplicate, or orphan rows. The final reranked fixtures pass; semantic activation is blocked only on the isolated staging API and fallback gate, not on further backfill. See `docs/RECIPE_EMBEDDING_OPERATIONS.md` for the production record.
 
 ## Next Improvement Candidates
 

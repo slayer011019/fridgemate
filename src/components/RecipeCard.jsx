@@ -2,33 +2,16 @@ import { memo } from 'react';
 import RecipeExternalLinks from './RecipeExternalLinks';
 import { joinIngredientLabels } from '../utils/displayText';
 
-function RecipeCard({ recipe, onSelect }) {
+function RecipeCard({ recipe, isSelected = false, onDismiss, onExternalOpen, onSelect }) {
   const recipeName = recipe.title || recipe.name || '';
   const matchedIngredients = recipe.matchedIngredients || recipe.matchedCore || [];
   const missingIngredients = recipe.missingIngredients || recipe.missingCore || [];
   const missingSeasonings = recipe.missingSeasonings || [];
   const coreIngredients = recipe.coreIngredients || recipe.ingredients || [];
   const hasMissingItems = missingIngredients.length > 0 || missingSeasonings.length > 0 || recipe.missingGroups?.length > 0;
-  const isInteractive = typeof onSelect === 'function';
-
-  const handleKeyDown = (event) => {
-    if (!isInteractive) {
-      return;
-    }
-
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onSelect(recipe);
-    }
-  };
-
   return (
     <article
-      className={`card overflow-hidden border-l-4 border-l-brand-500 ${isInteractive ? 'cursor-pointer hover:border-brand-500 hover:shadow-md' : ''}`}
-      onClick={isInteractive ? () => onSelect(recipe) : undefined}
-      onKeyDown={handleKeyDown}
-      role={isInteractive ? 'button' : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
+      className={`card overflow-hidden border-l-4 ${isSelected ? 'border-l-emerald-600 ring-2 ring-emerald-100' : 'border-l-brand-500'}`}
     >
       <div className="flex flex-col gap-3.5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -37,6 +20,7 @@ function RecipeCard({ recipe, onSelect }) {
               {recipe.category ? <p className="kicker">{recipe.category}</p> : null}
               {recipe.useSoon ? <span className="badge border border-amber-200 bg-amber-50 text-amber-800">먼저 쓸 재료</span> : null}
               {recipe.canMakeNow ? <span className="badge border border-emerald-200 bg-emerald-50 text-emerald-800">바로 가능</span> : null}
+              {isSelected ? <span className="badge border border-emerald-200 bg-emerald-50 text-emerald-800">오늘 메뉴</span> : null}
             </div>
             <h3 className="text-lg font-semibold text-slate-900">{recipeName}</h3>
             {recipe.reason ? (
@@ -88,7 +72,25 @@ function RecipeCard({ recipe, onSelect }) {
           </details>
         ) : null}
 
-        <RecipeExternalLinks recipeName={recipeName} searchLinks={recipe.searchLinks} />
+        <div className="flex flex-wrap gap-2 border-t border-slate-200/80 pt-3">
+          <button
+            className="btn-primary"
+            disabled={isSelected}
+            onClick={() => onSelect?.(recipe)}
+            type="button"
+          >
+            {isSelected ? '선택됨' : '오늘 먹기'}
+          </button>
+          <button className="btn-secondary" onClick={() => onDismiss?.(recipe)} type="button">
+            관심 없음
+          </button>
+        </div>
+
+        <RecipeExternalLinks
+          recipeName={recipeName}
+          searchLinks={recipe.searchLinks}
+          onOpen={(provider) => onExternalOpen?.(recipe, provider)}
+        />
       </div>
     </article>
   );

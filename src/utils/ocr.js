@@ -1,7 +1,22 @@
+import { assertOcrImageDimensions } from './ocr/imageValidation.js';
+
 const DEFAULT_OCR_MODE = 'contrast';
+const MAX_PREPROCESS_DIMENSION = 8192;
+const MAX_PREPROCESS_PIXELS = 16_000_000;
+
+export function buildLocalOcrAssetPaths(baseUrl = import.meta.env.BASE_URL, origin = window.location.origin) {
+  const appBaseUrl = new URL(String(baseUrl || '/'), origin);
+  const assetBaseUrl = new URL('ocr/tesseract/', appBaseUrl);
+
+  return {
+    workerPath: new URL('worker.min.js', assetBaseUrl).href,
+    corePath: new URL('core/', assetBaseUrl).href,
+    langPath: new URL('lang/', assetBaseUrl).href
+  };
+}
 
 function getTestOcrOverride() {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !import.meta.env.DEV) {
     return null;
   }
 
@@ -48,7 +63,10 @@ function drawScaledImage(image, scale) {
 }
 
 function applyPreprocessMode(image, mode) {
-  const scale = image.width < 1400 ? 2 : 1.4;
+  const preferredScale = image.width < 1400 ? 2 : 1.4;
+  const pixelScale = Math.sqrt(MAX_PREPROCESS_PIXELS / Math.max(1, image.width * image.height));
+  const dimensionScale = MAX_PREPROCESS_DIMENSION / Math.max(1, image.width, image.height);
+  const scale = Math.min(preferredScale, pixelScale, dimensionScale);
   const { canvas, context } = drawScaledImage(image, scale);
 
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -176,9 +194,12 @@ export async function extractTextFromImage(file, options = {}) {
   const { onProgress } = options;
   const { createWorker, PSM } = await import('tesseract.js');
   const image = await loadImageFromFile(file);
+  assertOcrImageDimensions(image.naturalWidth || image.width, image.naturalHeight || image.height);
   const variants = buildVariantList(image);
+  const assetPaths = buildLocalOcrAssetPaths();
 
   const worker = await createWorker('kor+eng', 1, {
+    ...assetPaths,
     logger: (message) => {
       if (message.status === 'recognizing text' && typeof onProgress === 'function') {
         onProgress(message.progress || 0);

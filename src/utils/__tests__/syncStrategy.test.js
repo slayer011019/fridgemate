@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compactIngredientTombstone,
   getVisibleIngredients,
   markIngredientAsPending,
   markIngredientAsSynced,
@@ -19,6 +20,28 @@ function createIngredient(clientId, overrides = {}) {
 }
 
 describe('syncStrategy', () => {
+  it('compacts a deletion tombstone to the exact anti-resurrection metadata', () => {
+    expect(compactIngredientTombstone({
+      ...createIngredient('deleted'),
+      category: 'vegetable',
+      quantity: '2',
+      memo: 'private memo',
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-26T12:00:00.000Z',
+      deletedAt: '2026-08-26T12:00:00.000Z',
+      userId: 'user-1',
+      syncState: 'pendingDelete',
+      lastSyncedAt: '2026-08-26T11:00:00.000Z'
+    })).toEqual({
+      id: 'deleted',
+      clientId: 'deleted',
+      userId: 'user-1',
+      updatedAt: '2026-08-26T12:00:00.000Z',
+      deletedAt: '2026-08-26T12:00:00.000Z',
+      syncState: 'pendingDelete'
+    });
+  });
+
   it('marks remote ingredients as clean when syncing', () => {
     const ingredient = markIngredientAsSynced(createIngredient('synced'));
     expect(ingredient).toMatchObject({ syncState: 'clean', lastSyncedAt: ingredient.updatedAt });
@@ -74,13 +97,20 @@ describe('syncStrategy', () => {
     );
     const result = await syncIngredientSnapshot({ localIngredients: [tombstone], remoteIngredients: [] });
 
-    expect(result.pendingUploads).toEqual([expect.objectContaining({ clientId: 'deleted', syncState: 'pendingDelete' })]);
+    expect(result.pendingUploads).toEqual([{
+      id: 'deleted',
+      clientId: 'deleted',
+      updatedAt: '2026-08-26T12:00:00.000Z',
+      deletedAt: '2026-08-26T12:00:00.000Z',
+      syncState: 'pendingDelete'
+    }]);
+    expect(result.nextSnapshot).toEqual(result.pendingUploads);
     expect(getVisibleIngredients(result.nextSnapshot)).toEqual([]);
   });
 
-  it('does not resurrect a server tombstone from an older active device copy', async () => {
+  it('does not resurrect a server tombstone from an active device copy with a newer clock', async () => {
     const oldDeviceCopy = markIngredientAsPending(
-      createIngredient('deleted', { updatedAt: '2026-08-26T09:00:00.000Z' }),
+      createIngredient('deleted', { updatedAt: '2026-08-26T13:00:00.000Z' }),
       'pendingUpdate'
     );
     const serverTombstone = createIngredient('deleted', {
@@ -96,6 +126,57 @@ describe('syncStrategy', () => {
     expect(result.pendingUploads).toEqual([]);
     expect(result.conflicts).toEqual([expect.objectContaining({ clientId: 'deleted', resolution: 'remote' })]);
     expect(getVisibleIngredients(result.nextSnapshot)).toEqual([]);
+    expect(result.nextSnapshot).toEqual([{
+      id: 'server-id',
+      clientId: 'deleted',
+      updatedAt: '2026-08-26T12:00:00.000Z',
+      deletedAt: '2026-08-26T12:00:00.000Z',
+      syncState: 'clean'
+    }]);
+  });
+
+  it('keeps a local pending deletion when a newer active server snapshot arrives', async () => {
+    const localTombstone = markIngredientAsPending(createIngredient('deleted', {
+      updatedAt: '2026-08-26T11:00:00.000Z',
+      deletedAt: '2026-08-26T11:00:00.000Z'
+    }), 'pendingDelete');
+    const newerActiveServerCopy = createIngredient('deleted', {
+      id: 'server-id',
+      name: 'must-not-return',
+      updatedAt: '2026-08-26T13:00:00.000Z'
+    });
+
+    const result = await syncIngredientSnapshot({
+      localIngredients: [localTombstone],
+      remoteIngredients: [newerActiveServerCopy]
+    });
+
+    expect(result.pendingUploads).toEqual([localTombstone]);
+    expect(result.nextSnapshot[0]).not.toHaveProperty('name');
+    expect(getVisibleIngredients(result.nextSnapshot)).toEqual([]);
+  });
+
+  it('requeues a clean local tombstone when the server unexpectedly returns an active copy', async () => {
+    const cleanLocalTombstone = markIngredientAsSynced(createIngredient('deleted', {
+      updatedAt: '2026-08-26T11:00:00.000Z',
+      deletedAt: '2026-08-26T11:00:00.000Z'
+    }));
+    const activeServerCopy = createIngredient('deleted', {
+      id: 'server-id',
+      name: 'must-not-return',
+      updatedAt: '2026-08-26T13:00:00.000Z'
+    });
+
+    const result = await syncIngredientSnapshot({
+      localIngredients: [cleanLocalTombstone],
+      remoteIngredients: [activeServerCopy]
+    });
+
+    expect(result.pendingUploads).toEqual([expect.objectContaining({
+      clientId: 'deleted',
+      syncState: 'pendingDelete'
+    })]);
+    expect(result.nextSnapshot[0]).not.toHaveProperty('name');
   });
 
   it('applies a server deletion to a clean local cache', async () => {

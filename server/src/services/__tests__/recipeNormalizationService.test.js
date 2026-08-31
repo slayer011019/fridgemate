@@ -37,4 +37,19 @@ describe('recipeNormalizationService', () => {
     expect(normalized.map((ingredient) => ingredient.normalizedName)).toEqual(['마늘', '계란']);
     expect(normalized.every((ingredient) => typeof ingredient.reviewNeeded === 'boolean')).toBe(true);
   });
+
+  it('falls back to rules when an operator normalization request times out', async () => {
+    const rawIngredients = parseRecipeIngredients('다진 마늘 5g');
+    const normalized = await normalizeIngredientsWithLLM(rawIngredients, {
+      apiKey: 'test-key',
+      timeoutMs: 1,
+      fetchImpl: (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+        })
+    });
+
+    expect(normalized).toHaveLength(1);
+    expect(normalized[0]).toMatchObject({ normalizedName: '마늘' });
+  });
 });

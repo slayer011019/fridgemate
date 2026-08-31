@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { getRecipeRecommendations, RecipesApiError } from '../api/recipesApi';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  getRecipeRecommendations,
+  getSemanticRecipeRecommendations,
+  RecipesApiError
+} from '../api/recipesApi';
 import { useAuth } from './useAuth';
 import { isBackendEnabled } from '../utils/backendConfig';
+import { useOptionalUserPreferences } from './useUserPreferences';
 
 function shouldHideRow(error) {
   return error instanceof RecipesApiError && (!error.status || error.status >= 500);
@@ -9,6 +14,7 @@ function shouldHideRow(error) {
 
 export function useDBRecommendations({ ingredients = [], pantryItems = [] } = {}) {
   const { isAuthenticated } = useAuth();
+  const { preferences } = useOptionalUserPreferences();
   const rowRef = useRef(null);
   const requestIdRef = useRef(0);
   const [hasEnteredViewport, setHasEnteredViewport] = useState(false);
@@ -16,6 +22,7 @@ export function useDBRecommendations({ ingredients = [], pantryItems = [] } = {}
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hidden, setHidden] = useState(false);
+  const [mode, setMode] = useState('rule');
 
   useEffect(() => {
     if (hasEnteredViewport || !isAuthenticated || !isBackendEnabled() || hidden) {
@@ -80,13 +87,14 @@ export function useDBRecommendations({ ingredients = [], pantryItems = [] } = {}
       setHidden(false);
 
       try {
-        const nextRecommendations = await getRecipeRecommendations(ingredients, pantryItems);
+        const nextRecommendations = await getRecipeRecommendations(ingredients, pantryItems, preferences);
 
         if (!isMounted || requestIdRef.current !== requestId) {
           return;
         }
 
         setRecommendations(Array.isArray(nextRecommendations) ? nextRecommendations : []);
+        setMode('rule');
         setError('');
         setHidden(false);
       } catch (nextError) {
@@ -116,7 +124,41 @@ export function useDBRecommendations({ ingredients = [], pantryItems = [] } = {}
     return () => {
       isMounted = false;
     };
-  }, [hasEnteredViewport, ingredients, isAuthenticated, pantryItems]);
+  }, [hasEnteredViewport, ingredients, isAuthenticated, pantryItems, preferences]);
+
+  const requestExternalAiRecommendations = useCallback(async () => {
+    if (!isAuthenticated || !isBackendEnabled()) return null;
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    setLoading(true);
+    setError('');
+    setHidden(false);
+
+    try {
+      const payload = await getSemanticRecipeRecommendations(
+        ingredients,
+        pantryItems,
+        preferences,
+        { userInitiated: true }
+      );
+
+      if (requestIdRef.current !== requestId) return payload;
+
+      setRecommendations(Array.isArray(payload?.recommendations) ? payload.recommendations : []);
+      setMode(payload?.mode === 'semantic' ? 'semantic' : 'rule-fallback');
+      return payload;
+    } catch (nextError) {
+      if (requestIdRef.current === requestId) {
+        setError(nextError.message || '외부 AI 추천을 불러오지 못했어요.');
+      }
+      return null;
+    } finally {
+      if (requestIdRef.current === requestId) {
+        setLoading(false);
+      }
+    }
+  }, [ingredients, isAuthenticated, pantryItems, preferences]);
 
   return {
     rowRef,
@@ -124,7 +166,9 @@ export function useDBRecommendations({ ingredients = [], pantryItems = [] } = {}
     loading,
     error,
     hidden,
+    mode,
     needsLogin: !isAuthenticated,
-    hasEnteredViewport
+    hasEnteredViewport,
+    requestExternalAiRecommendations
   };
 }

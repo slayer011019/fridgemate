@@ -1,4 +1,11 @@
-import { clearAuthCookies, getAccessTokenFromRequest, getRefreshTokenFromRequest, setAuthCookies } from '../lib/cookies.js';
+import {
+  clearAuthCookies,
+  getAccessTokenFromRequest,
+  getBearerAccessTokenFromRequest,
+  getRefreshTokenFromRequest,
+  setAuthCookies
+} from '../lib/cookies.js';
+import { recordAccountDeletionRevocationFailure } from '../lib/operationalTelemetry.js';
 import { verifyAccessToken } from '../lib/token.js';
 import { serverConfig } from '../config.js';
 import {
@@ -32,6 +39,10 @@ export async function loginHandler(request, response, next) {
       user: session.user
     });
   } catch (error) {
+    if (error?.status === 429 && Number.isFinite(error.retryAfterSeconds)) {
+      response.setHeader('Retry-After', String(Math.max(1, Math.ceil(error.retryAfterSeconds))));
+    }
+
     next(error);
   }
 }
@@ -60,13 +71,17 @@ export async function getCurrentUserHandler(request, response, next) {
 
 export async function exportUserDataHandler(request, response, next) {
   try {
-    const exportData = await exportUserData(request.auth.userId);
+    const exportData = await exportUserData(request.auth.userId, request.body?.password);
     response.setHeader(
       'Content-Disposition',
       `attachment; filename="fridgemate-data-${new Date().toISOString().slice(0, 10)}.json"`
     );
     response.json(exportData);
   } catch (error) {
+    if (error?.status === 429 && Number.isFinite(error.retryAfterSeconds)) {
+      response.setHeader('Retry-After', String(Math.max(1, Math.ceil(error.retryAfterSeconds))));
+    }
+
     next(error);
   }
 }
@@ -75,6 +90,13 @@ export async function deleteUserAccountHandler(request, response, next) {
   try {
     await deleteUserAccount(request.auth.userId, request.body?.password);
     clearAuthCookies(response);
+
+    try {
+      await revokeToken(request.auth.jti, request.auth.exp);
+    } catch (revocationError) {
+      recordAccountDeletionRevocationFailure(revocationError);
+    }
+
     response.status(204).send();
   } catch (error) {
     next(error);
@@ -85,19 +107,31 @@ export async function logoutHandler(request, response, next) {
   clearAuthCookies(response);
 
   try {
-    const accessToken = getAccessTokenFromRequest(request);
-    const accessPayload = accessToken
-      ? verifyAccessToken(accessToken, {
-          secret: serverConfig.jwtSecret,
-          issuer: serverConfig.jwtIssuer,
-          audience: serverConfig.jwtAudience
-        })
-      : null;
-
     const revocationOperations = [logoutUser(getRefreshTokenFromRequest(request))];
+    const verifiedAccessPayloads = [
+      getAccessTokenFromRequest(request),
+      getBearerAccessTokenFromRequest(request)
+    ].map((accessToken) =>
+      verifyAccessToken(accessToken, {
+        secret: serverConfig.jwtSecret,
+        issuer: serverConfig.jwtIssuer,
+        audience: serverConfig.jwtAudience
+      })
+    );
+    const accessRevocations = new Map();
 
-    if (accessPayload?.jti && accessPayload?.exp) {
-      revocationOperations.push(revokeToken(accessPayload.jti, accessPayload.exp));
+    for (const accessPayload of verifiedAccessPayloads) {
+      if (
+        typeof accessPayload?.jti === 'string' &&
+        accessPayload.jti &&
+        Number.isSafeInteger(accessPayload.exp)
+      ) {
+        accessRevocations.set(accessPayload.jti, accessPayload.exp);
+      }
+    }
+
+    for (const [jti, exp] of accessRevocations) {
+      revocationOperations.push(revokeToken(jti, exp));
     }
 
     const revocationResults = await Promise.allSettled(revocationOperations);

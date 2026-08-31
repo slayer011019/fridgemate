@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useIngredients } from '../hooks/useIngredients';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
@@ -11,6 +12,7 @@ const TOAST_STYLES = {
 };
 
 function ConnectionStatusToast() {
+  const { pathname } = useLocation();
   const backendEnabled = isBackendEnabled();
   const { error: authError, isAuthenticated } = useAuth();
   const { dataSource, error, isSyncing } = useIngredients();
@@ -19,7 +21,9 @@ function ConnectionStatusToast() {
   const notices = useMemo(() => {
     const nextNotices = [];
 
-    if (authError) {
+    const authErrorShownInline = pathname === '/login' || pathname === '/account';
+
+    if (authError && !authErrorShownInline) {
       nextNotices.push({
         id: 'auth-error',
         tone: 'danger',
@@ -67,7 +71,7 @@ function ConnectionStatusToast() {
     }
 
     return nextNotices;
-  }, [authError, backendEnabled, dataSource, error, isAuthenticated, isOnline, isSyncing]);
+  }, [authError, backendEnabled, dataSource, error, isAuthenticated, isOnline, isSyncing, pathname]);
 
   if (!notices.length) {
     return null;

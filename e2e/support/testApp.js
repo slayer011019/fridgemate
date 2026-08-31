@@ -3,10 +3,22 @@ export const DEFAULT_USER = {
   email: 'user@example.com'
 };
 
+function scrubIngredientTombstone(ingredient) {
+  if (!ingredient.deletedAt) return ingredient;
+  return {
+    id: ingredient.id,
+    clientId: ingredient.clientId || ingredient.id,
+    updatedAt: ingredient.updatedAt || ingredient.deletedAt,
+    deletedAt: ingredient.deletedAt
+  };
+}
+
 export function createMockApiBackend({ ingredients = [] } = {}) {
   return {
     ingredients: [...ingredients],
-    syncFailureStatus: null
+    syncFailureStatus: null,
+    menuDecision: null,
+    menuDecisionFailureStatus: null
   };
 }
 
@@ -50,7 +62,7 @@ export async function seedBrowserState(
 
       function openDatabase(name) {
         return new Promise((resolve, reject) => {
-          const request = window.indexedDB.open(name, 1);
+          const request = window.indexedDB.open(name, 2);
 
           request.onupgradeneeded = () => {
             const database = request.result;
@@ -60,6 +72,10 @@ export async function seedBrowserState(
               store.createIndex('expiryDate', 'expiryDate', { unique: false });
               store.createIndex('category', 'category', { unique: false });
               store.createIndex('storageType', 'storageType', { unique: false });
+            }
+
+            if (!database.objectStoreNames.contains('menuDecisions')) {
+              database.createObjectStore('menuDecisions', { keyPath: 'decisionDate' });
             }
           };
 
@@ -146,7 +162,7 @@ export async function waitForIngredientNames(page, scope, expectedNames) {
 
       function openDatabase(name) {
         return new Promise((resolve, reject) => {
-          const request = window.indexedDB.open(name, 1);
+          const request = window.indexedDB.open(name, 2);
           request.onsuccess = () => resolve(request.result);
           request.onerror = () => reject(request.error);
         });
@@ -174,7 +190,7 @@ export async function waitForIngredientNames(page, scope, expectedNames) {
 export async function readBrowserIngredients(page, scope) {
   return page.evaluate(async (scopeName) => {
     const safeScope = String(scopeName || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const request = window.indexedDB.open(`fridgemate-db__${safeScope}`, 1);
+    const request = window.indexedDB.open(`fridgemate-db__${safeScope}`, 2);
     const database = await new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -194,11 +210,14 @@ export async function writeBrowserIngredients(page, scope, ingredients) {
   await page.evaluate(
     async ({ scopeName, items }) => {
       const safeScope = String(scopeName || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const request = window.indexedDB.open(`fridgemate-db__${safeScope}`, 1);
+      const request = window.indexedDB.open(`fridgemate-db__${safeScope}`, 2);
       const database = await new Promise((resolve, reject) => {
         request.onupgradeneeded = () => {
           if (!request.result.objectStoreNames.contains('ingredients')) {
             request.result.createObjectStore('ingredients', { keyPath: 'id' });
+          }
+          if (!request.result.objectStoreNames.contains('menuDecisions')) {
+            request.result.createObjectStore('menuDecisions', { keyPath: 'decisionDate' });
           }
         };
         request.onsuccess = () => resolve(request.result);
@@ -303,10 +322,10 @@ export async function mockApiSession(
 
     const savedItems = changes.map((ingredient, index) => {
       const { userId: _userId, ...safeIngredient } = ingredient;
-      return {
+      return scrubIngredientTombstone({
         ...safeIngredient,
         updatedAt: ingredient.updatedAt || `2026-04-14T11:00:${String(index).padStart(2, '0')}.000Z`
-      };
+      });
     });
     let appliedCount = 0;
     savedItems.forEach((ingredient) => {
@@ -316,6 +335,8 @@ export async function mockApiSession(
       if (existingIndex === -1) {
         ingredientBackend.ingredients.push(ingredient);
         appliedCount += 1;
+      } else if (ingredientBackend.ingredients[existingIndex].deletedAt && !ingredient.deletedAt) {
+        return;
       } else if (
         Date.parse(ingredient.updatedAt) > Date.parse(ingredientBackend.ingredients[existingIndex].updatedAt || 0)
       ) {
@@ -323,7 +344,10 @@ export async function mockApiSession(
         appliedCount += 1;
       }
     });
-    await jsonResponse(route, { items: ingredientBackend.ingredients, appliedCount });
+    await jsonResponse(route, {
+      items: ingredientBackend.ingredients.map(scrubIngredientTombstone),
+      appliedCount
+    });
   });
 
   await page.route('**/api/ingredients', async (route) => {
@@ -387,6 +411,82 @@ export async function mockApiSession(
 
     await route.fallback();
   });
+
+  await page.route('**/api/menu-decisions?*', async (route) => {
+    await jsonResponse(route, ingredientBackend.menuDecision);
+  });
+
+  await page.route('**/api/menu-decisions/*', async (route) => {
+    const request = route.request();
+    if (ingredientBackend.menuDecisionFailureStatus) {
+      await jsonResponse(route, { message: 'Temporary menu decision failure.' }, ingredientBackend.menuDecisionFailureStatus);
+      return;
+    }
+
+    const payload = JSON.parse(request.postData() || '{}');
+    const url = new URL(request.url());
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const isComplete = pathParts.at(-1) === 'complete';
+    const decisionDate = isComplete ? pathParts.at(-2) : pathParts.at(-1);
+
+    if (request.method() === 'PUT') {
+      ingredientBackend.menuDecision = {
+        id: 'decision-1',
+        ...payload,
+        decisionDate,
+        status: 'selected',
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        userId: state.user.id
+      };
+      await jsonResponse(route, ingredientBackend.menuDecision);
+      return;
+    }
+
+    if (request.method() === 'PATCH' && isComplete && ingredientBackend.menuDecision) {
+      ingredientBackend.menuDecision = {
+        ...ingredientBackend.menuDecision,
+        status: 'completed',
+        completedAt: payload.completedAt,
+        updatedAt: new Date().toISOString()
+      };
+      await jsonResponse(route, ingredientBackend.menuDecision);
+      return;
+    }
+
+    if (request.method() === 'DELETE' && ingredientBackend.menuDecision) {
+      ingredientBackend.menuDecision = {
+        ...ingredientBackend.menuDecision,
+        status: 'cancelled',
+        completedAt: null,
+        updatedAt: new Date().toISOString()
+      };
+      await jsonResponse(route, ingredientBackend.menuDecision);
+      return;
+    }
+
+    await jsonResponse(route, { message: 'Menu decision not found.' }, 404);
+  });
+
+  await page.route('**/api/pantry-ownership', async (route) => {
+    if (route.request().method() === 'GET') await jsonResponse(route, []);
+    else await jsonResponse(route, JSON.parse(route.request().postData() || '{}').items || []);
+  });
+  await page.route('**/api/user-preferences', async (route) => {
+    const defaults = {
+      preferredIngredients: [],
+      dislikedIngredients: [],
+      spiceLevel: 'medium',
+      cookingTimePreference: 'flexible'
+    };
+    await jsonResponse(route, route.request().method() === 'GET'
+      ? defaults
+      : { ...defaults, ...JSON.parse(route.request().postData() || '{}') });
+  });
+  await page.route('**/api/recommendation-events', (route) => route.fulfill({ status: 204, body: '' }));
+  await page.route('**/api/product-events', (route) => route.fulfill({ status: 204, body: '' }));
+  await page.route('**/api/recipes/recommendations', (route) => jsonResponse(route, []));
 
   return exposedState;
 }

@@ -68,3 +68,28 @@ export function recordRecommendationFallback(source, error, options = {}) {
   logger.warn?.('[server] recommendation fallback', event);
   return event;
 }
+
+export function recordAccountDeletionRevocationFailure(error, options = {}) {
+  const logger = options.logger || console;
+  const event = {
+    event: 'account_deletion_revocation_failure',
+    errorName: String(error?.name || 'Error').slice(0, 80),
+    errorCode: error?.code == null ? null : String(error.code).slice(0, 80)
+  };
+
+  logger.warn?.('[server] account deletion revocation failure', event);
+  return event;
+}
+
+export function recordSemanticRecommendationOutcome(metrics = {}, options = {}) {
+  const logger = options.logger || console;
+  const event = {
+    event: 'semantic_recommendation',
+    mode: metrics.mode === 'semantic' ? 'semantic' : 'rule-fallback',
+    recommendationCount: nonNegativeInteger(metrics.recommendationCount) ?? 0,
+    durationMs: nonNegativeInteger(metrics.durationMs) ?? 0
+  };
+
+  logger.info?.('[server] semantic recommendation', event);
+  return event;
+}

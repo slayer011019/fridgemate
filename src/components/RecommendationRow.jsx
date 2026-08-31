@@ -2,10 +2,8 @@ import { memo, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import RecipeCard from './RecipeCard';
 import { saveRecommendationEvent } from '../api/recommendationEventsApi';
-
-function getRecipeKey(recipe = {}) {
-  return String(recipe.recipeId || recipe.id || recipe.sourceRecipeId || recipe.title || recipe.name || '').trim();
-}
+import { useMenuDecision } from '../hooks/useMenuDecision';
+import { getRecipeKey } from '../features/recipes/recipeIdentity';
 
 function SkeletonCard() {
   return (
@@ -33,19 +31,29 @@ function RecommendationRow({
   emptyActionLabel = '',
   emptyActionTo = '',
   loginCtaTo = '/login',
+  loginMessage = '로그인하면 AI 추천을 볼 수 있어요',
   onRecipeSelect,
   observeRef,
   source = ''
 }) {
+  const {
+    decision,
+    dismissedRecipeKeys,
+    dismissRecipe,
+    recordExternalOpen,
+    selectMenu
+  } = useMenuDecision();
   const impressedRecipeIdsRef = useRef(new Set());
   const rankedRecipes = useMemo(
     () =>
-      recipes.map((recipe, index) => ({
-        ...recipe,
-        _recommendationRank: index + 1,
-        _recommendationSource: source || recipe._recommendationSource || null
-      })),
-    [recipes, source]
+      recipes
+        .filter((recipe) => !dismissedRecipeKeys.includes(getRecipeKey(recipe)))
+        .map((recipe, index) => ({
+          ...recipe,
+          _recommendationRank: index + 1,
+          _recommendationSource: recipe._recommendationSource || source || null
+        })),
+    [dismissedRecipeKeys, recipes, source]
   );
 
   useEffect(() => {
@@ -77,6 +85,8 @@ function RecommendationRow({
     if (typeof onRecipeSelect === 'function') {
       onRecipeSelect(recipe);
     }
+
+    selectMenu(recipe, { screen: 'recipes' }).catch(() => {});
   };
 
   if (hidden) {
@@ -96,7 +106,7 @@ function RecommendationRow({
       {needsLogin ? (
         <div className="rounded-md border border-dashed border-slate-300 bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-medium text-slate-800">로그인하면 AI 추천을 볼 수 있어요</p>
+            <p className="text-sm font-medium text-slate-800">{loginMessage}</p>
             <Link to={loginCtaTo} className="btn-primary">
               로그인
             </Link>
@@ -104,7 +114,7 @@ function RecommendationRow({
         </div>
       ) : null}
 
-      {error ? <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">{error}</div> : null}
 
       {!needsLogin && !error && loading ? (
         <div className="flex gap-3 overflow-x-auto pb-3">
@@ -118,7 +128,13 @@ function RecommendationRow({
         <div className="flex snap-x gap-3 overflow-x-auto pb-3">
           {rankedRecipes.map((recipe) => (
             <div key={recipe.id || recipe.recipeId || recipe.title} className="min-w-[300px] flex-[0_0_300px] snap-start sm:min-w-[380px] sm:flex-[0_0_380px]">
-              <RecipeCard recipe={recipe} onSelect={handleRecipeSelect} />
+              <RecipeCard
+                recipe={recipe}
+                isSelected={decision?.status !== 'cancelled' && decision?.recipeKey === getRecipeKey(recipe)}
+                onDismiss={(selectedRecipe) => dismissRecipe(selectedRecipe, { screen: 'recipes' })}
+                onExternalOpen={(selectedRecipe) => recordExternalOpen(selectedRecipe, { screen: 'recipes' })}
+                onSelect={handleRecipeSelect}
+              />
             </div>
           ))}
         </div>

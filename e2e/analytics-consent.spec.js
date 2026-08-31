@@ -25,9 +25,27 @@ test('analytics stays blocked until consent and stops after withdrawal', async (
   await expect(page.getByText('현재 설정: 이용 분석 허용')).toBeVisible();
   await page.getByRole('button', { name: '필수 기능만' }).click();
 
-  const dataLayerLengthAfterWithdrawal = await page.evaluate(() => window.dataLayer.length);
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        analyticsId: window.localStorage.getItem('fridgemate-analytics-id'),
+        dataLayerLength: window.dataLayer.length,
+        eventCount: window.__FRIDGEMATE_ANALYTICS_EVENTS__?.length || 0,
+        gtagType: typeof window.gtag,
+        scriptCount: document.querySelectorAll('script[data-fridgemate-ga]').length,
+        sessionId: window.sessionStorage.getItem('fridgemate-analytics-session-id')
+      }))
+    )
+    .toEqual({
+      analyticsId: null,
+      dataLayerLength: 0,
+      eventCount: 0,
+      gtagType: 'undefined',
+      scriptCount: 0,
+      sessionId: null
+    });
   await page.getByRole('link', { name: '서비스 소개' }).click();
   await expect(page).toHaveURL(/\/about$/u);
-  await expect.poll(() => page.evaluate(() => window.dataLayer.length)).toBe(dataLayerLengthAfterWithdrawal);
+  await expect.poll(() => page.evaluate(() => window.dataLayer.length)).toBe(0);
   expect(googleAnalyticsRequests).toBe(1);
 });

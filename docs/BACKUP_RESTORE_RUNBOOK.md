@@ -66,6 +66,14 @@ age --decrypt --identity /secure/path/recovery_ed25519 fridgemate-*.dump.age \
 
 This logical backup covers PostgreSQL data and schema, including Supabase database schemas. It does not independently back up Storage objects, project configuration, API keys, Edge Functions, or external Cloudflare configuration. GitHub Actions is also not a substitute for an independent off-provider copy; migrate the encrypted artifacts to a separate object store when a no-card storage target is available.
 
+Before a manual Free-plan logical backup, prepare an existing, empty, encrypted directory outside the repository and run:
+
+```bash
+npm run backup:preflight -- --output-dir=ABSOLUTE_ENCRYPTED_DIRECTORY --confirm-database-host=EXACT_DB_HOST --confirm-encrypted-storage
+```
+
+The preflight accepts only `BACKUP_DATABASE_URL` or `DIRECT_URL`, requires its project ref to match `SUPABASE_URL`, rejects transaction-pooler port 6543, and verifies that Supabase CLI plus a running Docker engine are already present. It does not create a dump, install software, prove encryption, or transmit data. The encryption flag is an explicit operator assertion and must not be supplied for an unencrypted location.
+
 ## 2. Pre-drill safety gate
 
 Before starting a restore:
@@ -114,6 +122,10 @@ SELECT
   (SELECT COUNT(*) FROM "Ingredient") AS ingredients,
   (SELECT COUNT(*) FROM "ImportCorrection") AS import_corrections,
   (SELECT COUNT(*) FROM "RecommendationEvent") AS recommendation_events,
+  (SELECT COUNT(*) FROM "MenuDecision") AS menu_decisions,
+  (SELECT COUNT(*) FROM "PantryOwnership") AS pantry_ownership,
+  (SELECT COUNT(*) FROM "UserPreference") AS user_preferences,
+  (SELECT COUNT(*) FROM "ProductEvent") AS product_events,
   (SELECT COUNT(*) FROM recipes) AS recipes,
   (SELECT COUNT(*) FROM recipe_ingredients) AS recipe_ingredients,
   (SELECT COUNT(*) FROM recipe_embeddings) AS recipe_embeddings;
@@ -132,6 +144,10 @@ WHERE namespace.nspname = 'public'
     'Ingredient',
     'ImportCorrection',
     'RecommendationEvent',
+    'MenuDecision',
+    'PantryOwnership',
+    'UserPreference',
+    'ProductEvent',
     'recipes',
     'recipe_ingredients'
   )

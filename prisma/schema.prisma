@@ -19,6 +19,10 @@ model User {
   authSessions      AuthSession[]
   importCorrections ImportCorrection[]
   recommendationEvents RecommendationEvent[]
+  menuDecisions      MenuDecision[]
+  pantryOwnerships   PantryOwnership[]
+  preference         UserPreference?
+  productEvents      ProductEvent[]
 }
 
 model AuthSession {
@@ -39,15 +43,15 @@ model AuthSession {
 model Ingredient {
   id           String   @id @default(cuid())
   clientId     String
-  name         String
-  category     String
-  storageType  String
-  quantity     String
+  name         String?
+  category     String?
+  storageType  String?
+  quantity     String?
   purchaseDate String?
   expiryDate   String?
   memo         String?
-  consumed     Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  consumed     Boolean? @default(false)
+  createdAt    DateTime? @default(now())
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?
   userId       String?
@@ -87,6 +91,8 @@ model Recipe {
   updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
   ingredients     RecipeIngredient[]
   embeddings      RecipeEmbedding[]
+  menuDecisions   MenuDecision[]
+  recommendationEvents RecommendationEvent[]
 
   @@index([name])
   @@index([source])
@@ -160,8 +166,11 @@ model ImportCorrection {
 model RecommendationEvent {
   id                     String   @id @default(cuid())
   userId                 String?
-  user                   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user                   User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   recipeId               String
+  catalogRecipeId        String?  @db.Uuid
+  catalogRecipe          Recipe?  @relation(fields: [catalogRecipeId], references: [id], onDelete: SetNull)
+  clientEventId          String?
   eventType              String
   sessionId              String?
   rank                   Int?
@@ -175,7 +184,74 @@ model RecommendationEvent {
   createdAt              DateTime @default(now())
 
   @@index([userId])
+  @@unique([userId, clientEventId])
   @@index([recipeId])
+  @@index([catalogRecipeId])
   @@index([eventType])
-  @@index([createdAt])
+  @@index([createdAt, id])
+}
+
+model MenuDecision {
+  id                   String   @id @default(cuid())
+  clientId             String
+  decisionDate         DateTime @db.Date
+  recipeKey            String
+  catalogRecipeId      String?  @db.Uuid
+  catalogRecipe        Recipe?  @relation(fields: [catalogRecipeId], references: [id], onDelete: SetNull)
+  recipeName           String
+  recommendationSource String?
+  status               String   @default("selected")
+  selectedAt           DateTime @default(now()) @db.Timestamptz(6)
+  completedAt          DateTime? @db.Timestamptz(6)
+  createdAt            DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(6)
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, decisionDate])
+  @@unique([userId, clientId])
+  @@index([userId, status])
+  @@index([catalogRecipeId])
+}
+
+model PantryOwnership {
+  id        String   @id @default(cuid())
+  stapleId  String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stapleId])
+  @@index([userId, updatedAt])
+}
+
+model UserPreference {
+  id                   String   @id @default(cuid())
+  preferredIngredients String[] @default([])
+  dislikedIngredients  String[] @default([])
+  spiceLevel            String   @default("medium")
+  cookingTimePreference String   @default("flexible")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ProductEvent {
+  id            String   @id @default(cuid())
+  clientEventId String
+  eventName     String
+  route         String?
+  properties    Json?
+  occurredAt    DateTime @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientEventId])
+  @@index([userId, occurredAt])
+  @@index([eventName, occurredAt])
+  @@index([createdAt, id])
 }

@@ -1,4 +1,8 @@
 import { ApiClientError, requestJson } from './apiClient';
+import {
+  createExternalAiRequestSignal,
+  EXTERNAL_AI_ACTIONS
+} from './externalAiRequest';
 
 export class ImportCorrectionsApiError extends ApiClientError {
   constructor(message, options = {}) {
@@ -7,23 +11,30 @@ export class ImportCorrectionsApiError extends ApiClientError {
   }
 }
 
-function toCorrectionPayloadItem(item) {
+export function isRemoteImportLearningEnabled() {
+  return String(import.meta.env.VITE_ENABLE_REMOTE_IMPORT_LEARNING || '').toLowerCase() === 'true';
+}
+
+export function toCorrectionPayloadItem(item) {
   return {
     id: item.id,
-    name: item.name,
-    displayName: item.displayName,
-    normalizedName: item.normalizedName,
-    sourceLine: item.sourceLine,
-    rawLine: item.rawLine,
-    originalText: item.originalText,
-    specText: item.specText,
-    quantity: item.quantity,
+    normalizedName: item.normalizedName || item.name,
+    correctedName: item.name,
     category: item.category,
     storageType: item.storageType
   };
 }
 
 export function getImportCorrectionSuggestions(items = [], options = {}) {
+  const externalAi = createExternalAiRequestSignal(
+    EXTERNAL_AI_ACTIONS.importCorrectionSuggestions,
+    options
+  );
+
+  if (!isRemoteImportLearningEnabled() || !externalAi) {
+    return Promise.resolve({ suggestions: {} });
+  }
+
   return requestJson(
     '/import/corrections/suggestions',
     {
@@ -33,14 +44,19 @@ export function getImportCorrectionSuggestions(items = [], options = {}) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        items: items.map(toCorrectionPayloadItem)
+        items: items.map(toCorrectionPayloadItem),
+        externalAi
       })
     },
     { authMode: 'required', errorClass: ImportCorrectionsApiError }
   );
 }
 
-export function saveImportCorrectionsRemote(items = []) {
+export function saveImportCorrectionsRemote(items = [], options = {}) {
+  if (!isRemoteImportLearningEnabled()) {
+    return Promise.resolve({ savedCount: 0 });
+  }
+
   return requestJson(
     '/import/corrections',
     {
@@ -49,7 +65,11 @@ export function saveImportCorrectionsRemote(items = []) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        items: items.map(toCorrectionPayloadItem)
+        items: items.map(toCorrectionPayloadItem),
+        externalAi: createExternalAiRequestSignal(
+          EXTERNAL_AI_ACTIONS.importCorrectionEmbedding,
+          options
+        )
       })
     },
     { authMode: 'required', errorClass: ImportCorrectionsApiError }

@@ -5,6 +5,7 @@ import { useAuth } from './useAuth';
 import { useIngredients } from './useIngredients';
 import { isBackendEnabled } from '../utils/backendConfig';
 import { buildRecipeRecommendations } from '../utils/recommendations';
+import { useOptionalUserPreferences } from './useUserPreferences';
 
 function shouldFallbackToLocalRecommendations(error) {
   return error instanceof RecipesApiError && (!error.status || error.status >= 500);
@@ -13,10 +14,11 @@ function shouldFallbackToLocalRecommendations(error) {
 export function useRecipeRecommendations(pantryItems = []) {
   const { isAuthenticated } = useAuth();
   const { ingredients, loading: ingredientsLoading } = useIngredients();
+  const { preferences } = useOptionalUserPreferences();
   const requestIdRef = useRef(0);
   const localRecommendations = useMemo(
-    () => buildRecipeRecommendations(seedRecipes, ingredients, { pantryItems }),
-    [ingredients, pantryItems]
+    () => buildRecipeRecommendations(seedRecipes, ingredients, { pantryItems, preferences }),
+    [ingredients, pantryItems, preferences]
   );
   const [recommendations, setRecommendations] = useState(localRecommendations);
   const [loading, setLoading] = useState(ingredientsLoading);
@@ -41,7 +43,7 @@ export function useRecipeRecommendations(pantryItems = []) {
       setLoading(true);
 
       try {
-        const nextRecommendations = await getRecipeRecommendations(ingredients, pantryItems);
+        const nextRecommendations = await getRecipeRecommendations(ingredients, pantryItems, preferences);
 
         if (!isMounted || requestIdRef.current !== requestId) {
           return;
@@ -78,7 +80,7 @@ export function useRecipeRecommendations(pantryItems = []) {
     return () => {
       isMounted = false;
     };
-  }, [ingredients, ingredientsLoading, isAuthenticated, localRecommendations, pantryItems]);
+  }, [ingredients, ingredientsLoading, isAuthenticated, localRecommendations, pantryItems, preferences]);
 
   return {
     recommendations,

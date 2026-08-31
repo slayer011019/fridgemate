@@ -1,12 +1,33 @@
 import { getRemainingDays } from './date';
 import { isBackendEnabled } from './backendConfig';
 import { trackGoogleAnalyticsEvent } from './googleAnalytics';
+import {
+  ANALYTICS_EVENT_STORE_KEY,
+  ANALYTICS_ID_STORAGE_KEY,
+  ANALYTICS_SESSION_ID_STORAGE_KEY,
+  ANALYTICS_SESSION_STARTED_STORAGE_KEY,
+  getAnalyticsConsent
+} from './analyticsConsent';
+import { saveProductEvent } from '../api/productEventsApi';
+import { createSecureId } from './secureId';
 
-const ANALYTICS_ID_KEY = 'fridgemate-analytics-id';
-const ANALYTICS_SESSION_ID_KEY = 'fridgemate-analytics-session-id';
-const ANALYTICS_SESSION_STARTED_KEY = 'fridgemate-analytics-session-started';
-const ANALYTICS_EVENT_STORE_KEY = '__FRIDGEMATE_ANALYTICS_EVENTS__';
 const ANALYTICS_EVENT_NAME = 'fridgemate:analytics';
+const PROTECTED_ANALYTICS_PROPERTY_KEYS = new Set([
+  'analytics_id',
+  'api_mode',
+  'app_version',
+  'client_event_id',
+  'device_type',
+  'event_name',
+  'network_state',
+  'occurred_at',
+  'page_path',
+  'page_title',
+  'route',
+  'session_id',
+  'user_id',
+  'user_mode'
+]);
 
 function getStorage(type) {
   if (typeof window === 'undefined') {
@@ -17,14 +38,14 @@ function getStorage(type) {
 }
 
 function createId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return `fm-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return createSecureId('fm');
 }
 
 function getOrCreateStoredValue(key, storageType) {
+  if (getAnalyticsConsent() !== 'granted') {
+    return null;
+  }
+
   const storage = getStorage(storageType);
 
   if (!storage) {
@@ -38,31 +59,34 @@ function getOrCreateStoredValue(key, storageType) {
   }
 
   const nextValue = createId();
+  if (!nextValue) return null;
   storage.setItem(key, nextValue);
   return nextValue;
 }
 
 export function getAnonymousAnalyticsId() {
-  return getOrCreateStoredValue(ANALYTICS_ID_KEY, 'localStorage');
+  return getOrCreateStoredValue(ANALYTICS_ID_STORAGE_KEY, 'localStorage');
 }
 
 export function getAnalyticsSessionId() {
-  return getOrCreateStoredValue(ANALYTICS_SESSION_ID_KEY, 'sessionStorage');
+  return getOrCreateStoredValue(ANALYTICS_SESSION_ID_STORAGE_KEY, 'sessionStorage');
 }
 
 export function hasTrackedSessionStarted() {
+  if (getAnalyticsConsent() !== 'granted') return false;
   const storage = getStorage('sessionStorage');
-  return storage?.getItem(ANALYTICS_SESSION_STARTED_KEY) === 'true';
+  return storage?.getItem(ANALYTICS_SESSION_STARTED_STORAGE_KEY) === 'true';
 }
 
 export function markSessionStartedTracked() {
+  if (getAnalyticsConsent() !== 'granted') return;
   const storage = getStorage('sessionStorage');
 
   if (!storage) {
     return;
   }
 
-  storage.setItem(ANALYTICS_SESSION_STARTED_KEY, 'true');
+  storage.setItem(ANALYTICS_SESSION_STARTED_STORAGE_KEY, 'true');
 }
 
 export function getDeviceType() {
@@ -111,24 +135,50 @@ export function getDaysToExpiryBucket(expiryDate) {
   return '8_plus';
 }
 
-export function buildAnalyticsPayload({ eventName, route, isAuthenticated, userId, properties = {} }) {
+function getAnalyticsEventProperties(properties) {
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(properties).filter(([key]) => !PROTECTED_ANALYTICS_PROPERTY_KEYS.has(key))
+  );
+}
+
+export function buildAnalyticsPayload({ eventName, route, isAuthenticated, properties = {} }) {
+  if (getAnalyticsConsent() !== 'granted') {
+    return null;
+  }
+
+  const clientEventId = createId();
+  const sessionId = getAnalyticsSessionId();
+  const analyticsId = getAnonymousAnalyticsId();
+
+  if (!clientEventId || !sessionId || !analyticsId) {
+    return null;
+  }
+
   return {
+    ...getAnalyticsEventProperties(properties),
+    client_event_id: clientEventId,
     event_name: eventName,
     occurred_at: new Date().toISOString(),
-    session_id: getAnalyticsSessionId(),
-    analytics_id: getAnonymousAnalyticsId(),
+    session_id: sessionId,
+    analytics_id: analyticsId,
     user_mode: isAuthenticated ? 'authenticated' : 'guest',
-    user_id: userId || null,
     route: route || '/',
     device_type: getDeviceType(),
     api_mode: getApiMode(),
     network_state: getNetworkState(),
-    app_version: import.meta.env.VITE_APP_VERSION || null,
-    ...properties
+    app_version: import.meta.env.VITE_APP_VERSION || null
   };
 }
 
 export function recordAnalyticsEvent(payload) {
+  if (getAnalyticsConsent() !== 'granted' || !payload) {
+    return null;
+  }
+
   if (typeof window === 'undefined') {
     return payload;
   }
@@ -138,6 +188,10 @@ export function recordAnalyticsEvent(payload) {
   window[ANALYTICS_EVENT_STORE_KEY] = events;
   window.dispatchEvent(new CustomEvent(ANALYTICS_EVENT_NAME, { detail: payload }));
   trackGoogleAnalyticsEvent(payload);
+
+  if (getAnalyticsConsent() === 'granted' && isBackendEnabled()) {
+    saveProductEvent(payload).catch(() => {});
+  }
 
   if (import.meta.env.DEV) {
     console.info('[analytics]', payload.event_name, payload);

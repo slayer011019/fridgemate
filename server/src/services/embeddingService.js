@@ -1,39 +1,53 @@
 import { serverConfig } from '../config.js';
+import {
+  EXTERNAL_AI_ACTIONS,
+  isExternalAiOperationAllowed,
+  normalizeExternalAiText
+} from '../lib/externalAiPrivacy.js';
+import { requestExternalAiJson } from '../lib/externalAiRequest.js';
 
 function normalizeEmbeddingInput(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
-export function isEmbeddingEnabled() {
-  return Boolean(serverConfig.openaiApiKey);
+export function isEmbeddingEnabled({
+  externalAi,
+  action = EXTERNAL_AI_ACTIONS.importCorrectionSuggestions
+} = {}) {
+  return Boolean(
+    serverConfig.openaiApiKey && isExternalAiOperationAllowed(externalAi, action)
+  );
 }
 
-export async function createEmbedding(input) {
-  const normalizedInput = normalizeEmbeddingInput(input);
-
-  if (!normalizedInput || !isEmbeddingEnabled()) {
+export async function createEmbedding(input, options = {}) {
+  if (!isEmbeddingEnabled(options)) {
     return null;
   }
+  const normalizedInput = normalizeExternalAiText(
+    normalizeEmbeddingInput(input),
+    'Import correction embedding input',
+    { maxLength: 400 }
+  );
 
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${serverConfig.openaiApiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      input: normalizedInput,
-      model: serverConfig.embeddingModel,
-      dimensions: serverConfig.embeddingDimensions,
-      encoding_format: 'float'
-    })
+  const { payload } = await requestExternalAiJson({
+    provider: 'OpenAI embeddings',
+    url: 'https://api.openai.com/v1/embeddings',
+    fetchImpl: options.fetchImpl ?? globalThis.fetch,
+    timeoutMs: options.timeoutMs,
+    init: {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${serverConfig.openaiApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        input: normalizedInput,
+        model: serverConfig.embeddingModel,
+        dimensions: serverConfig.embeddingDimensions,
+        encoding_format: 'float'
+      })
+    }
   });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI embeddings request failed with status ${response.status}.`);
-  }
-
-  const payload = await response.json();
   const embedding = payload?.data?.[0]?.embedding;
 
   return Array.isArray(embedding) ? embedding : null;

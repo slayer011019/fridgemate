@@ -31,9 +31,11 @@ create index if not exists recipes_dish_type_idx on public.recipes (dish_type);
 create or replace function public.set_recipes_updated_at()
 returns trigger
 language plpgsql
+security invoker
+set search_path = pg_catalog
 as $$
 begin
-  new.updated_at = now();
+  new.updated_at = pg_catalog.now();
   return new;
 end;
 $$;
@@ -43,6 +45,9 @@ create trigger recipes_set_updated_at
 before update on public.recipes
 for each row
 execute function public.set_recipes_updated_at();
+
+revoke execute on function public.set_recipes_updated_at() from public;
+revoke execute on function public.set_recipes_updated_at() from anon, authenticated;
 
 alter table public.recipes enable row level security;
 
