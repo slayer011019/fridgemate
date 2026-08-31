@@ -173,7 +173,10 @@ async function validateBackupOutputDirectory(rawPath, { workspaceRoot = process.
     throw new Error('--output-dir must be a dedicated empty directory to prevent overwrites.');
   }
 
-  return canonicalOutput;
+  // Preserve the operator-provided absolute spelling (for example `/var` on
+  // macOS, whose canonical path is `/private/var`) after validating the real
+  // directory. The canonical path is still used for every containment check.
+  return resolvedOutput;
 }
 
 function sanitizeProbeEnvironment(env = process.env) {

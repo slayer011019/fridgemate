@@ -243,10 +243,13 @@ async function openVerifiedWorkspaceFile(
     const pathStats = await lstat(resolvedFilePath);
     const canonicalWorkspaceRoot = await realpath(resolvedWorkspaceRoot);
     const canonicalFilePath = await realpath(resolvedFilePath);
+    const canonicalExpectedFilePath = resolve(
+      canonicalWorkspaceRoot,
+      relative(resolvedWorkspaceRoot, resolvedFilePath)
+    );
 
     if (
-      !isSameResolvedPath(canonicalWorkspaceRoot, resolvedWorkspaceRoot) ||
-      !isSameResolvedPath(canonicalFilePath, resolvedFilePath) ||
+      !isSameResolvedPath(canonicalFilePath, canonicalExpectedFilePath) ||
       !isUnlinkedRegularFile(openedStats) ||
       !isUnlinkedRegularFile(pathStats) ||
       !isSameFileIdentity(openedStats, pathStats) ||
