@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
       EXPECTED_SUPABASE_PROJECT_REF: zninmnfyanyqjaipbyzx
+      POSTGRES_CLIENT_MAJOR: '17'
 
     steps:
       - name: Checkout repository
@@ -29,6 +29,8 @@ jobs:
           persist-credentials: false
 
       - name: Require and validate backup target
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
         run: node scripts/validateBackupTarget.js
 
       - name: Install backup tools
@@ -36,31 +38,38 @@ jobs:
         run: |
           set -Eeuo pipefail
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends age postgresql-client
+          sudo apt-get install --yes --no-install-recommends age ca-certificates postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install --yes --no-install-recommends "postgresql-client-${POSTGRES_CLIENT_MAJOR}"
+          postgres_client_bin="/usr/lib/postgresql/${POSTGRES_CLIENT_MAJOR}/bin"
           age --version
-          pg_dump --version
+          "${postgres_client_bin}/pg_dump" --version
+          "${postgres_client_bin}/pg_restore" --version
 
       - name: Create and encrypt backup
         id: backup
         shell: bash
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
         run: |
           set -Eeuo pipefail
           umask 077
 
+          postgres_client_bin="/usr/lib/postgresql/${POSTGRES_CLIENT_MAJOR}/bin"
           backup_directory="${RUNNER_TEMP}/fridgemate-backup"
           backup_timestamp="$(date -u +'%Y%m%dT%H%M%SZ')"
           backup_name="fridgemate-${backup_timestamp}.dump"
           encrypted_name="${backup_name}.age"
           mkdir -p "${backup_directory}"
 
-          pg_dump \
+          "${postgres_client_bin}/pg_dump" \
             --dbname="${BACKUP_DATABASE_URL}" \
             --format=custom \
             --no-owner \
             --no-privileges \
             --file="${backup_directory}/${backup_name}"
 
-          pg_restore --list "${backup_directory}/${backup_name}" > /dev/null
+          "${postgres_client_bin}/pg_restore" --list "${backup_directory}/${backup_name}" > /dev/null
           age \
             --recipients-file .github/backup-recipients.txt \
             --output "${backup_directory}/${encrypted_name}" \

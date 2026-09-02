@@ -260,6 +260,8 @@ npm run prisma:deploy
 
 운영 백업 존재 여부와 PITR 설정은 Supabase Dashboard 또는 Management API의 직접 증거로 확인해야 합니다. 운영 DB를 덮어쓰지 않는 별도 프로젝트 복구 훈련과 RLS 검증 절차는 [백업·복구 런북](docs/BACKUP_RESTORE_RUNBOOK.md)을 따릅니다.
 
+예약 백업 워크플로는 현재 Supabase 서버와 같은 PostgreSQL 17 `pg_dump`/`pg_restore`를 명시적으로 사용합니다. Supabase가 PostgreSQL major 버전을 올리면 백업 클라이언트 major도 함께 갱신해야 합니다.
+
 Free 플랜에서 수동 논리 백업을 준비할 때는 전용 암호화 디렉터리를 저장소 밖에 먼저 만들고 다음 읽기 전용 preflight를 실행합니다. 이 명령은 `BACKUP_DATABASE_URL` 또는 `DIRECT_URL`의 비밀번호를 출력하지 않으며, transaction pooler, 다른 Supabase project ref, 저장소 내부·symlink·비어 있지 않은 출력 경로, 미설치 Supabase CLI/Docker를 거부합니다.
 
 ```bash

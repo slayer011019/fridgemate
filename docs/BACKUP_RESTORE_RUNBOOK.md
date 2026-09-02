@@ -49,6 +49,8 @@ If using the Management API, use a personal access token stored outside the repo
 
 The scheduled workflow runs daily at 02:30 Asia/Seoul and retains only encrypted artifacts for 14 days. Configure the repository secret `BACKUP_DATABASE_URL` with the production Supabase owner connection using either the direct endpoint or the session pooler on port 5432. The URL must include `sslmode=require` (or a stricter verification mode), and its project ref must be `zninmnfyanyqjaipbyzx`. Prefer the session pooler when the runner cannot reach Supabase's IPv6 direct endpoint.
 
+The workflow pins `pg_dump` and `pg_restore` to PostgreSQL major 17 to match the current production server. When Supabase upgrades the production PostgreSQL major version, update and verify the workflow client major before relying on the next scheduled backup.
+
 The encryption recipient is public and committed at `.github/backup-recipients.txt`. Its private recovery key must remain outside Git and GitHub:
 
 - local key path: `C:\Users\lee\.fridgemate-backup\recovery_ed25519`;

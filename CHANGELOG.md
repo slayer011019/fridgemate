@@ -23,6 +23,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Pinned the production backup job to PostgreSQL 17 client binaries so `pg_dump` matches the Supabase PostgreSQL 17 server instead of aborting with the Ubuntu runner's default PostgreSQL 16 client.
 - Split the pending event-retention indexes into single-statement concurrent migrations, separated Ingredient CHECK validation from its short nullable-column lock, made Supabase function hardening fail closed on owner mismatch, and ignored common plaintext database-dump artifacts.
 - Moved shared client rate limits ahead of access-token and revocation checks, then kept per-user limits after authentication so forged or anonymous requests cannot trigger unbounded security-store work.
 - Made logout verify and revoke both cookie and Bearer access tokens independently so an invalid Bearer value cannot hide a valid cookie token, and hardened product-event property normalization against inherited or attacker-selected object keys.
