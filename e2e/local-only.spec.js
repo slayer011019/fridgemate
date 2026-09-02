@@ -15,8 +15,7 @@ test('local-only mode keeps CRUD data in IndexedDB across reloads', async ({ pag
   await expect(page).toHaveURL(/\/ingredients$/);
   await expect(page.getByText('우유')).toBeVisible();
 
-  await page.reload();
-  await page.waitForLoadState('networkidle');
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByText('우유')).toBeVisible();
 
   await page.getByRole('button', { name: '삭제' }).click();
@@ -45,8 +44,8 @@ test('guest menu selection survives a reload without a server account', async ({
   await firstCard.getByRole('button', { name: '오늘 먹기' }).click();
   await expect(page.getByRole('button', { name: '선택됨' }).first()).toBeVisible();
 
-  await page.reload();
-  await page.waitForLoadState('networkidle');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('button', { name: '선택됨' }).first()).toBeVisible();
   await gotoAndWait(page, '/');
   await expect(page.getByRole('heading', { name: recipeName, exact: true })).toBeVisible();
 });
