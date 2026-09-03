@@ -40,8 +40,6 @@
 - 보유 재료, 팬트리 재료, 유통기한 임박도를 반영한 규칙 기반 점수
 - PostgreSQL 레시피 카탈로그와 pgvector 임베딩을 이용한 후보 검색 기반
 - 추천 노출과 클릭 이벤트 저장 및 학습 데이터 내보내기
-- 식품안전나라 원문에서 공개용으로 선별한 레시피 100개와 재료·조리 단계·영양 정보 상세 페이지
-- 각 상세 페이지의 canonical URL, 사이트맵 항목, 출처 기반 `Recipe` JSON-LD
 
 ### 계정과 동기화
 
@@ -67,22 +65,18 @@
 - 게스트·로그인 사용자별 오늘 메뉴 선택, 완료, 취소와 실패 후 재시도 기반
 - 사용자별 팬트리·간단 취향 저장과 멱등 제품 이벤트 API
 - Vitest, React Testing Library, Playwright, ESLint, GitHub Actions CI
-- 공개 서비스·연락처·개인정보처리방침·식약처 레시피 상세·사이트맵·`ads.txt`
+- 공개 서비스·연락처·개인정보처리방침·사이트맵·`ads.txt`
 
 ### 검색 노출 경계
 
-- 홈, 메뉴 추천, 서비스 소개, 문의, 개인정보 처리 안내와 식약처 공개 레시피 100개는 빌드 시 본문과 경로별 메타·JSON-LD를 HTML로 프리렌더합니다.
+- 홈, 메뉴 추천, 서비스 소개, 문의, 개인정보 처리 안내는 빌드 시 본문과 경로별 메타·JSON-LD를 HTML로 프리렌더합니다.
 - 재료, OCR 가져오기, 로그인, 회원가입, 계정 화면은 Vercel `X-Robots-Tag`와 `robots.txt`에서 색인을 차단합니다.
 - `npm run build`의 postbuild 단계는 공개 HTML의 `h1`, canonical, structured data와 기능 화면의 빈 `noindex` 앱 셸을 자동 검증합니다.
 - Google, 네이버, Bing의 URL-prefix 소유권 인증은 각각 `VITE_GOOGLE_SITE_VERIFICATION`, `VITE_NAVER_SITE_VERIFICATION`, `VITE_BING_SITE_VERIFICATION` 값이 있을 때 정적 `<meta>` 태그로 빌드되고 postbuild에서 검증됩니다.
-- 재료별 공개 허브 6개와 냉장고 활용 가이드 2개를 포함해 총 113개 공개 URL을 프리렌더하며, `/recipes`에서 100개 레시피 상세 URL을 모두 내부 링크합니다.
+- 위 5개 공개 URL만 프리렌더하며, 재료·계정 등 개인 기능 화면은 검색 결과에 노출하지 않습니다.
 - `VITE_GA_MEASUREMENT_ID`가 설정되어도 이용자가 분석을 허용하기 전에는 Google Analytics를 불러오지 않습니다.
 - 브라우저에서는 화면별 코드를 지연 로딩하고, SEO 사전 렌더링은 별도의 동기식 서버 엔트리를 사용해 공개 HTML 본문을 그대로 유지합니다.
 - `llms.txt`는 공개 정보와 사용자별 비공개 영역의 경계를 설명하며, 개인정보나 개인화 추천 데이터는 인용 대상으로 제공하지 않습니다.
-- 공개 레시피 상세 페이지의 `Recipe` JSON-LD에는 실제 원문에 있는 재료·조리 단계·이미지·영양·출처만 넣고 평점이나 조리 시간은 추정하지 않습니다.
-
-공개 레시피 카탈로그는 식품안전나라 `COOKRCP01` 원문을 곧바로 소스 파일에 쓰지 않습니다. 먼저 `npm run recipes:export-public -- --limit=100 --print-review > public-recipes.review.json`으로 검토 파일을 만들고 내용을 확인한 뒤, `npm run recipes:export-public -- --write-from=public-recipes.review.json`으로 갱신합니다. 검토 파일과 저장소의 기존 출력 파일은 심볼릭 링크나 하드 링크가 아닌 일반 파일이어야 하며, 스크립트는 검증한 파일 핸들에만 읽고 씁니다. 공개 조건을 충족하지 못한 항목은 제외합니다.
-
 운영용 MFDS seed와 재료 parser도 기본값은 dry run입니다. 실제 Supabase 쓰기는 `--execute`와 현재 `SUPABASE_URL`의 정확한 `--confirm-project-ref`를 함께 지정해야 하며, 자세한 절차는 [레시피 데이터 가져오기](docs/recipe-seeding.md)에 정리되어 있습니다.
 
 현재 공개 운영 서비스의 범위 밖입니다.
@@ -406,7 +400,7 @@ FridgeMate/
 
 ## 다음 단계
 
-1. 별도 Supabase·Cloudflare staging을 만들고 공개 레시피 카탈로그만 복사해 semantic 품질·fallback·인증·요청 제한을 검증
+1. 별도 Supabase·Cloudflare staging을 만들고 레시피 카탈로그만 복사해 semantic 품질·fallback·인증·요청 제한을 검증
 2. staging 통과 후 운영 Worker의 semantic flag만 제한적으로 활성화하고 24시간 오류·fallback·지연·API 사용량 관찰
 3. `MenuDecision`, 추천 이벤트 FK, 팬트리·취향·제품 이벤트 migration을 staging에서 검토하고 메뉴 선택 E2E 통과
 4. 운영 migration을 별도 승인·적용한 뒤 하루 한 개 메뉴 선택 루프와 행동 이벤트 수집 활성화

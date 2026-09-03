@@ -9,15 +9,12 @@ const pages = {
   AccountPage: lazy(() => import('./pages/AccountPage')),
   ContactPage: lazy(() => import('./pages/ContactPage')),
   HomePage: lazy(() => import('./pages/HomePage')),
-  GuidePage: lazy(() => import('./pages/GuidePage')),
   ImportPage: lazy(() => import('./pages/ImportPage')),
-  IngredientHubPage: lazy(() => import('./pages/IngredientHubPage')),
   IngredientFormPage: lazy(() => import('./pages/IngredientFormPage')),
   IngredientsPage: lazy(() => import('./pages/IngredientsPage')),
   LoginPage: lazy(() => import('./pages/LoginPage')),
   NotFoundPage: lazy(() => import('./pages/NotFoundPage')),
   PrivacyPage: lazy(() => import('./pages/PrivacyPage')),
-  PublicRecipePage: lazy(() => import('./pages/PublicRecipePage')),
   RecipesPage: lazy(() => import('./pages/RecipesPage')),
   SignupPage: lazy(() => import('./pages/SignupPage'))
 };

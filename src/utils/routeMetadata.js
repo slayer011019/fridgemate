@@ -1,15 +1,3 @@
-import {
-  getPublicRecipeByPath,
-  getPublicRecipeDescription,
-  PUBLIC_RECIPE_PATHS
-} from '../features/recipes/publicRecipeCatalog.js';
-import {
-  getGuideByPath,
-  getIngredientHubByPath,
-  GUIDE_PATHS,
-  INGREDIENT_HUB_PATHS
-} from '../features/recipes/recipeContentHubs.js';
-
 const SITE_ORIGIN = 'https://xn--wh1bs8l5xa003adme.com';
 
 const PUBLIC_PAGE_METADATA = {
@@ -35,12 +23,7 @@ const PUBLIC_PAGE_METADATA = {
   }
 };
 
-export const PUBLIC_ROUTES = Object.freeze([
-  ...Object.keys(PUBLIC_PAGE_METADATA),
-  ...INGREDIENT_HUB_PATHS,
-  ...GUIDE_PATHS,
-  ...PUBLIC_RECIPE_PATHS
-]);
+export const PUBLIC_ROUTES = Object.freeze(Object.keys(PUBLIC_PAGE_METADATA));
 
 const FUNCTIONAL_PATH_PATTERNS = [
   /^\/ingredients(?:\/.*)?$/,
@@ -59,42 +42,6 @@ export function getRouteMetadata(pathname = '/') {
       canonical: `${SITE_ORIGIN}${pathname === '/' ? '/' : pathname}`,
       indexable: true,
       notFound: false
-    };
-  }
-
-  const contentHub = getIngredientHubByPath(pathname);
-  if (contentHub) {
-    return {
-      title: contentHub.title,
-      description: contentHub.description,
-      canonical: new URL(pathname, SITE_ORIGIN).href,
-      indexable: true,
-      notFound: false,
-      contentHub
-    };
-  }
-
-  const guide = getGuideByPath(pathname);
-  if (guide) {
-    return {
-      title: guide.title,
-      description: guide.description,
-      canonical: new URL(pathname, SITE_ORIGIN).href,
-      indexable: true,
-      notFound: false,
-      guide
-    };
-  }
-
-  const publicRecipe = getPublicRecipeByPath(pathname);
-  if (publicRecipe) {
-    return {
-      title: `${publicRecipe.name} 재료와 만드는 법 | 오늘뭐먹지`,
-      description: getPublicRecipeDescription(publicRecipe),
-      canonical: new URL(pathname, SITE_ORIGIN).href,
-      indexable: true,
-      notFound: false,
-      recipe: publicRecipe
     };
   }
 

@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PUBLIC_ROUTES, getRouteMetadata } from '../src/utils/routeMetadata.js';
-import { PUBLIC_RECIPE_PATHS } from '../src/features/recipes/publicRecipeCatalog.js';
 import { getWebmasterVerificationTags } from '../src/utils/webmasterVerification.js';
 import { hasOnlySameOriginExecutableScripts } from './lib/seoHtmlSecurity.js';
 
@@ -15,10 +14,7 @@ const routeOutputFiles = {
 };
 
 function getRouteOutputFile(pathname) {
-  if (routeOutputFiles[pathname]) return routeOutputFiles[pathname];
-  if (pathname.startsWith('/recipes/')) return `_seo${pathname}.html`;
-  if (pathname.startsWith('/guides/')) return `_seo${pathname}.html`;
-  return '';
+  return routeOutputFiles[pathname] || '';
 }
 
 function assert(condition, message) {
@@ -45,18 +41,13 @@ for (const pathname of PUBLIC_ROUTES) {
 }
 
 const sitemap = await readFile(resolve(outputDirectory, 'sitemap.xml'), 'utf8');
-assert(PUBLIC_ROUTES.length === 113, `Expected 113 public routes, found ${PUBLIC_ROUTES.length}`);
+assert(PUBLIC_ROUTES.length === 5, `Expected 5 public routes, found ${PUBLIC_ROUTES.length}`);
 for (const pathname of PUBLIC_ROUTES) {
   const canonical = getRouteMetadata(pathname).canonical.replaceAll('&', '&amp;');
   assert(sitemap.includes(`<loc>${canonical}</loc>`), `${pathname} is missing from sitemap.xml`);
 }
 for (const privatePath of ['/account', '/import', '/ingredients', '/login', '/signup']) {
   assert(!sitemap.includes(`${privatePath}</loc>`), `${privatePath} must not appear in sitemap.xml`);
-}
-
-const recipeIndexHtml = await readFile(resolve(outputDirectory, '_seo/recipes.html'), 'utf8');
-for (const pathname of PUBLIC_RECIPE_PATHS) {
-  assert(recipeIndexHtml.includes(`href="${pathname}"`), `${pathname} has no internal link from /recipes`);
 }
 
 const appShell = await readFile(resolve(outputDirectory, '_seo/app.html'), 'utf8');

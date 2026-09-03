@@ -17,18 +17,6 @@ const ROUTE_TEMPLATES = [
     pattern: /^\/ingredients\/[^/]+\/edit$/,
     template: '/ingredients/:ingredientId/edit'
   },
-  {
-    pattern: /^\/recipes\/ingredients\/[^/]+$/,
-    template: '/recipes/ingredients/:ingredientSlug'
-  },
-  {
-    pattern: /^\/recipes\/[^/]+$/,
-    template: '/recipes/:recipeSlug'
-  },
-  {
-    pattern: /^\/guides\/[^/]+$/,
-    template: '/guides/:guideSlug'
-  }
 ];
 
 const SAFE_REQUEST_METHODS = new Set(['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT']);

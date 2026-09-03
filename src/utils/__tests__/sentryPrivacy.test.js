@@ -15,15 +15,10 @@ describe('getSentryRouteTemplate', () => {
         { origin: APP_ORIGIN }
       )
     ).toBe('/ingredients/:ingredientId/edit');
-    expect(getSentryRouteTemplate('/recipes/secret-family-recipe?token=secret', { origin: APP_ORIGIN })).toBe(
-      '/recipes/:recipeSlug'
+    expect(getSentryRouteTemplate('/recipes/removed-recipe?token=secret', { origin: APP_ORIGIN })).toBe(
+      '/:route'
     );
-    expect(getSentryRouteTemplate('/recipes/ingredients/private-name#section', { origin: APP_ORIGIN })).toBe(
-      '/recipes/ingredients/:ingredientSlug'
-    );
-    expect(getSentryRouteTemplate('/guides/private-note', { origin: APP_ORIGIN })).toBe(
-      '/guides/:guideSlug'
-    );
+    expect(getSentryRouteTemplate('/guides/removed-guide', { origin: APP_ORIGIN })).toBe('/:route');
   });
 
   it('keeps known static routes and makes unknown same-site paths generic', () => {
