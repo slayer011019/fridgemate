@@ -65,9 +65,6 @@ export function normalizeProductEventRoute(value) {
 
   if (STATIC_ROUTES.has(pathname)) return pathname;
   if (/^\/ingredients\/[^/]+\/edit$/u.test(pathname)) return '/ingredients/:id/edit';
-  if (/^\/recipes\/ingredients\/[^/]+$/u.test(pathname)) return '/recipes/ingredients/:slug';
-  if (/^\/recipes\/[^/]+$/u.test(pathname)) return '/recipes/:slug';
-  if (/^\/guides\/[^/]+$/u.test(pathname)) return '/guides/:slug';
   return '/other';
 }
 

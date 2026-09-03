@@ -69,9 +69,8 @@ describe('googleAnalytics', () => {
 
   it.each([
     ['/ingredients/550e8400-e29b-41d4-a716-446655440000/edit?from=home#private', '/ingredients/:id/edit'],
-    ['/recipes/ingredients/private-slug?source=email', '/recipes/ingredients/:slug'],
-    ['/recipes/private-recipe#instructions', '/recipes/:slug'],
-    ['/guides/private-guide?draft=true', '/guides/:slug'],
+    ['/recipes/removed-recipe#instructions', '/other'],
+    ['/guides/removed-guide?draft=true', '/other'],
     ['/recipes?query=private', '/recipes'],
     ['/private/person@example.com?token=secret', '/other']
   ])('reduces %s to the non-identifying route template %s', (route, expected) => {
@@ -101,14 +100,14 @@ describe('googleAnalytics', () => {
 
     trackGoogleAnalyticsEvent({
       event_name: 'session_started',
-      route: '/recipes/private-recipe?source=home',
+      route: '/recipes',
       entry_route: '/ingredients/private-record-id/edit?from=home#details',
       has_existing_local_data: true
     });
 
     const eventParameters = Array.from(window.dataLayer.at(-1))[2];
     expect(eventParameters).toEqual({
-      page_path: '/recipes/:slug',
+      page_path: '/recipes',
       entry_route: '/ingredients/:id/edit',
       has_existing_local_data: true
     });

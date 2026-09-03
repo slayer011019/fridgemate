@@ -21,6 +21,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 - Updated recipe-search documentation to separate historical staged-backfill checkpoints from the final 1,166-current-vector state.
 
+### Removed
+
+- Removed the public MFDS recipe gallery, detail pages, ingredient hubs, related guides, and their prerendered SEO routes while keeping ingredient-based recommendations.
+
 ### Fixed
 
 - Pinned the production backup job to PostgreSQL 17 client binaries so `pg_dump` matches the Supabase PostgreSQL 17 server instead of aborting with the Ubuntu runner's default PostgreSQL 16 client.
