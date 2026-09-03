@@ -9,6 +9,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added a reproducible MFDS/MAFRA recipe dataset validation script and an evidence-backed source-selection report for Korean home-cooking candidates.
+- Added a cost-controlled daily production database backup workflow that validates the pinned Supabase owner/TLS target, verifies a custom-format dump, encrypts it to an offline recovery key, uploads only ciphertext with a checksum, and expires GitHub artifacts after 14 days.
 - Added a read-only Free-plan backup preflight that validates the exact Supabase project and session/direct host, requires an empty encrypted output directory outside the repository, detects missing CLI/Docker prerequisites, and never prints the database URL or password.
 - Added a local-first daily menu decision loop with Korean calendar dates, one menu per user/day, explicit completion and cancellation, guest import, IndexedDB persistence, and retryable server writes.
 - Added authenticated pantry ownership and lightweight preference storage, structured preference-aware recommendation reasons, and bounded idempotent product-event ingestion.
@@ -21,6 +23,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Pinned the production backup job to PostgreSQL 17 client binaries so `pg_dump` matches the Supabase PostgreSQL 17 server instead of aborting with the Ubuntu runner's default PostgreSQL 16 client.
 - Split the pending event-retention indexes into single-statement concurrent migrations, separated Ingredient CHECK validation from its short nullable-column lock, made Supabase function hardening fail closed on owner mismatch, and ignored common plaintext database-dump artifacts.
 - Moved shared client rate limits ahead of access-token and revocation checks, then kept per-user limits after authentication so forged or anonymous requests cannot trigger unbounded security-store work.
 - Made logout verify and revoke both cookie and Bearer access tokens independently so an invalid Bearer value cannot hide a valid cookie token, and hardened product-event property normalization against inherited or attacker-selected object keys.
@@ -102,7 +105,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added consent-gated GA4 delivery behind the existing analytics interface, including SPA page views, identifier filtering, accessible allow/deny controls, and revocable footer settings.
 - Added optional Search Console HTML-tag verification and strengthened the WebSite entity with natural `오늘 뭐 먹지` and `FridgeMate` alternate names without adding typo keywords to visible copy.
 - Added a read-only recipe embedding verifier that checks staged expected counts, current/missing/stale coverage, model/dimensions, vector type, duplicate keys, and orphan rows without API calls or row-level output.
-- Added metadata-only API request IDs, failure/latency telemetry, client-side error correlation, and optional embedding token/cost metrics without logging prompts, request bodies, user IDs, or vectors.
+- Added metadata-only request identifiers, failure and latency telemetry, client-side error correlation, and optional embedding token/cost metrics without logging prompts, request bodies, user IDs, or vectors.
 - Added a separate 20-recipe Korean home-meal search fixture with realistic three-to-five-ingredient queries, expiring ingredients, alias coverage, category balance, Hit@5 rate, owned-ingredient ratio, and missing-ingredient metrics.
 - Added 100 source-backed Food Safety Korea recipe detail pages with stable slugs, ingredients, cooking steps, nutrition, images, canonical URLs, sitemap entries, and truthful `Recipe` JSON-LD.
 - Added a safe public-recipe export command that is read-only by default, strips raw source payloads, upgrades image URLs to HTTPS, and writes only with an explicit `--write` flag.
@@ -152,6 +155,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Added a lightweight analytics layer with session, auth, ingredient, OCR, and recommendation instrumentation hooks.
 
 ### Changed
+
+- Held Prisma, ESLint, React, and Tailwind major updates plus React Hooks plugin minor updates in Dependabot so breaking migrations are handled explicitly instead of opening version-only PRs that fail CI.
 
 - Split browser routes into lazy chunks while keeping a synchronous SEO render entry, reducing the initial minified JavaScript chunk from about 623 KB to 160 KB and removing the Vite 500 KB warning.
 - Moved GitHub Actions CI and its official checkout, Node setup, and artifact upload actions to the Node.js 24 generation.

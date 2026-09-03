@@ -4,7 +4,7 @@ This runbook covers FridgeMate's Supabase PostgreSQL database. It deliberately s
 
 ## Current verification status
 
-As of 2026-08-30:
+As of 2026-08-31:
 
 - Production database connectivity and all Prisma migrations are healthy.
 - The runtime Worker uses the non-owner `fridgemate_runtime` role through the RLS Hyperdrive configuration.
@@ -12,6 +12,7 @@ As of 2026-08-30:
 - The project has **no scheduled backups**. The Dashboard explicitly reports that Free Plan projects do not include project backups; therefore there is no current backup retention window or recovery point.
 - PITR is **not enabled**. The Dashboard describes it as a Pro Plan add-on starting at USD 100/month.
 - **Restore to a New Project** is unavailable on the current plan. The Dashboard requires Pro Plan and physical backups for this operation.
+- A cost-controlled fallback is defined in `.github/workflows/database-backup.yml`: a daily full logical dump is encrypted with a recovery-only public key before it is uploaded as a GitHub Actions artifact with 14-day retention. It is not operational until the workflow is merged to the default branch, `BACKUP_DATABASE_URL` is configured, and a manual run succeeds.
 - No restore drill is complete until a backup has been restored into a separate project and the checks in this document pass.
 
 This is an operational gap for a production service that stores personal data: a database-loss or destructive-migration incident currently has no Supabase-managed recovery point. Do not describe backups or PITR as enabled until the plan changes and the Dashboard or Management API provides direct evidence.
@@ -24,7 +25,7 @@ Record the agreed targets before changing the Supabase plan or enabling a paid a
 | ------------------------------ | --------------------------------------------------- | --------------- |
 | Recovery point objective (RPO) | No more than 24 hours for daily backups             | Not confirmed   |
 | Recovery time objective (RTO)  | Restore and application verification within 4 hours | Not confirmed   |
-| Backup retention               | At least 7 days                                     | 0 days (gap)    |
+| Backup retention               | At least 7 days                                     | Planned: 14-day encrypted logical backups |
 | Restore drill frequency        | Quarterly and before a high-risk migration          | Not confirmed   |
 
 PITR is preferred if losing up to one day of user writes is unacceptable. Enabling PITR or creating a restore project can incur charges and requires explicit operator approval.
@@ -44,7 +45,30 @@ Open the source project in **Supabase Dashboard → Database → Backups** and r
 
 If using the Management API, use a personal access token stored outside the repository and call the backup-list endpoint. Never use `SUPABASE_SERVICE_ROLE_KEY` for this operation and never paste a token into an issue, terminal transcript, or committed file.
 
-For a Free-plan logical backup, prepare an existing, empty, encrypted directory outside the repository and run:
+### Automated Free-plan fallback
+
+The scheduled workflow runs daily at 02:30 Asia/Seoul and retains only encrypted artifacts for 14 days. Configure the repository secret `BACKUP_DATABASE_URL` with the production Supabase owner connection using either the direct endpoint or the session pooler on port 5432. The URL must include `sslmode=require` (or a stricter verification mode), and its project ref must be `zninmnfyanyqjaipbyzx`. Prefer the session pooler when the runner cannot reach Supabase's IPv6 direct endpoint.
+
+The workflow pins `pg_dump` and `pg_restore` to PostgreSQL major 17 to match the current production server. When Supabase upgrades the production PostgreSQL major version, update and verify the workflow client major before relying on the next scheduled backup.
+
+The encryption recipient is public and committed at `.github/backup-recipients.txt`. Its private recovery key must remain outside Git and GitHub:
+
+- local key path: `C:\Users\lee\.fridgemate-backup\recovery_ed25519`;
+- expected fingerprint: `SHA256:1vtNDl0iZw56xYLBkZaElRMYM00X5wDvwtqEw66wxpQ`;
+- copy the private key once to a separately protected offline location;
+- never paste the private key into a GitHub secret, issue, workflow, or chat.
+
+After downloading an artifact, verify the checksum and decryptability without restoring it:
+
+```bash
+sha256sum --check fridgemate-*.dump.age.sha256
+age --decrypt --identity /secure/path/recovery_ed25519 fridgemate-*.dump.age \
+  | pg_restore --list --file=/dev/null
+```
+
+This logical backup covers PostgreSQL data and schema, including Supabase database schemas. It does not independently back up Storage objects, project configuration, API keys, Edge Functions, or external Cloudflare configuration. GitHub Actions is also not a substitute for an independent off-provider copy; migrate the encrypted artifacts to a separate object store when a no-card storage target is available.
+
+Before a manual Free-plan logical backup, prepare an existing, empty, encrypted directory outside the repository and run:
 
 ```bash
 npm run backup:preflight -- --output-dir=ABSOLUTE_ENCRYPTED_DIRECTORY --confirm-database-host=EXACT_DB_HOST --confirm-encrypted-storage

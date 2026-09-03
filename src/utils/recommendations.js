@@ -24,6 +24,11 @@ function roundToTwo(value) {
   return Math.round(value * 100) / 100;
 }
 
+function normalizeHomePriority(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
+}
+
 function getRecipeDisplayName(recipe = {}) {
   return String(recipe?.title || recipe?.name || '').trim();
 }
@@ -349,18 +354,18 @@ function evaluateRecipe(recipe, ingredientIndex, preferences = {}) {
   const preparedRecipe = prepareRecipe(recipe);
   const matchMetrics = computeMatchMetrics(preparedRecipe, ingredientIndex, preparedRecipe.id, preferences);
   const canMakeNow = matchMetrics.missingIngredients.length === 0 && matchMetrics.missingGroups.length === 0;
+  const homePriority = normalizeHomePriority(preparedRecipe.homePriority);
+  const ingredientRankingScore =
+    matchMetrics.score * 100 -
+    matchMetrics.missingIngredients.length * 18 -
+    matchMetrics.missingGroups.length * 12 +
+    matchMetrics.matchedOptional.length * 4 +
+    matchMetrics.expiringMatchedIngredients.length * 6;
+  const homePriorityBonus = homePriority * 0.2;
+  const rankingScore = roundToTwo(ingredientRankingScore + homePriorityBonus);
   const score = Math.max(
     0,
-    Math.min(
-      100,
-      Math.round(
-        matchMetrics.score * 100 -
-          matchMetrics.missingIngredients.length * 18 -
-          matchMetrics.missingGroups.length * 12 +
-          matchMetrics.matchedOptional.length * 4 +
-          matchMetrics.expiringMatchedIngredients.length * 6
-      )
-    )
+    Math.min(100, Math.round(rankingScore))
   );
   const reason = buildRecommendationReason({
     canMakeNow,
@@ -373,6 +378,9 @@ function evaluateRecipe(recipe, ingredientIndex, preferences = {}) {
 
   return {
     ...preparedRecipe,
+    homePriority,
+    homePriorityBonus: roundToTwo(homePriorityBonus),
+    rankingScore,
     score,
     scoreLabel: `${score}점`,
     matchRate: matchMetrics.score,
@@ -400,6 +408,19 @@ function evaluateRecipe(recipe, ingredientIndex, preferences = {}) {
   };
 }
 
+function isRecipeCandidate(recipe, ingredientIndex) {
+  if (!ingredientIndex.availableSet.size) return true;
+  const preparedRecipe = prepareRecipe(recipe);
+  const mainNames = preparedRecipe.ingredientGroups.mainIngredients.map((item) => item.normalizedName);
+  if (!mainNames.length) return true;
+  const matchedMainCount = mainNames.filter((item) => ingredientIndex.availableSet.has(item)).length;
+  const missingRatio = (mainNames.length - matchedMainCount) / mainNames.length;
+
+  // A household-priority bonus must not rescue a recipe that is unrelated to
+  // the available ingredients or still lacks most of a large core set.
+  return matchedMainCount > 0 && !(mainNames.length >= 3 && missingRatio > 2 / 3);
+}
+
 export function recommendRecipes({
   recipes = [],
   fridgeIngredients = [],
@@ -411,17 +432,26 @@ export function recommendRecipes({
   const ingredientIndex = buildIngredientIndex(fridgeIngredients, resolvePantryItems({ pantryItems, pantryOwnership }));
 
   return recipes
+    .filter((recipe) => isRecipeCandidate(recipe, ingredientIndex))
     .map((recipe) => evaluateRecipe(recipe, ingredientIndex, preferences))
     .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
+      if (right.rankingScore !== left.rankingScore) {
+        return right.rankingScore - left.rankingScore;
+      }
+
+      if (right.homePriority !== left.homePriority) {
+        return right.homePriority - left.homePriority;
+      }
+
+      if (right.urgentMatches.length !== left.urgentMatches.length) {
+        return right.urgentMatches.length - left.urgentMatches.length;
       }
 
       if (left.missingIngredients.length !== right.missingIngredients.length) {
         return left.missingIngredients.length - right.missingIngredients.length;
       }
 
-      return left.title.localeCompare(right.title, 'ko');
+      return 0;
     })
     .slice(0, limit);
 }
