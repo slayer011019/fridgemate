@@ -54,14 +54,14 @@ vi.mock('../../utils/backendConfig.js', () => ({
   isBackendEnabled: () => backendState.enabled
 }));
 
-function HookProbe({ ingredients = defaultIngredients, pantryItems = defaultPantryItems, onState }) {
+function HookProbe({ ingredients = defaultIngredients, pantryItems = defaultPantryItems, showRow = true, onState }) {
   const state = useDBRecommendations({ ingredients, pantryItems });
 
   useEffect(() => {
     onState(state);
   }, [onState, state]);
 
-  return createElement('section', { ref: state.rowRef, 'data-testid': 'db-row' });
+  return showRow ? createElement('section', { ref: state.rowRef, 'data-testid': 'db-row' }) : null;
 }
 
 describe('useDBRecommendations', () => {
@@ -117,6 +117,42 @@ describe('useDBRecommendations', () => {
     expect(latestState.needsLogin).toBe(true);
     expect(apiMocks.getRecipeRecommendations).not.toHaveBeenCalled();
     expect(observerInstances).toHaveLength(0);
+  });
+
+  it('starts observing when ingredient loading mounts the row after authentication', async () => {
+    let latestState;
+    const onState = (state) => { latestState = state; };
+    apiMocks.getRecipeRecommendations.mockResolvedValue([{ id: 'late-recipe', title: '계란찜' }]);
+    const view = render(createElement(HookProbe, { onState, showRow: false }));
+
+    expect(observerInstances).toHaveLength(0);
+    expect(apiMocks.getRecipeRecommendations).not.toHaveBeenCalled();
+
+    view.rerender(createElement(HookProbe, { onState, showRow: true }));
+    expect(observerInstances).toHaveLength(1);
+    expect(observerInstances[0].observe).toHaveBeenCalledWith(view.getByTestId('db-row'));
+    expect(apiMocks.getRecipeRecommendations).not.toHaveBeenCalled();
+
+    await act(async () => {
+      observerInstances[0].callback([{ isIntersecting: true }]);
+    });
+
+    await waitFor(() => expect(latestState.recommendations).toEqual([{ id: 'late-recipe', title: '계란찜' }]));
+    expect(apiMocks.getSemanticRecipeRecommendations).not.toHaveBeenCalled();
+  });
+
+  it('disconnects a removed row and observes its replacement before viewport entry', () => {
+    const onState = vi.fn();
+    const view = render(createElement(HookProbe, { onState }));
+    expect(observerInstances).toHaveLength(1);
+
+    view.rerender(createElement(HookProbe, { onState, showRow: false }));
+    expect(observerInstances[0].disconnect).toHaveBeenCalled();
+    view.rerender(createElement(HookProbe, { onState, showRow: true }));
+
+    expect(observerInstances).toHaveLength(2);
+    expect(observerInstances[1].observe).toHaveBeenCalledWith(view.getByTestId('db-row'));
+    expect(apiMocks.getRecipeRecommendations).not.toHaveBeenCalled();
   });
 
   it('hides the row for network and server failures', async () => {

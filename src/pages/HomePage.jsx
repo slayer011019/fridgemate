@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
+import PublicRecipeExplorer from '../components/PublicRecipeExplorer';
 import PageHeader from '../components/PageHeader';
 import AdSenseSlot from '../components/ads/AdSenseSlot';
 import { useAnalytics } from '../hooks/useAnalytics';
@@ -10,6 +11,60 @@ import { getCategoryLabel, getStorageLabel, joinIngredientLabels } from '../util
 import { getExpiryLabel, getRemainingDays } from '../utils/date';
 import { useMenuDecision } from '../hooks/useMenuDecision';
 import RecipeExternalLinks from '../components/RecipeExternalLinks';
+
+function RecipePreview({ recipe }) {
+  const personalized = recipe.isPersonalized !== false && recipe.inputState !== 'empty';
+  const missingCore = recipe.missingCore || recipe.missingIngredients || [];
+  const missingGroups = recipe.missingGroups || [];
+  const missingSeasonings = recipe.missingSeasonings || [];
+  const missingUnknown = recipe.missingUnknownIngredients || [];
+  const requiredCount = recipe.totalRequiredIngredients ?? recipe.coreIngredients?.length ?? 0;
+  const hasKnownRequirements = recipe.hasKnownRequirements !== false &&
+    (requiredCount > 0 || recipe.requiredGroups?.length > 0);
+  const matchedCoreCount = recipe.matchedCore?.length ?? recipe.matchedCount ?? 0;
+  const matchedRequirements = matchedCoreCount + Number(recipe.matchedRequiredGroupCount || 0);
+  const coreComplete = hasKnownRequirements && !missingCore.length && !missingGroups.length;
+  const canMakeNow = personalized && recipe.canMakeNow && coreComplete && !missingSeasonings.length && !missingUnknown.length;
+  const canMakeWithOneMore = personalized && recipe.canMakeWithOneMore !== false && hasKnownRequirements &&
+    matchedRequirements > 0 && missingCore.length + missingGroups.length === 1 && !missingUnknown.length &&
+    missingSeasonings.every((item) => missingCore.includes(item));
+  const needsSeasonings = personalized && recipe.needsSeasonings !== false && coreComplete &&
+    missingSeasonings.length > 0 && !missingUnknown.length;
+  const statusLabel = !personalized ? '메뉴 둘러보기'
+    : !hasKnownRequirements ? '원문 재료 확인 필요'
+    : missingUnknown.length ? '재료 분류 확인 필요'
+    : canMakeNow ? '재료 종류 확인됨'
+    : canMakeWithOneMore ? '한 가지만 더 준비'
+    : needsSeasonings ? '양념 추가 필요'
+    : '추가 재료 확인';
+  const rate = recipe.matchRate;
+  const matchRateLabel = recipe.matchRateLabel ??
+    (Number.isFinite(rate) && rate >= 0 && rate <= 1 ? `${Math.round(rate * 100)}%` : '');
+
+  return (
+    <article className="soft-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-slate-900">{recipe.title || recipe.name}</p>
+          <p className="mt-1 text-xs leading-5 muted">{statusLabel}</p>
+        </div>
+        {personalized && hasKnownRequirements && requiredCount > 0 && matchRateLabel ? (
+          <span className="badge bg-slate-900 text-white">{matchRateLabel}</span>
+        ) : null}
+      </div>
+      {personalized ? (
+        <p className="mt-2 text-xs leading-5 muted">
+          {`보유 재료: ${joinIngredientLabels(recipe.matchedIngredients || recipe.matchedCore || []) || '확인된 재료가 없어요'}`}
+        </p>
+      ) : null}
+      {missingCore.length ? <p className="mt-1 text-xs leading-5 text-rose-700">{`핵심 재료: ${joinIngredientLabels(missingCore)}`}</p> : null}
+      {missingGroups.length ? <p className="mt-1 text-xs leading-5 text-rose-700">{`필수 조합: ${missingGroups.join(', ')}`}</p> : null}
+      {missingSeasonings.length ? <p className="mt-1 text-xs leading-5 text-rose-700">{`양념: ${joinIngredientLabels(missingSeasonings)}`}</p> : null}
+      {missingUnknown.length ? <p className="mt-1 text-xs leading-5 text-amber-700">{`분류 확인: ${joinIngredientLabels(missingUnknown)}`}</p> : null}
+      {canMakeNow || canMakeWithOneMore ? <p className="mt-1 text-xs leading-5 muted">원문 분량과 재료 상태도 확인하세요.</p> : null}
+    </article>
+  );
+}
 
 function HomePage() {
   const ocrEnabled = isOcrEnabled();
@@ -25,6 +80,7 @@ function HomePage() {
     retrySync,
     syncing: menuDecisionSyncing
   } = useMenuDecision();
+  const showDashboard = !loading && summary.total > 0;
   const isEmptyDashboard = !loading && summary.total === 0 && urgentCount === 0 && topRecommendations.length === 0;
   const summaryItems = [
     {
@@ -69,11 +125,9 @@ function HomePage() {
   return (
     <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
       <PageHeader
-        eyebrow={'\uB300\uC2DC\uBCF4\uB4DC'}
-        title={'\uC624\uB298 \uCC98\uB9AC\uD560 \uC7AC\uB8CC\uC640 \uB9CC\uB4E4 \uC218 \uC788\uB294 \uBA54\uB274\uB97C \uD55C\uBC88\uC5D0 \uBCF4\uC138\uC694'}
-        description={
-          '\uC720\uD1B5\uAE30\uD55C \uC784\uBC15, \uC7AC\uB8CC \uCD94\uAC00, \uCD94\uCC9C \uD655\uC778\uAE4C\uC9C0 \uC790\uC8FC \uD558\uB294 \uC791\uC5C5\uB9CC \uC55E\uCABD\uC5D0 \uBAA8\uC544\uB450\uC5C8\uC5B4\uC694.'
-        }
+        eyebrow={showDashboard ? '내 냉장고' : '오늘 한 끼 고르기'}
+        title={showDashboard ? '먼저 쓸 재료와 오늘 메뉴를 확인하세요' : '남은 재료로 오늘 메뉴를 골라보세요'}
+        description={showDashboard ? '보유 재료와 날짜를 확인하고 메뉴의 정확한 분량과 조리법을 살펴보세요.' : '가입이나 재료 등록 없이 메뉴를 비교하고, 준비 재료와 만드는 순서까지 확인할 수 있어요.'}
         action={
           <>
             {ocrEnabled ? (
@@ -128,6 +182,7 @@ function HomePage() {
         </section>
       ) : null}
 
+      {showDashboard ? <>
       <section className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {summaryItems.map((item) => (
           <div key={item.label} className={`rounded-lg border px-4 py-4 text-center shadow-sm ${item.className}`}>
@@ -207,28 +262,14 @@ function HomePage() {
 
           <div className="content-grid-3">
             {topRecommendations.map((recipe) => (
-              <article key={recipe.id} className="soft-panel">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-semibold text-slate-900">{recipe.title || recipe.name}</p>
-                    <p className="mt-1 text-xs leading-5 muted">
-                      {recipe.canMakeNow ? '\uC9C0\uAE08 \uAC00\uB2A5' : recipe.missingCore?.length === 1 ? '\uD558\uB098\uB9CC \uBD80\uC871' : '\uC7AC\uB8CC \uB9E4\uCE6D'}
-                    </p>
-                  </div>
-                  <span className="badge bg-slate-900 text-white">{recipe.matchRateLabel || `${Math.round((recipe.matchRate || 0) * 100)}%`}</span>
-                </div>
-                <p className="mt-2 text-xs leading-5 muted">
-                  {joinIngredientLabels(recipe.matchedIngredients || recipe.matchedCore || []) || '\uBCF4\uC720 \uC7AC\uB8CC\uB97C \uB354 \uCD94\uAC00\uD574\uBCF4\uC138\uC694'}
-                </p>
-                {recipe.missingCore?.length ? (
-                  <p className="mt-1 text-xs leading-5 text-rose-700">{`\uBD80\uC871: ${joinIngredientLabels(recipe.missingCore)}`}</p>
-                ) : null}
-              </article>
+              <RecipePreview key={recipe.id} recipe={recipe} />
             ))}
           </div>
         </div>
       </section>
 
+      </> : null}
+      <PublicRecipeExplorer compact />
       <AdSenseSlot placement="home" />
     </div>
   );

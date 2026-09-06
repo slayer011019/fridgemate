@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getRouteMetadata, PUBLIC_ROUTES } from '../routeMetadata';
+import { getPublicRecipePath, publicRecipeCatalog } from '../../features/recipes/publicRecipeCatalog';
 
 describe('routeMetadata', () => {
   it('gives each public content page its own canonical URL', () => {
@@ -29,15 +30,33 @@ describe('routeMetadata', () => {
     expect(metadata.notFound).toBe(true);
   });
 
-  it('publishes only the five maintained public pages', () => {
-    expect(PUBLIC_ROUTES).toEqual(['/', '/recipes', '/about', '/contact', '/privacy']);
-    expect(getRouteMetadata('/recipes/removed-recipe')).toMatchObject({
-      indexable: false,
-      notFound: true
-    });
-    expect(getRouteMetadata('/guides/removed-guide')).toMatchObject({
-      indexable: false,
-      notFound: true
-    });
+  it('makes only known public recipe details indexable', () => {
+    const recipe = publicRecipeCatalog[0];
+    const path = getPublicRecipePath(recipe);
+    const metadata = getRouteMetadata(path);
+
+    expect(metadata.indexable).toBe(true);
+    expect(metadata.recipe).toEqual(recipe);
+    expect(metadata.title).toContain(recipe.name);
+    expect(metadata.canonical).toBe(new URL(path, 'https://오늘뭐먹지.com').href);
+
+    expect(getRouteMetadata('/recipes/not-a-real-recipe').indexable).toBe(false);
+  });
+
+  it('publishes six ingredient hubs and two guides with unique metadata', () => {
+    expect(PUBLIC_ROUTES).toHaveLength(113);
+
+    const hub = getRouteMetadata('/recipes/ingredients/tofu');
+    const guide = getRouteMetadata('/guides/fridge-cleanout');
+
+    expect(hub).toMatchObject({ indexable: true, notFound: false });
+    expect(hub.title).toContain('두부');
+    expect(hub.contentHub.recipes.length).toBeGreaterThan(0);
+    expect(guide).toMatchObject({ indexable: true, notFound: false });
+    expect(guide.title).toContain('냉장고 파먹기');
+    expect(guide.guide.steps).toHaveLength(5);
+
+    expect(getRouteMetadata('/recipes/ingredients/unknown').indexable).toBe(false);
+    expect(getRouteMetadata('/guides/unknown').indexable).toBe(false);
   });
 });

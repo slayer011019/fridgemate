@@ -7,12 +7,15 @@ function AppRoutes({ pages, ocrEnabled }) {
     AccountPage,
     ContactPage,
     HomePage,
+    GuidePage,
     ImportPage,
+    IngredientHubPage,
     IngredientFormPage,
     IngredientsPage,
     LoginPage,
     NotFoundPage,
     PrivacyPage,
+    PublicRecipePage,
     RecipesPage,
     SignupPage
   } = pages;
@@ -25,6 +28,9 @@ function AppRoutes({ pages, ocrEnabled }) {
       <Route path="/ingredients/:ingredientId/edit" element={<IngredientFormPage />} />
       <Route path="/import" element={ocrEnabled ? <ImportPage /> : <Navigate to="/" replace />} />
       <Route path="/recipes" element={<RecipesPage />} />
+      <Route path="/recipes/ingredients/:ingredientSlug" element={<IngredientHubPage />} />
+      <Route path="/recipes/:recipeSlug" element={<PublicRecipePage />} />
+      <Route path="/guides/:guideSlug" element={<GuidePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />

@@ -15,7 +15,10 @@ const routeOutputFiles = {
 };
 
 function getRouteOutputFile(pathname) {
-  return routeOutputFiles[pathname] || '';
+  if (routeOutputFiles[pathname]) return routeOutputFiles[pathname];
+  if (pathname.startsWith('/recipes/')) return `_seo${pathname}.html`;
+  if (pathname.startsWith('/guides/')) return `_seo${pathname}.html`;
+  return '';
 }
 
 function escapeAttribute(value) {

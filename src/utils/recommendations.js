@@ -12,7 +12,10 @@ export { normalizeIngredientName } from '../features/ingredients/ingredientDomai
 const EXPIRING_SOON_DAYS = 3;
 
 export const RECIPE_STATUS = {
+  BROWSE: 'browse',
   READY: 'ready',
+  NEEDS_SEASONINGS: 'needsSeasonings',
+  INSUFFICIENT_DATA: 'insufficientData',
   NEEDS_CORE: 'needsCore'
 };
 
@@ -40,13 +43,16 @@ function buildIngredientIndex(ingredients = [], pantryItems = []) {
         return result;
       }
 
-      const normalizedName = normalizeIngredientName(ingredient?.name);
+      const normalizedName = normalizeIngredientName(
+        typeof ingredient === 'string' ? ingredient : ingredient?.name || ingredient?.normalizedName || ingredient?.rawName
+      );
 
       if (!normalizedName) {
         return result;
       }
 
       result.availableSet.add(normalizedName);
+      result.fridgeSet.add(normalizedName);
 
       const expiresAt = ingredient?.expiresAt || ingredient?.expiryDate || null;
       const remainingDays = getRemainingDays(expiresAt);
@@ -59,6 +65,7 @@ function buildIngredientIndex(ingredients = [], pantryItems = []) {
     },
     {
       availableSet: new Set(),
+      fridgeSet: new Set(),
       urgentSet: new Set()
     }
   );
@@ -67,7 +74,13 @@ function buildIngredientIndex(ingredients = [], pantryItems = []) {
     index.availableSet.add(item);
   });
 
+  index.inputState = index.fridgeSet.size ? 'ingredients' : index.availableSet.size ? 'pantryOnly' : 'empty';
+
   return index;
+}
+
+export function getRecommendationInputState(fridgeIngredients = [], options = {}) {
+  return buildIngredientIndex(fridgeIngredients, resolvePantryItems(options)).inputState;
 }
 
 function mapRecipeIngredient(item, ingredientType = 'main', section = 'main') {
@@ -124,7 +137,11 @@ function uniqueByNormalizedName(items = []) {
 function buildIngredientGroups(recipe = {}) {
   if (Array.isArray(recipe.ingredients) && recipe.ingredients.length) {
     const normalizedIngredients = uniqueByNormalizedName(
-      recipe.ingredients.map((item) => mapRecipeIngredient(item)).filter(Boolean)
+      [
+        ...recipe.ingredients.map((item) => mapRecipeIngredient(item)),
+        ...(recipe.requiredSeasonings || recipe.pantryIngredients || []).map((item) => mapRecipeIngredient(item, 'seasoning', '양념장')),
+        ...(recipe.optionalIngredients || []).map((item) => mapRecipeIngredient(item, 'optional'))
+      ].filter(Boolean)
     );
 
     return {
@@ -164,7 +181,9 @@ function buildIngredientGroups(recipe = {}) {
 function prepareRecipe(recipe = {}) {
   const ingredientGroups = buildIngredientGroups(recipe);
   const displayName = getRecipeDisplayName(recipe);
-  const requiredGroups = Array.isArray(recipe.requiredGroups) ? recipe.requiredGroups : [];
+  const requiredGroups = Array.isArray(recipe.requiredGroups)
+    ? recipe.requiredGroups.filter((group) => group && typeof group === 'object')
+    : [];
   const coreIngredients = ingredientGroups.mainIngredients.map((item) => item.normalizedName);
   const optionalIngredients = ingredientGroups.optionalIngredients.map((item) => item.normalizedName);
   const requiredSeasonings = ingredientGroups.seasoningIngredients.map((item) => item.normalizedName);
@@ -193,8 +212,7 @@ function evaluateRequiredGroups(requiredGroups = [], ingredientIndex) {
   );
   const missingGroups = requiredGroups
     .filter((group) => !satisfiedGroups.includes(group))
-    .map((group) => group.label)
-    .filter(Boolean);
+    .map((group) => group.label || uniqueNormalizedIngredients(group.anyOf || []).join(' 또는 ') || '필수 재료 조합');
 
   return {
     satisfiedGroups,
@@ -293,38 +311,54 @@ function computeMatchMetrics(preparedRecipe, ingredientIndex, recipeId = prepare
 }
 
 function buildRecommendationReason({
+  inputState,
+  hasKnownRequirements,
   canMakeNow,
+  canMakeWithOneMore,
+  needsSeasonings,
   missingIngredients,
   missingSeasonings,
+  missingUnknown,
   expiringMatchedIngredients,
   missingGroups,
   preferredMatches
 }) {
-  if (preferredMatches?.length) {
-    return `${preferredMatches[0]} 선호를 반영한 메뉴예요.`;
+  if (inputState === 'empty') {
+    return '메뉴를 둘러보고 필요한 재료와 조리법을 확인해 보세요.';
+  }
+
+  const pantryPrefix = inputState === 'pantryOnly' ? '팬트리 보유 정보만 반영했어요. ' : '';
+  const preferencePrefix = preferredMatches?.length ? `${preferredMatches[0]} 선호를 반영한 메뉴예요. ` : '';
+  const prefix = `${pantryPrefix}${preferencePrefix}`;
+
+  if (!hasKnownRequirements) {
+    return `${prefix}핵심 재료 정보가 없어 조리 가능 여부를 판단하기 어려워요. 조리법의 재료를 확인해 주세요.`;
   }
 
   if (canMakeNow) {
-    return '핵심 재료가 모두 있어서 외부 레시피 검색으로 바로 조리법을 확인하면 좋아요.';
+    return `${prefix}필수 재료와 양념의 종류를 갖췄어요. 조리법에서 필요한 분량과 재료 상태를 확인해 주세요.`;
   }
 
-  if (missingIngredients.length === 1) {
-    return `${missingIngredients[0]}만 추가하면 바로 도전하기 좋아요.`;
+  if (canMakeWithOneMore) {
+    const missingRequirement = missingIngredients[0] || missingGroups[0];
+    return `${prefix}${missingRequirement}만 더 준비하면 필수 재료 종류를 갖출 수 있어요. 분량은 조리법에서 확인해 주세요.`;
   }
 
-  if (expiringMatchedIngredients.length) {
-    return `${expiringMatchedIngredients[0]}처럼 빨리 써야 하는 재료를 먼저 활용하기 좋은 메뉴예요.`;
+  if (needsSeasonings) {
+    return `${prefix}핵심 재료와 필수 조합은 갖췄어요. ${missingSeasonings.join(', ')} 양념을 추가로 준비해 주세요.`;
   }
 
-  if (missingSeasonings.length && missingIngredients.length <= 2) {
-    return `핵심 재료는 대부분 맞고 ${missingSeasonings.join(', ')} 같은 양념만 조금 보완하면 돼요.`;
-  }
+  const missingDetails = [
+    missingIngredients.length ? `핵심 재료: ${missingIngredients.join(', ')}` : '',
+    missingGroups.length ? `필수 조합: ${missingGroups.join(', ')}` : '',
+    missingSeasonings.length ? `양념: ${missingSeasonings.join(', ')}` : '',
+    missingUnknown.length ? `분류 확인이 필요한 재료: ${missingUnknown.join(', ')}` : ''
+  ].filter(Boolean).join(' / ');
+  const urgency = expiringMatchedIngredients.length
+    ? `${expiringMatchedIngredients[0]}을 먼저 활용할 수 있는 메뉴예요. `
+    : '';
 
-  if (missingGroups.length) {
-    return `${missingGroups.join(', ')} 조합을 채우면 매칭률이 더 좋아져요.`;
-  }
-
-  return '보유 재료와 겹치는 메뉴를 먼저 추천했어요.';
+  return `${prefix}${urgency}추가로 확인할 항목은 ${missingDetails}예요.`;
 }
 
 /**
@@ -341,7 +375,7 @@ function buildRecommendationReason({
  * }}
  */
 export function getRecipeMatchScore(userIngredients = [], recipeIngredients = [], options = {}) {
-  const ingredientIndex = buildIngredientIndex(userIngredients, resolvePantryItems({ pantryItems: options.pantryItems }));
+  const ingredientIndex = buildIngredientIndex(userIngredients, resolvePantryItems(options));
   const preparedRecipe = prepareRecipe({
     id: options.recipeId,
     ingredients: recipeIngredients
@@ -353,7 +387,20 @@ export function getRecipeMatchScore(userIngredients = [], recipeIngredients = []
 function evaluateRecipe(recipe, ingredientIndex, preferences = {}) {
   const preparedRecipe = prepareRecipe(recipe);
   const matchMetrics = computeMatchMetrics(preparedRecipe, ingredientIndex, preparedRecipe.id, preferences);
-  const canMakeNow = matchMetrics.missingIngredients.length === 0 && matchMetrics.missingGroups.length === 0;
+  const { inputState } = ingredientIndex;
+  const isPersonalized = inputState !== 'empty';
+  const hasKnownRequirements = preparedRecipe.coreIngredients.length + preparedRecipe.requiredGroups.length > 0;
+  const hasCoreIngredients = isPersonalized && hasKnownRequirements &&
+    matchMetrics.missingIngredients.length === 0 && matchMetrics.missingGroups.length === 0;
+  const needsSeasonings = hasCoreIngredients && matchMetrics.missingSeasonings.length > 0 &&
+    matchMetrics.missingUnknown.length === 0;
+  const canMakeNow = hasCoreIngredients && matchMetrics.missingSeasonings.length === 0 &&
+    matchMetrics.missingUnknown.length === 0;
+  const canMakeWithOneMore = isPersonalized &&
+    matchMetrics.matchedMain.length + matchMetrics.satisfiedGroups.length > 0 &&
+    matchMetrics.missingIngredients.length + matchMetrics.missingGroups.length === 1 &&
+    matchMetrics.missingSeasonings.every((item) => matchMetrics.missingIngredients.includes(item)) &&
+    matchMetrics.missingUnknown.length === 0;
   const homePriority = normalizeHomePriority(preparedRecipe.homePriority);
   const ingredientRankingScore =
     matchMetrics.score * 100 -
@@ -368,9 +415,14 @@ function evaluateRecipe(recipe, ingredientIndex, preferences = {}) {
     Math.min(100, Math.round(rankingScore))
   );
   const reason = buildRecommendationReason({
+    inputState,
+    hasKnownRequirements,
     canMakeNow,
+    canMakeWithOneMore,
+    needsSeasonings,
     missingIngredients: matchMetrics.missingIngredients,
     missingSeasonings: matchMetrics.missingSeasonings,
+    missingUnknown: matchMetrics.missingUnknown,
     expiringMatchedIngredients: matchMetrics.expiringMatchedIngredients,
     missingGroups: matchMetrics.missingGroups,
     preferredMatches: matchMetrics.preferredMatches
@@ -378,13 +430,19 @@ function evaluateRecipe(recipe, ingredientIndex, preferences = {}) {
 
   return {
     ...preparedRecipe,
+    inputState,
+    isPersonalized,
+    hasKnownRequirements,
+    hasCoreIngredients,
+    canMakeWithOneMore,
+    needsSeasonings,
     homePriority,
     homePriorityBonus: roundToTwo(homePriorityBonus),
     rankingScore,
     score,
-    scoreLabel: `${score}점`,
+    scoreLabel: isPersonalized && hasKnownRequirements ? `${score}점` : '',
     matchRate: matchMetrics.score,
-    matchRateLabel: `${Math.round(matchMetrics.score * 100)}%`,
+    matchRateLabel: isPersonalized && hasKnownRequirements ? `${Math.round(matchMetrics.score * 100)}%` : '',
     missingCore: matchMetrics.missingIngredients,
     missingGroups: matchMetrics.missingGroups,
     urgentMatches: matchMetrics.expiringMatchedIngredients,
@@ -395,12 +453,21 @@ function evaluateRecipe(recipe, ingredientIndex, preferences = {}) {
     matchedIngredients: matchMetrics.matchedIngredients,
     missingIngredients: matchMetrics.missingIngredients,
     missingSeasonings: matchMetrics.missingSeasonings,
+    missingUnknownIngredients: matchMetrics.missingUnknown,
     matchedCount: matchMetrics.matchedMain.length,
+    matchedCountLabel: isPersonalized && preparedRecipe.coreIngredients.length
+      ? `${matchMetrics.matchedMain.length}/${preparedRecipe.coreIngredients.length}개 일치`
+      : '',
+    matchedRequiredGroupCount: matchMetrics.satisfiedGroups.length,
     missingCount: matchMetrics.missingIngredients.length + matchMetrics.missingGroups.length,
     totalRequiredIngredients: preparedRecipe.coreIngredients.length,
     expiringMatchedIngredients: matchMetrics.expiringMatchedIngredients,
     useSoon: matchMetrics.expiringMatchedIngredients.length > 0,
-    status: canMakeNow ? RECIPE_STATUS.READY : RECIPE_STATUS.NEEDS_CORE,
+    status: !isPersonalized ? RECIPE_STATUS.BROWSE
+      : !hasKnownRequirements ? RECIPE_STATUS.INSUFFICIENT_DATA
+      : canMakeNow ? RECIPE_STATUS.READY
+      : needsSeasonings ? RECIPE_STATUS.NEEDS_SEASONINGS
+      : RECIPE_STATUS.NEEDS_CORE,
     reason,
     preferredMatches: matchMetrics.preferredMatches,
     dislikedMatches: matchMetrics.dislikedMatches,
@@ -421,15 +488,14 @@ function isRecipeCandidate(recipe, ingredientIndex) {
   return matchedMainCount > 0 && !(mainNames.length >= 3 && missingRatio > 2 / 3);
 }
 
-export function recommendRecipes({
-  recipes = [],
-  fridgeIngredients = [],
-  pantryItems = [],
-  pantryOwnership = {},
-  preferences = {},
-  limit = recipes.length
-} = {}) {
-  const ingredientIndex = buildIngredientIndex(fridgeIngredients, resolvePantryItems({ pantryItems, pantryOwnership }));
+export function recommendRecipes(options = {}) {
+  const {
+    recipes = [],
+    fridgeIngredients = [],
+    preferences = {},
+    limit = recipes.length
+  } = options;
+  const ingredientIndex = buildIngredientIndex(fridgeIngredients, resolvePantryItems(options));
 
   return recipes
     .filter((recipe) => isRecipeCandidate(recipe, ingredientIndex))
@@ -474,17 +540,14 @@ export function getTopRecommendations(recipes, ingredients, limit = 3, options =
 
 export function explainRecipeMatch(
   recipeId,
-  { recipes = [], fridgeIngredients = [], pantryItems = [], pantryOwnership = {} } = {}
+  options = {}
 ) {
+  const { recipes = [], fridgeIngredients = [] } = options;
   const recipe = recipes.find((item) => (item.id || item.sourceRecipeId || getRecipeDisplayName(item)) === recipeId);
 
   if (!recipe) {
     return null;
   }
 
-  return evaluateRecipe(
-    recipe,
-    buildIngredientIndex(fridgeIngredients, resolvePantryItems({ pantryItems, pantryOwnership })),
-    {}
-  );
+  return evaluateRecipe(recipe, buildIngredientIndex(fridgeIngredients, resolvePantryItems(options)), options.preferences);
 }

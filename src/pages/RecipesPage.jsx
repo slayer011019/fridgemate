@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
+import PublicRecipeExplorer from '../components/PublicRecipeExplorer';
+import { getPublicRecipeLinkItems } from '../features/recipes/recipeContentHubs';
 import PantryStaplesPanel from '../components/PantryStaplesPanel';
 import RecommendationRow from '../components/RecommendationRow';
 import StatCard from '../components/StatCard';
@@ -33,6 +35,7 @@ function RecipesPage() {
     fridgeInsight,
     sectionStats
   } = useRecipesPageModel();
+  const hasInventory = !loading && activeIngredientCount > 0;
   const recommendationEmptyMessage = !loading && activeIngredientCount === 0 ? '재료를 등록하면 추천을 시작할 수 있어요' : '';
   const dbRecommendationsState = useDBRecommendations({
     ingredients,
@@ -87,13 +90,12 @@ function RecipesPage() {
   return (
     <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
       <PageHeader
-        eyebrow={'\uB808\uC2DC\uD53C'}
-        title={'\uC9C0\uAE08 \uB9CC\uB4E4 \uC218 \uC788\uB294 \uBA54\uB274\uB97C \uBE60\uB974\uAC8C \uACE0\uB974\uC138\uC694'}
-        description={
-          '\uBC14\uB85C \uD560 \uC218 \uC788\uB294 \uAC83, \uD55C \uB450 \uAC1C \uB9CC \uB354 \uD544\uC694\uD55C \uAC83, \uBE68\uB9AC \uCC98\uB9AC\uD558\uBA74 \uC88B\uC740 \uAC83\uC73C\uB85C \uB098\uB220 \uBCF4\uC5EC\uC90D\uB2C8\uB2E4.'
-        }
+        eyebrow={hasInventory ? '내 재료 추천' : '공개 메뉴 탐색'}
+        title={hasInventory ? '보유 재료로 만들 메뉴를 확인하세요' : '남은 재료를 골라 조리법까지 살펴보세요'}
+        description={hasInventory ? '핵심 재료와 양념을 함께 비교합니다. 분량과 보관 상태는 조리 전에 확인하세요.' : '입력한 재료는 이번 탐색에만 사용해요. 마음에 드는 메뉴에서 준비 재료와 만드는 순서를 확인하세요.'}
       />
 
+      {hasInventory ? <>
       <section className="stats-grid">
         <StatCard
           label={'\uC9C0\uAE08 \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694'}
@@ -171,7 +173,7 @@ function RecipesPage() {
 
       <RecommendationRow
         title={'재료 기반 추천'}
-        description={'현재 재료와 팬트리 기본 재료를 기존 로컬 점수 계산으로 정렬했어요.'}
+        description={'보유 재료와 양념을 비교해 메뉴를 정렬했어요. 필요한 재료와 조리법을 함께 확인하세요.'}
         recipes={localRecommendations}
         loading={loading}
         source="rule"
@@ -250,6 +252,26 @@ function RecipesPage() {
         emptyActionLabel={'재료 등록하러 가기'}
         emptyActionTo="/ingredients/new"
       />
+      </> : null}
+      <PublicRecipeExplorer />
+      {!hasInventory ? <details className="card">
+        <summary className="cursor-pointer py-2 font-semibold text-slate-900">보유 양념 설정 · {ownedPantryCount}개 보유</summary>
+        <p className="my-3 text-sm leading-6 text-slate-600">냉장고 재료를 등록하지 않아도 양념 보유 상태를 기록할 수 있어요. 저장한 양념은 내 재료 추천과 조리 전 준비 확인에 사용할 수 있습니다.</p>
+        <PantryStaplesPanel
+          items={pantryStaples}
+          pantryOwnership={pantryOwnership}
+          pantrySummary={pantrySummary}
+          onCycle={cyclePantryStatus}
+        />
+      </details> : null}
+      <section className="card space-y-3" aria-labelledby="all-public-recipes">
+        <h2 id="all-public-recipes" className="text-xl font-semibold text-slate-950">전체 공개 레시피</h2>
+        <p className="text-sm leading-6 text-slate-600">식품의약품안전처 원문의 재료·조리 순서·이미지·출처를 확인할 수 있어요.</p>
+        <details>
+          <summary className="cursor-pointer py-3 font-semibold text-brand-800">전체 {getPublicRecipeLinkItems().length}개 조리법 보기</summary>
+          <ul className="grid gap-2 py-3 text-sm sm:grid-cols-2">{getPublicRecipeLinkItems().map((item) => <li key={item.id}><Link to={item.path} className="block py-1 text-brand-800 underline underline-offset-2">{item.name}</Link></li>)}</ul>
+        </details>
+      </section>
       <AdSenseSlot placement="recipes" />
     </div>
   );

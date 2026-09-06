@@ -27,7 +27,16 @@ export function getSectionHelperText(count, emptyText, lowText, positiveText) {
 export function splitRecommendationsByReadiness(recommendations = []) {
   return recommendations.reduce(
     (groups, recommendation) => {
-      if (recommendation.canMakeNow) {
+      if (recommendation.isPersonalized === false) return groups;
+      const missingCore = recommendation.missingCore || recommendation.missingIngredients || [];
+      const missingGroups = recommendation.missingGroups || [];
+      const missingSeasonings = recommendation.missingSeasonings || [];
+      const missingUnknown = recommendation.missingUnknownIngredients || [];
+      const knownRequirements = recommendation.hasKnownRequirements !== false &&
+        !(recommendation.totalRequiredIngredients === 0 && !recommendation.requiredGroups?.length);
+      const coreComplete = knownRequirements && missingCore.length === 0 && missingGroups.length === 0;
+
+      if (recommendation.canMakeNow && coreComplete && !missingSeasonings.length && !missingUnknown.length) {
         groups.ready.push(recommendation);
         return groups;
       }
@@ -36,21 +45,39 @@ export function splitRecommendationsByReadiness(recommendations = []) {
         ? recommendation.matchedCore.length
         : Number(recommendation.matchedCount || 0);
 
-      if (recommendation.missingCore.length === 1 && matchedCoreCount > 0) {
+      const canCompleteWithOne = knownRequirements && missingCore.length + missingGroups.length === 1 &&
+        matchedCoreCount + Number(recommendation.matchedRequiredGroupCount || 0) > 0 &&
+        missingSeasonings.every((item) => missingCore.includes(item)) && !missingUnknown.length;
+
+      if (recommendation.canMakeWithOneMore !== false && canCompleteWithOne) {
         groups.buyOneMore.push(recommendation);
         return groups;
       }
 
-      if (recommendation.score > 0) {
+      const usesExpiringIngredient = recommendation.useSoon || recommendation.urgentMatches?.length ||
+        recommendation.expiringMatchedIngredients?.length;
+
+      if (usesExpiringIngredient && recommendation.score > 0) {
         groups.useSoon.push(recommendation);
+        return groups;
       }
+
+      if (recommendation.needsSeasonings !== false && coreComplete && missingSeasonings.length && !missingUnknown.length &&
+        matchedCoreCount + Number(recommendation.matchedRequiredGroupCount || 0) > 0) {
+        groups.needsSeasonings.push(recommendation);
+        return groups;
+      }
+
+      groups.other.push(recommendation);
 
       return groups;
     },
     {
       ready: [],
       buyOneMore: [],
-      useSoon: []
+      useSoon: [],
+      needsSeasonings: [],
+      other: []
     }
   );
 }

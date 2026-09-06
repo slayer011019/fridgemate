@@ -1,4 +1,5 @@
 import { SITE_ORIGIN } from './routeMetadata.js';
+import { getPublicRecipePath, getRecipeIngredientLines } from '../features/recipes/publicRecipeCatalog.js';
 
 const SITE_NAME = '오늘뭐먹지';
 const SITE_ALTERNATE_NAMES = Object.freeze(['오늘 뭐 먹지', 'FridgeMate']);
@@ -50,6 +51,86 @@ export function getRouteStructuredData(pathname, metadata) {
         url: metadata.canonical,
         inLanguage: 'ko-KR',
         description: metadata.description
+      }
+    ];
+  }
+
+  if (metadata.contentHub) {
+    const hub = metadata.contentHub;
+    const itemListId = `${metadata.canonical}#recipe-list`;
+
+    return [
+      {
+        ...webPageSchema(pathname, metadata, 'CollectionPage'),
+        mainEntity: { '@id': itemListId }
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        '@id': itemListId,
+        name: `${hub.name} 관련 레시피`,
+        numberOfItems: hub.recipes.length,
+        itemListElement: hub.recipes.map((recipe, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: recipe.name,
+          url: new URL(getPublicRecipePath(recipe), SITE_ORIGIN).href
+        }))
+      }
+    ];
+  }
+
+  if (metadata.guide) {
+    return [webPageSchema(pathname, metadata, 'WebPage')];
+  }
+
+  if (metadata.recipe) {
+    const recipe = metadata.recipe;
+    const images = [recipe.imageLargeUrl, recipe.imageSmallUrl].filter(Boolean);
+    const keywords = [...new Set([...(recipe.hashTags || []), recipe.sodiumTip ? '저염 레시피' : null])]
+      .filter(Boolean)
+      .join(', ');
+    const nutrition = {
+      '@type': 'NutritionInformation',
+      ...(recipe.nutrition.calories == null ? {} : { calories: `${recipe.nutrition.calories} kcal` }),
+      ...(recipe.nutrition.carbohydrate == null
+        ? {}
+        : { carbohydrateContent: `${recipe.nutrition.carbohydrate} g` }),
+      ...(recipe.nutrition.protein == null ? {} : { proteinContent: `${recipe.nutrition.protein} g` }),
+      ...(recipe.nutrition.fat == null ? {} : { fatContent: `${recipe.nutrition.fat} g` }),
+      ...(recipe.nutrition.sodium == null ? {} : { sodiumContent: `${recipe.nutrition.sodium} mg` })
+    };
+
+    return [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Recipe',
+        name: recipe.name,
+        description: metadata.description,
+        url: metadata.canonical,
+        mainEntityOfPage: metadata.canonical,
+        isPartOf: websiteReference(),
+        inLanguage: 'ko-KR',
+        image: images,
+        recipeCategory: recipe.dishType || undefined,
+        cookingMethod: recipe.cookingMethod || undefined,
+        keywords: keywords || undefined,
+        recipeYield: 1,
+        recipeIngredient: getRecipeIngredientLines(recipe),
+        recipeInstructions: recipe.steps.map((step) => ({
+          '@type': 'HowToStep',
+          position: step.order,
+          name: `${step.order}단계`,
+          text: step.text,
+          ...(step.imageUrl ? { image: step.imageUrl } : {})
+        })),
+        nutrition,
+        author: {
+          '@type': 'Organization',
+          name: '식품의약품안전처',
+          url: 'https://www.mfds.go.kr/'
+        },
+        isBasedOn: recipe.sourceUrl
       }
     ];
   }
