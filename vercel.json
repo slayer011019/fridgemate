@@ -52,6 +52,9 @@
   ],
   "rewrites": [
     { "source": "/recipes", "destination": "/_seo/recipes.html" },
+    { "source": "/recipes/ingredients/:ingredientSlug", "destination": "/_seo/recipes/ingredients/:ingredientSlug.html" },
+    { "source": "/recipes/:recipeSlug", "destination": "/_seo/recipes/:recipeSlug.html" },
+    { "source": "/guides/:guideSlug", "destination": "/_seo/guides/:guideSlug.html" },
     { "source": "/about", "destination": "/_seo/about.html" },
     { "source": "/contact", "destination": "/_seo/contact.html" },
     { "source": "/privacy", "destination": "/_seo/privacy.html" },

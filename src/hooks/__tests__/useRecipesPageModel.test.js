@@ -5,7 +5,7 @@ const recipeRecommendationsState = {
   recommendations: [
     { id: 'r1', title: 'ready', canMakeNow: true, missingCore: [], score: 80 },
     { id: 'r2', title: 'buy', canMakeNow: false, missingCore: ['양파'], matchedCore: ['계란'], score: 40 },
-    { id: 'r3', title: 'soon', canMakeNow: false, missingCore: ['양파', '대파'], score: 20 }
+    { id: 'r3', title: 'soon', canMakeNow: false, missingCore: ['양파', '대파'], score: 20, useSoon: true }
   ],
   loading: false,
   error: '',

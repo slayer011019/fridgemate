@@ -15,7 +15,8 @@ function shouldHideRow(error) {
 export function useDBRecommendations({ ingredients = [], pantryItems = [] } = {}) {
   const { isAuthenticated } = useAuth();
   const { preferences } = useOptionalUserPreferences();
-  const rowRef = useRef(null);
+  const [rowElement, setRowElement] = useState(null);
+  const rowRef = useCallback((element) => { setRowElement(element); }, []);
   const requestIdRef = useRef(0);
   const [hasEnteredViewport, setHasEnteredViewport] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
@@ -29,7 +30,7 @@ export function useDBRecommendations({ ingredients = [], pantryItems = [] } = {}
       return undefined;
     }
 
-    const target = rowRef.current;
+    const target = rowElement;
 
     if (!target) {
       return undefined;
@@ -55,7 +56,7 @@ export function useDBRecommendations({ ingredients = [], pantryItems = [] } = {}
     return () => {
       observer.disconnect();
     };
-  }, [hasEnteredViewport, hidden, isAuthenticated]);
+  }, [hasEnteredViewport, hidden, isAuthenticated, rowElement]);
 
   useEffect(() => {
     if (!isAuthenticated) {

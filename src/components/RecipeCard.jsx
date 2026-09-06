@@ -1,6 +1,8 @@
 import { memo } from 'react';
+import { Link } from 'react-router-dom';
 import RecipeExternalLinks from './RecipeExternalLinks';
 import { joinIngredientLabels } from '../utils/displayText';
+import { getPublicRecipeForRecommendation, getPlanningRecipePath } from '../features/recipes/publicRecipePlanning';
 
 function RecipeCard({ recipe, isSelected = false, onDismiss, onExternalOpen, onSelect }) {
   const recipeName = recipe.title || recipe.name || '';
@@ -9,6 +11,12 @@ function RecipeCard({ recipe, isSelected = false, onDismiss, onExternalOpen, onS
   const missingSeasonings = recipe.missingSeasonings || [];
   const coreIngredients = recipe.coreIngredients || recipe.ingredients || [];
   const hasMissingItems = missingIngredients.length > 0 || missingSeasonings.length > 0 || recipe.missingGroups?.length > 0;
+  const personalized = recipe.isPersonalized !== false;
+  const requiredCount = recipe.totalRequiredIngredients ?? coreIngredients.length;
+  const matchedCoreCount = recipe.matchedCore?.length ?? recipe.matchedCount ?? 0;
+  const countLabel = recipe.matchedCountLabel ?? (requiredCount > 0 && matchedCoreCount <= requiredCount ? `${matchedCoreCount}/${requiredCount}개 일치` : '');
+  const canMakeNow = recipe.canMakeNow && personalized && !hasMissingItems && !recipe.missingUnknownIngredients?.length && recipe.hasKnownRequirements !== false && requiredCount > 0;
+  const publicRecipe = getPublicRecipeForRecommendation(recipe);
   return (
     <article
       className={`card overflow-hidden border-l-4 ${isSelected ? 'border-l-emerald-600 ring-2 ring-emerald-100' : 'border-l-brand-500'}`}
@@ -19,7 +27,7 @@ function RecipeCard({ recipe, isSelected = false, onDismiss, onExternalOpen, onS
             <div className="flex flex-wrap items-center gap-2">
               {recipe.category ? <p className="kicker">{recipe.category}</p> : null}
               {recipe.useSoon ? <span className="badge border border-amber-200 bg-amber-50 text-amber-800">먼저 쓸 재료</span> : null}
-              {recipe.canMakeNow ? <span className="badge border border-emerald-200 bg-emerald-50 text-emerald-800">바로 가능</span> : null}
+              {canMakeNow ? <span className="badge border border-emerald-200 bg-emerald-50 text-emerald-800">재료 종류 확인됨</span> : null}
               {isSelected ? <span className="badge border border-emerald-200 bg-emerald-50 text-emerald-800">오늘 메뉴</span> : null}
             </div>
             <h3 className="text-lg font-semibold text-slate-900">{recipeName}</h3>
@@ -33,20 +41,20 @@ function RecipeCard({ recipe, isSelected = false, onDismiss, onExternalOpen, onS
 
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             {recipe.cookingMethod ? <span className="badge bg-white text-slate-600">{recipe.cookingMethod}</span> : null}
-            <div className="flex items-baseline gap-1 rounded-md bg-slate-900 px-3 py-2 text-white">
+            {personalized && recipe.hasKnownRequirements !== false && requiredCount > 0 ? <div className="flex items-baseline gap-1 rounded-md bg-slate-900 px-3 py-2 text-white">
               <span className="text-lg font-bold leading-none">{recipe.matchRateLabel || `${Math.round((recipe.matchRate || 0) * 100)}%`}</span>
               <span className="text-[11px] text-slate-300">매칭</span>
-            </div>
+            </div> : null}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-700">
+        {personalized ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-700">
           <span className="font-semibold text-slate-900">보유 재료</span>
           <span>{joinIngredientLabels(matchedIngredients) || '아직 없어요'}</span>
           <span className="text-xs text-slate-500">
-            {`${recipe.matchedCount ?? matchedIngredients.length}/${recipe.totalRequiredIngredients ?? coreIngredients.length}개 일치`}
+            {countLabel}
           </span>
-        </div>
+        </div> : null}
 
         {hasMissingItems ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
@@ -73,6 +81,7 @@ function RecipeCard({ recipe, isSelected = false, onDismiss, onExternalOpen, onS
         ) : null}
 
         <div className="flex flex-wrap gap-2 border-t border-slate-200/80 pt-3">
+          {publicRecipe ? <Link to={getPlanningRecipePath(publicRecipe)} className="btn-secondary">재료와 조리법 보기</Link> : null}
           <button
             className="btn-primary"
             disabled={isSelected}
@@ -86,6 +95,7 @@ function RecipeCard({ recipe, isSelected = false, onDismiss, onExternalOpen, onS
           </button>
         </div>
 
+        <p className="text-xs text-slate-500">외부 사이트에서 {recipeName} 조리법 검색</p>
         <RecipeExternalLinks
           recipeName={recipeName}
           searchLinks={recipe.searchLinks}

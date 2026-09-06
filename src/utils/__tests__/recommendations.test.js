@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pantryStaples } from '../../data/pantryStaples.js';
+import { adaptCatalogRecipe } from '../../features/recipes/recipeCatalogAdapter.js';
 import {
   RECIPE_STATUS,
   buildRecipeRecommendations,
   explainRecipeMatch,
+  getRecommendationInputState,
   getTopRecommendations,
   normalizeIngredientName,
   recommendRecipes
@@ -221,7 +223,36 @@ describe('recommendation utilities', () => {
       expect(withoutPantry.missingCore).toEqual([getPantryStapleName('salt'), getPantryStapleName('soy-sauce')]);
       expect(withPantry.missingCore).toEqual([]);
       expect(withPantry.score).toBeGreaterThan(withoutPantry.score);
+      expect(withPantry.hasCoreIngredients).toBe(true);
+      expect(withPantry.canMakeNow).toBe(false);
+      expect(withPantry.needsSeasonings).toBe(true);
+      expect(withPantry.missingSeasonings).toEqual([getPantryStapleName('cooking-oil')]);
+    });
+
+    it('preserves separate seasoning and optional lists emitted by the real local catalog adapter', () => {
+      const adaptedRecipe = adaptCatalogRecipe({
+        id: 'adapter-tofu',
+        name_ko: '두부 메뉴',
+        required_ingredients: ['tofu'],
+        optional_ingredients: ['green_onion'],
+        seasoning_preset: 'doenjang_base'
+      });
+      const withoutPantry = explainRecipeMatch(adaptedRecipe.id, {
+        recipes: [adaptedRecipe],
+        fridgeIngredients: [createIngredient('두부'), createIngredient('대파')]
+      });
+      const withPantry = explainRecipeMatch(adaptedRecipe.id, {
+        recipes: [adaptedRecipe],
+        fridgeIngredients: [createIngredient('두부'), createIngredient('대파')],
+        pantryItems: ['된장', '다진 마늘']
+      });
+
+      expect(withoutPantry.matchedOptional).toEqual(['대파']);
+      expect(withoutPantry.missingSeasonings).toEqual(['된장', '다진 마늘']);
+      expect(withoutPantry.canMakeNow).toBe(false);
+      expect(withoutPantry.needsSeasonings).toBe(true);
       expect(withPantry.canMakeNow).toBe(true);
+      expect(withPantry.score).toBeGreaterThan(withoutPantry.score);
     });
 
     it('uses home priority for ranking even when display scores are both capped at 100', () => {
@@ -310,6 +341,178 @@ describe('recommendation utilities', () => {
       expect(pantryAwareRecommendations[0].score).toBeGreaterThan(legacyRecommendations[0].score);
       expect(legacyTop[0].missingCore).toEqual(legacyRecommendations[0].missingCore);
       expect(pantryAwareTop[0].missingCore).toEqual([]);
+    });
+  });
+
+  describe('honest preparation guidance', () => {
+    const recipe = {
+      id: 'preparation',
+      title: '두부 달걀 볶음',
+      coreIngredients: ['두부', '계란'],
+      requiredGroups: [{ label: '채소 1가지', anyOf: ['양파', '대파'] }],
+      requiredSeasonings: ['식용유']
+    };
+
+    function explain(fridgeIngredients = [], options = {}) {
+      return explainRecipeMatch(recipe.id, { recipes: [recipe], fridgeIngredients, ...options });
+    }
+
+    it('offers browsing without personalized claims when no ingredients are registered', () => {
+      const result = explain();
+
+      expect(result).toMatchObject({
+        inputState: 'empty',
+        isPersonalized: false,
+        canMakeNow: false,
+        canMakeWithOneMore: false,
+        needsSeasonings: false,
+        scoreLabel: '',
+        matchRateLabel: '',
+        matchedCountLabel: '',
+        status: RECIPE_STATUS.BROWSE
+      });
+      expect(result.reason).toContain('메뉴를 둘러보고');
+      expect(result.reason).not.toMatch(/보유|대부분|양념만|바로/);
+    });
+
+    it('does not count consumed or unnamed fridge items as inventory', () => {
+      const inactive = [createIngredient('두부', 3, true), createIngredient('  ')];
+
+      expect(getRecommendationInputState(inactive)).toBe('empty');
+      expect(explain(inactive).isPersonalized).toBe(false);
+      expect(getRecommendationInputState(inactive, { pantryItems: ['식용유'] })).toBe('pantryOnly');
+    });
+
+    it('distinguishes pantry-only data and lists missing main ingredients and groups', () => {
+      const result = explain([], { pantryItems: ['식용유'] });
+
+      expect(result).toMatchObject({ inputState: 'pantryOnly', isPersonalized: true, hasCoreIngredients: false });
+      expect(result.reason).toContain('팬트리 보유 정보만 반영');
+      expect(result.reason).toContain('핵심 재료: 두부, 계란');
+      expect(result.reason).toContain('필수 조합: 채소 1가지');
+      expect(result.reason).not.toMatch(/대부분|양념만|모두 있어서/);
+    });
+
+    it('uses owned pantry flags when a pantry list is not explicitly supplied', () => {
+      const ingredients = [createIngredient('두부'), createIngredient('계란'), createIngredient('양파')];
+      const pantryOwnership = { 'cooking-oil': 'owned', salt: 'notOwned' };
+      const result = explain(ingredients, { pantryOwnership });
+      const recommendations = recommendRecipes({ recipes: [recipe], fridgeIngredients: ingredients, pantryOwnership });
+
+      expect(result.canMakeNow).toBe(true);
+      expect(recommendations[0].canMakeNow).toBe(true);
+      expect(explain(ingredients, { pantryOwnership, pantryItems: [] }).canMakeNow).toBe(false);
+    });
+
+    it('reserves seasoning-only guidance for completed main ingredients and required groups', () => {
+      const result = explain([createIngredient('두부'), createIngredient('계란'), createIngredient('양파')]);
+
+      expect(result).toMatchObject({ hasCoreIngredients: true, needsSeasonings: true, canMakeNow: false });
+      expect(result.status).toBe(RECIPE_STATUS.NEEDS_SEASONINGS);
+      expect(result.reason).toContain('식용유 양념을 추가로 준비');
+
+      const missingGroup = explain([createIngredient('두부'), createIngredient('계란')]);
+      expect(missingGroup.needsSeasonings).toBe(false);
+      expect(missingGroup.reason).toContain('필수 조합: 채소 1가지');
+      expect(missingGroup.reason).toContain('양념: 식용유');
+      expect(missingGroup.reason).not.toContain('필수 조합은 갖췄어요');
+    });
+
+    it('does not say one ingredient is enough when a required group or seasoning is also missing', () => {
+      const missingGroup = explain([createIngredient('두부')], { pantryItems: ['식용유'] });
+      const missingSeasoning = explain([createIngredient('두부'), createIngredient('양파')]);
+
+      for (const result of [missingGroup, missingSeasoning]) {
+        expect(result.missingCore).toEqual(['계란']);
+        expect(result.canMakeWithOneMore).toBe(false);
+        expect(result.reason).not.toContain('계란만');
+      }
+      expect(missingGroup.reason).toContain('필수 조합: 채소 1가지');
+      expect(missingSeasoning.reason).toContain('양념: 식용유');
+    });
+
+    it('preserves preference ranking without letting preference guidance hide missing requirements', () => {
+      const ingredients = [createIngredient('두부'), createIngredient('양파')];
+      const baseline = explain(ingredients);
+      const preferred = explain(ingredients, { preferences: { preferredIngredients: ['두부'] } });
+      const disliked = explain(ingredients, { preferences: { dislikedIngredients: ['두부'] } });
+
+      expect(preferred.score).toBeGreaterThan(baseline.score);
+      expect(disliked.score).toBeLessThan(baseline.score);
+      expect(preferred.preferredMatches).toEqual(['두부']);
+      expect(disliked.dislikedMatches).toEqual(['두부']);
+      expect(preferred.canMakeNow).toBe(false);
+      expect(preferred.reason).toContain('두부 선호를 반영');
+      expect(preferred.reason).toContain('핵심 재료: 계란');
+      expect(preferred.reason).toContain('양념: 식용유');
+    });
+
+    it('identifies a single missing main ingredient only when every other requirement is satisfied', () => {
+      const result = explain([createIngredient('두부'), createIngredient('양파')], { pantryItems: ['식용유'] });
+
+      expect(result.canMakeWithOneMore).toBe(true);
+      expect(result.canMakeNow).toBe(false);
+      expect(result.reason).toContain('계란만 더 준비하면');
+      expect(result.reason).toContain('분량은 조리법에서 확인');
+    });
+
+    it('identifies a single missing alternative group without pretending it is already available', () => {
+      const result = explain([createIngredient('두부'), createIngredient('계란')], { pantryItems: ['식용유'] });
+
+      expect(result.canMakeWithOneMore).toBe(true);
+      expect(result.canMakeNow).toBe(false);
+      expect(result.reason).toContain('채소 1가지만 더 준비하면');
+    });
+
+    it('does not count the same missing ingredient twice when it is also listed as seasoning', () => {
+      const result = explainRecipeMatch(PANTRY_TOP_RECIPE.id, {
+        recipes: [PANTRY_TOP_RECIPE],
+        fridgeIngredients: [createIngredient('rice')]
+      });
+
+      expect(result.missingCore).toEqual([getPantryStapleName('salt')]);
+      expect(result.missingSeasonings).toEqual(result.missingCore);
+      expect(result.canMakeWithOneMore).toBe(true);
+      expect(result.reason).toContain(`${getPantryStapleName('salt')}만 더 준비하면`);
+    });
+
+    it('confirms available ingredient kinds without claiming quantities or freshness are sufficient', () => {
+      const result = explain(
+        [createIngredient('두부'), createIngredient('계란'), createIngredient('양파')],
+        { pantryItems: ['식용유'] }
+      );
+
+      expect(result).toMatchObject({ inputState: 'ingredients', canMakeNow: true, needsSeasonings: false });
+      expect(result.reason).toContain('필수 재료와 양념의 종류를 갖췄어요');
+      expect(result.reason).toContain('필요한 분량과 재료 상태');
+    });
+
+    it('does not mark an empty ingredient definition ready or produce a zero-denominator count', () => {
+      const result = explainRecipeMatch('incomplete', {
+        recipes: [{ id: 'incomplete', title: '미완성 메뉴', coreIngredients: [] }],
+        fridgeIngredients: [createIngredient('두부')]
+      });
+
+      expect(result).toMatchObject({
+        canMakeNow: false,
+        hasCoreIngredients: false,
+        matchedCountLabel: '',
+        matchRateLabel: '',
+        status: RECIPE_STATUS.INSUFFICIENT_DATA
+      });
+      expect(result.reason).toContain('핵심 재료 정보가 없어');
+      expect(Number.isFinite(result.matchRate)).toBe(true);
+    });
+
+    it('keeps unlabeled alternative groups as real requirements', () => {
+      const result = explainRecipeMatch('unlabeled', {
+        recipes: [{ id: 'unlabeled', coreIngredients: ['두부'], requiredGroups: [{ anyOf: ['양파', '대파'] }] }],
+        fridgeIngredients: [createIngredient('두부')]
+      });
+
+      expect(result.canMakeNow).toBe(false);
+      expect(result.missingGroups).toEqual(['양파 또는 대파']);
+      expect(result.reason).toContain('양파 또는 대파');
     });
   });
 

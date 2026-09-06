@@ -9,6 +9,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Restored 100 public recipe details, six ingredient hubs, two guides, and 113 prerendered routes on the latest security baseline. Added ingredient exploration before signup or inventory registration, exact recipe links, and an opt-in preparation checklist without automatic inventory writes.
+- Added reviewed selection, preparation, and substitution notes for six recipes, comparisons for tofu and mushroom hubs, and two complete leftover-ingredient examples. Added desktop/mobile public-flow coverage and a deployment verifier that compares live page bodies, metadata, links, sitemap entries, and real 404 responses with the current build.
 - Added a reproducible MFDS/MAFRA recipe dataset validation script and an evidence-backed source-selection report for Korean home-cooking candidates.
 - Added a cost-controlled daily production database backup workflow that validates the pinned Supabase owner/TLS target, verifies a custom-format dump, encrypts it to an offline recovery key, uploads only ciphertext with a checksum, and expires GitHub artifacts after 14 days.
 - Added a read-only Free-plan backup preflight that validates the exact Supabase project and session/direct host, requires an empty encrypted output directory outside the repository, detects missing CLI/Docker prerequisites, and never prints the database URL or password.
@@ -21,12 +23,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 - Updated recipe-search documentation to separate historical staged-backfill checkpoints from the final 1,166-current-vector state.
 
-### Removed
-
-- Removed the public MFDS recipe gallery, detail pages, ingredient hubs, related guides, and their prerendered SEO routes while keeping ingredient-based recommendations.
-
 ### Fixed
 
+- Distinguished empty inventory, pantry-only ownership, missing required groups, unknown ingredients, and missing seasonings in recommendation readiness. Preserved supplemental seasoning lists and source identifiers through recommendation adapters, and limited internal links to verified catalog identities.
 - Pinned the production backup job to PostgreSQL 17 client binaries so `pg_dump` matches the Supabase PostgreSQL 17 server instead of aborting with the Ubuntu runner's default PostgreSQL 16 client.
 - Split the pending event-retention indexes into single-statement concurrent migrations, separated Ingredient CHECK validation from its short nullable-column lock, made Supabase function hardening fail closed on owner mismatch, and ignored common plaintext database-dump artifacts.
 - Moved shared client rate limits ahead of access-token and revocation checks, then kept per-user limits after authentication so forged or anonymous requests cannot trigger unbounded security-store work.

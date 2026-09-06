@@ -19,7 +19,7 @@ export default defineConfig({
   projects: [
     {
       name: 'local-only',
-      testMatch: ['local-only.spec.js', 'ocr-import.spec.js', 'analytics-consent.spec.js'],
+      testMatch: ['local-only.spec.js', 'ocr-import.spec.js', 'analytics-consent.spec.js', 'public-recipes.spec.js'],
       use: {
         ...sharedUse,
         ...devices['Desktop Chrome'],
