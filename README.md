@@ -87,7 +87,15 @@
 
 공개 카탈로그와 로컬 추천은 서로 다른 데이터입니다. 출처와 ID가 일치하거나 명시적으로 연결한 추천에만 내부 상세를 제공합니다. 준비 목록을 검토하지 않은 94개 상세는 원문 재료 줄을 사용자가 직접 체크하며 수량이나 대체 가능성을 추정하지 않습니다. 콘텐츠 검토는 실제 조리 시험을 했다는 뜻이 아닙니다.
 
-운영 반영 후 `npm run verify:public-deployment -- --report /tmp/fridgemate-public-deployment.json`으로 실제 본문·메타·사이트맵·404를 새 빌드와 대조합니다. [개선 계획과 진행 상태](docs/adsense-improvement-plan.md), [공개 콘텐츠 삭제 원인과 배포 검증](docs/deployment-recovery-notes.md), [구현 검증 기록](docs/public-experience-validation.md)을 함께 참고하세요.
+운영 반영 후 `npm run verify:public-deployment -- --report /tmp/fridgemate-public-deployment.json`으로 실제 본문·메타·사이트맵·404를 새 빌드와 대조합니다. 보고서는 기존 디렉터리에 새 `.json` 파일로만 생성하며 기존 파일이나 링크를 덮어쓰지 않습니다. 재검사 시 새 파일명을 사용하세요. 보고서 v2는 검사 경로·HTTP 상태·고정 오류 설명·개수를 보존하고, 원격 본문·리다이렉트 대상·예상 밖 URL·예외 메시지 원문은 저장하지 않습니다. 다른 출처로의 리다이렉트는 따라가지 않고 실패로 처리하며 응답 본문은 2 MiB로 제한합니다. [개선 계획과 진행 상태](docs/adsense-improvement-plan.md), [공개 콘텐츠 삭제 원인과 배포 검증](docs/deployment-recovery-notes.md), [구현 검증 기록](docs/public-experience-validation.md)을 함께 참고하세요.
+
+공개 레시피 원본을 갱신할 때는 네트워크 미리보기와 로컬 저장을 나눕니다. 다음 첫 명령은 저장소 안에 검토 파일을 만들고, 내용을 확인한 뒤 두 번째 명령으로 고정된 `src/data/publicRecipes.json`에 반영합니다. `--write`는 허용하지 않으며 입력·출력의 심볼릭 링크와 하드 링크도 거부합니다. MFDS API 키는 환경 변수로 설정하며 명령에 직접 넣지 않습니다.
+
+```bash
+node scripts/export-public-recipes.js --limit=100 --print-review > public-recipes-review.json
+# 출처, 재료, 조리 단계와 URL을 검토한 뒤 실행
+node scripts/export-public-recipes.js --write-from=public-recipes-review.json
+```
 
 현재 공개 운영 서비스의 범위 밖입니다.
 

@@ -25,6 +25,9 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Restored the reviewed-local-file public recipe import after catalog recovery regressed to direct network writes, retaining pinned regular-file checks and bounding network previews.
+- Restricted deployment reports to comparison summaries without remote strings, required exclusive new JSON files, and bounded response bodies and same-origin redirects.
+
 - Distinguished empty inventory, pantry-only ownership, missing required groups, unknown ingredients, and missing seasonings in recommendation readiness. Preserved supplemental seasoning lists and source identifiers through recommendation adapters, and limited internal links to verified catalog identities.
 - Pinned the production backup job to PostgreSQL 17 client binaries so `pg_dump` matches the Supabase PostgreSQL 17 server instead of aborting with the Ubuntu runner's default PostgreSQL 16 client.
 - Split the pending event-retention indexes into single-statement concurrent migrations, separated Ingredient CHECK validation from its short nullable-column lock, made Supabase function hardening fail closed on owner mismatch, and ignored common plaintext database-dump artifacts.
