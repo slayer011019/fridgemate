@@ -9,6 +9,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added explicit public recipe quick picks from the best ingredient matches, repeat exclusion, filter resets, and exact preparation links without inventory writes; includes component and desktop/mobile journey coverage.
+
 - Restored 100 public recipe details, six ingredient hubs, two guides, and 113 prerendered routes on the latest security baseline. Added ingredient exploration before signup or inventory registration, exact recipe links, and an opt-in preparation checklist without automatic inventory writes.
 - Added reviewed selection, preparation, and substitution notes for six recipes, comparisons for tofu and mushroom hubs, and two complete leftover-ingredient examples. Added desktop/mobile public-flow coverage and a deployment verifier that compares live page bodies, metadata, links, sitemap entries, and real 404 responses with the current build.
 - Added a reproducible MFDS/MAFRA recipe dataset validation script and an evidence-backed source-selection report for Korean home-cooking candidates.
@@ -24,6 +26,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Updated recipe-search documentation to separate historical staged-backfill checkpoints from the final 1,166-current-vector state.
 
 ### Fixed
+
+- Stabilized menu-decision service tests with a controlled clock and sync-window boundary coverage; production date validation is unchanged.
 
 - Restored the reviewed-local-file public recipe import after catalog recovery regressed to direct network writes, retaining pinned regular-file checks and bounding network previews.
 - Restricted deployment reports to comparison summaries without remote strings, required exclusive new JSON files, and bounded response bodies and same-origin redirects.

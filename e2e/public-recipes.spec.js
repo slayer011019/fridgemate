@@ -97,6 +97,31 @@ for (const viewport of VIEWPORTS) {
       await expectNoHorizontalOverflow(page);
     });
 
+    test('a guest picks one relevant menu and opens its exact preparation page', async ({ page }) => {
+      // Keep the chosen catalog recipe deterministic; component tests cover the full pool and rerolls.
+      await page.addInitScript(() => { Math.random = () => 0; });
+      await seedBrowserState(page);
+      await gotoAndWait(page, '/recipes?have=오이,사과');
+      const picker = explorer(page).getByRole('region', { name: '메뉴 하나 골라보기' });
+      await picker.getByRole('button', { name: '메뉴 하나 골라보기', exact: true }).focus();
+      await page.keyboard.press('Enter');
+      const detail = picker.getByRole('link', { name: '골라본 메뉴의 재료와 조리법 보기' });
+      await expect(detail).toBeVisible();
+      const destination = new URL(await detail.getAttribute('href'), page.url());
+      expect(destination.searchParams.get('have')).toBe('오이,사과');
+      expect(decodeURIComponent(destination.pathname)).toBe('/recipes/32-순두부-사과-소스-오이무침');
+      expect(new URL(page.url()).pathname).toBe('/recipes');
+      await expectGuestStorage(page);
+      await expectNoHorizontalOverflow(page);
+
+      await detail.click();
+      await expect(checklist(page).getByRole('checkbox', { name: '오이 70g' })).toBeChecked();
+      await expect(checklist(page).getByRole('checkbox', { name: '사과 50g' })).toBeChecked();
+      await expect(checklist(page).getByRole('checkbox', { name: '순두부 40g' })).not.toBeChecked();
+      await expect(page.getByRole('heading', { level: 1, name: '순두부 사과 소스 오이무침' })).toBeVisible();
+      await expectGuestStorage(page);
+    });
+
     test('a returning guest sees saved priorities and can still browse public recipes', async ({ page }) => {
       await seedBrowserState(page, {
         ingredients: [
