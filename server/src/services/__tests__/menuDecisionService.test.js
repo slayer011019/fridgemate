@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { database, scopeMock } = vi.hoisted(() => ({
   database: {
@@ -36,6 +36,9 @@ const selection = {
 
 describe('menuDecisionService', () => {
   beforeEach(() => {
+    // Keep dated fixtures within the service's seven-day sync window on every run.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
     vi.clearAllMocks();
     database.recipe.findUnique.mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111' });
     database.menuDecision.upsert.mockImplementation(({ create }) => Promise.resolve({
@@ -44,6 +47,10 @@ describe('menuDecisionService', () => {
       createdAt: new Date(),
       updatedAt: new Date()
     }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('validates real calendar dates and namespaced recipe keys', () => {
@@ -70,6 +77,19 @@ describe('menuDecisionService', () => {
       where: { userId_decisionDate: { userId: 'user-a', decisionDate: expect.any(Date) } },
       update: expect.objectContaining({ status: 'selected', completedAt: null })
     }));
+  });
+
+  it.each(['2026-08-30T23:59:59.000Z', '2030-01-01T00:00:00.000Z'])('enforces UTC sync boundaries at %s', (clock) => {
+    vi.setSystemTime(new Date(clock));
+    const today = new Date(`${clock.slice(0, 10)}T00:00:00.000Z`).getTime();
+    const dateAt = (days) => new Date(today + days * 86400000).toISOString().slice(0, 10);
+
+    for (const days of [-7, 0, 7]) {
+      expect(normalizeDecisionDate(dateAt(days)).toISOString().slice(0, 10)).toBe(dateAt(days));
+    }
+    for (const days of [-8, 8]) {
+      expect(() => normalizeDecisionDate(dateAt(days))).toThrow('date is outside the supported sync window.');
+    }
   });
 
   it('rejects a stale device completion and never touches another user scope', async () => {
