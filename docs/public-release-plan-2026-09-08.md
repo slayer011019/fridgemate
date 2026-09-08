@@ -7,7 +7,8 @@
 - [x] 최신 main `b5347ad`에서 별도 브랜치 `codex/public-quick-pick`을 만들고 기능·검사·관련 문서만 분리.
 - [x] 기존 독립 QA JSON(두 크기 14개 항목, 오류/차단 0개)과 데스크톱/모바일 결과 캡처 검토. [자료](validation/public-quick-pick-2026-09-08/independent-report.json), [데스크톱](validation/public-quick-pick-2026-09-08/desktop-selected.png), [모바일](validation/public-quick-pick-2026-09-08/mobile-selected.png).
 - [x] 분리한 소스에서 전체 단위 테스트·lint·빌드·공개 E2E 재실행.
-- [ ] PR 게시 후 리뷰·CI 확인.
+- [x] [PR #45](https://github.com/slayer011019/fridgemate/pull/45) 게시.
+- [ ] PR 리뷰·CI 확인.
 - [ ] PR 리뷰와 CI 결과를 확인하고 병합·운영 배포.
 - [ ] 실제 운영 홈 → 메뉴 하나 골라보기 → 내부 상세를 클릭. `/recipes`에서도 다시 고르기, 필터 초기화, 단일/빈 후보와 준비 목록 확인. 데스크톱·모바일에서 확인.
 - [ ] 배포한 동일 소스를 새로 빌드하고 `npm run verify:public-deployment -- --report /tmp/public-quick-pick-live.json` 실행. 113/113, 사이트맵, 없는 경로 404 모두 통과해야 출시 완료.
