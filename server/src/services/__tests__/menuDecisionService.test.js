@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { database, scopeMock } = vi.hoisted(() => ({
   database: {
@@ -36,6 +36,9 @@ const selection = {
 
 describe('menuDecisionService', () => {
   beforeEach(() => {
+    // Keep dated fixtures within the service's seven-day sync window on every run.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
     vi.clearAllMocks();
     database.recipe.findUnique.mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111' });
     database.menuDecision.upsert.mockImplementation(({ create }) => Promise.resolve({
@@ -44,6 +47,10 @@ describe('menuDecisionService', () => {
       createdAt: new Date(),
       updatedAt: new Date()
     }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('validates real calendar dates and namespaced recipe keys', () => {
