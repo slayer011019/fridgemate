@@ -9,12 +9,55 @@ function normalize(value) {
   return String(value || '').normalize('NFKC').replace(/\s/g, '').toLowerCase();
 }
 
+// Called only by the pick button; rendering and prerendering never choose a recipe.
+function pickAnotherRecipeId(pool, previousId) {
+  const alternatives = pool.filter(({ recipe }) => recipe.externalId !== previousId);
+  if (!alternatives.length) return previousId;
+  return alternatives[Math.floor(Math.random() * alternatives.length)].recipe.externalId;
+}
+
+function RecipeQuickPick({ candidates, selected }) {
+  const [pickedId, setPickedId] = useState(null);
+  const mostMatches = candidates[0]?.matches.length || 0;
+  const pool = selected.length
+    ? candidates.filter(({ matches }) => matches.length === mostMatches)
+    : candidates;
+  const picked = pool.find(({ recipe }) => recipe.externalId === pickedId);
+
+  if (!pool.length) return null;
+
+  return <section aria-label="메뉴 하나 골라보기" className="rounded-lg border border-brand-100 bg-brand-50 p-4 sm:p-5">
+    <h3 className="font-semibold text-slate-950">마지막 선택이 어렵다면</h3>
+    <p className="mt-2 text-sm leading-6 text-slate-700">
+      {selected.length
+        ? `선택한 재료와 가장 많이 겹치는 메뉴 ${pool.length}개 중 하나를 골라드려요.`
+        : `공개 메뉴 ${pool.length}개 중 하나를 골라드려요. 남은 재료를 먼저 고르면 후보를 좁힐 수 있어요.`}
+    </p>
+    <button type="button" className="btn-secondary mt-3" onClick={() => setPickedId(pickAnotherRecipeId(pool, pickedId))} disabled={Boolean(picked) && pool.length === 1}>
+      {picked ? (pool.length > 1 ? '다른 메뉴 골라보기' : '메뉴를 골랐어요') : '메뉴 하나 골라보기'}
+    </button>
+    <p aria-live="polite" aria-atomic="true" className={picked ? 'mt-4 text-lg font-semibold text-slate-950' : ''}>
+      {picked ? `골라본 메뉴: ${picked.recipe.name}` : ''}
+    </p>
+    {picked ? <div className="mt-2 space-y-3">
+      {picked.matches.length ? <p className="text-sm font-semibold text-brand-700">관련 재료: {picked.matches.join(', ')}</p> : null}
+      {picked.editorial?.selectionReason ? <p className="text-sm leading-6 text-slate-700">{picked.editorial.selectionReason}</p> : null}
+      <p className="text-sm leading-6 text-slate-600">후보에서 임의로 고른 메뉴예요. 만들기 전 정확한 재료 종류와 분량, 추가로 준비할 것을 확인하세요.</p>
+      <div className="flex flex-wrap gap-2">
+        <Link to={getPlanningRecipePath(picked.recipe, selected)} className="btn-primary">골라본 메뉴의 재료와 조리법 보기</Link>
+      </div>
+      {pool.length === 1 ? <p className="text-xs leading-5 text-slate-600">현재 조건에 가장 가까운 후보는 이 메뉴 한 개예요.</p> : null}
+    </div> : null}
+  </section>;
+}
+
 function RecipeResults({ candidates, selected, compact }) {
   const [limit, setLimit] = useState(12);
   const visibleCount = Math.min(compact ? 6 : limit, candidates.length);
   const nextCount = Math.min(12, candidates.length - visibleCount);
 
   return <>
+    <RecipeQuickPick candidates={candidates} selected={selected} />
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {candidates.slice(0, visibleCount).map(({ recipe, matches, editorial }) => (
         <Link key={recipe.externalId} to={getPlanningRecipePath(recipe, selected)} className="soft-panel group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-700">

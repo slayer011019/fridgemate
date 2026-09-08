@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-08",
+  "scope": "Fresh branch based on b5347ad; local checks, not production deployment",
+  "tests": {
+    "files": 141,
+    "passed": 897
+  },
+  "lint": "passed",
+  "build": "passed",
+  "seoRoutes": 113,
+  "publicE2E": {
+    "desktop": 4,
+    "mobile": 4,
+    "passed": 8
+  },
+  "sha256": {
+    "src/components/PublicRecipeExplorer.jsx": "fad923a318418d89e1f2c20031ef070acd09831100f4b2ca38e7c0169cd1f9cf",
+    "src/components/__tests__/PublicRecipeQuickPick.test.jsx": "f8420d711e2907b462e7a4bc30707228642a7efccd8ebdd06e548c04596131b7",
+    "e2e/public-recipes.spec.js": "19cc90cf25a4804c9597b2ee189ea400cd1a9e29d9e8fa9778fbc8e1ee6cccd5",
+    "server/src/services/__tests__/menuDecisionService.test.js": "e10355639e9930acc5880440cfd022a76fe328bdeda95e300ef54ca47d7b623f"
+  },
+  "previousIndependentQA": "independent-report.json; reviewed along with desktop-selected.png and mobile-selected.png; not rerun as part of this PR preparation"
+}

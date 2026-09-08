@@ -79,6 +79,19 @@ describe('menuDecisionService', () => {
     }));
   });
 
+  it.each(['2026-08-30T23:59:59.000Z', '2030-01-01T00:00:00.000Z'])('enforces UTC sync boundaries at %s', (clock) => {
+    vi.setSystemTime(new Date(clock));
+    const today = new Date(`${clock.slice(0, 10)}T00:00:00.000Z`).getTime();
+    const dateAt = (days) => new Date(today + days * 86400000).toISOString().slice(0, 10);
+
+    for (const days of [-7, 0, 7]) {
+      expect(normalizeDecisionDate(dateAt(days)).toISOString().slice(0, 10)).toBe(dateAt(days));
+    }
+    for (const days of [-8, 8]) {
+      expect(() => normalizeDecisionDate(dateAt(days))).toThrow('date is outside the supported sync window.');
+    }
+  });
+
   it('rejects a stale device completion and never touches another user scope', async () => {
     database.menuDecision.findUnique.mockResolvedValue({ id: 'decision-1', clientId: 'newer-client' });
 
