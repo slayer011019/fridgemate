@@ -88,7 +88,7 @@
 - `VITE_GA_MEASUREMENT_ID`가 설정되어도 이용자가 분석을 허용하기 전에는 Google Analytics를 불러오지 않습니다.
 - 브라우저에서는 화면별 코드를 지연 로딩하고, SEO 사전 렌더링은 별도의 동기식 서버 엔트리를 사용해 공개 HTML 본문을 그대로 유지합니다.
 - `llms.txt`는 공개 정보와 사용자별 비공개 영역의 경계를 설명하며, 개인정보나 개인화 추천 데이터는 인용 대상으로 제공하지 않습니다.
-- 공개 레시피 상세 페이지의 `Recipe` JSON-LD에는 실제 원문에 있는 재료·조리 단계·이미지·영양·출처만 넣고 평점이나 조리 시간은 추정하지 않습니다.
+- 공개 레시피 상세 페이지의 `Recipe` JSON-LD에는 식품안전나라가 정의한 1인분 기준과 실제 원문의 재료·조리 단계·이미지·영양·저감 조리 팁·출처만 넣고, 평점이나 조리 시간·요리 국가는 추정하지 않습니다.
 
 공개 레시피 카탈로그는 `npm run recipes:export-public -- --limit=100 --write`로 식품안전나라 `COOKRCP01` 원문에서 갱신합니다. 쓰기 옵션을 빼면 파일을 바꾸지 않는 사전 점검으로 동작하며, 공개 조건을 충족하지 못한 항목은 제외합니다.
 
@@ -372,6 +372,7 @@ FridgeMate/
 - [Cloudflare 배포](docs/CLOUDFLARE_DEPLOYMENT.md)
 - [배포 체크리스트](docs/DEPLOY_CHECKLIST.md)
 - [AdSense 설정](docs/ADSENSE_SETUP.md)
+- [공개 콘텐츠·추천 경험 개선 계획](docs/adsense-improvement-plan.md)
 - [AI 기능과 안전 경계](docs/AI_FEATURES.md)
 - [레시피 데이터 가져오기](docs/recipe-seeding.md)
 - [로드맵](docs/ROADMAP.md)

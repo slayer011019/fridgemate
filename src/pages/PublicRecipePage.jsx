@@ -57,8 +57,10 @@ function PublicRecipePage() {
             <p className="mt-1 font-semibold text-slate-900">{recipe.cookingMethod || '정보 없음'}</p>
           </div>
           <div>
-            <p className="kicker">제공 중량</p>
-            <p className="mt-1 font-semibold text-slate-900">{recipe.servingWeight || '정보 없음'}</p>
+            <p className="kicker">기준 분량</p>
+            <p className="mt-1 font-semibold text-slate-900">
+              1인분{recipe.servingWeight ? ` (${recipe.servingWeight}g)` : ''}
+            </p>
           </div>
         </div>
       </section>

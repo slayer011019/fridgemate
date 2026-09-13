@@ -87,6 +87,9 @@ export function getRouteStructuredData(pathname, metadata) {
   if (metadata.recipe) {
     const recipe = metadata.recipe;
     const images = [recipe.imageLargeUrl, recipe.imageSmallUrl].filter(Boolean);
+    const keywords = [...new Set([...(recipe.hashTags || []), recipe.sodiumTip ? '저염 레시피' : null])]
+      .filter(Boolean)
+      .join(', ');
     const nutrition = {
       '@type': 'NutritionInformation',
       ...(recipe.nutrition.calories == null ? {} : { calories: `${recipe.nutrition.calories} kcal` }),
@@ -111,7 +114,8 @@ export function getRouteStructuredData(pathname, metadata) {
         image: images,
         recipeCategory: recipe.dishType || undefined,
         cookingMethod: recipe.cookingMethod || undefined,
-        keywords: recipe.hashTags?.join(', ') || undefined,
+        keywords: keywords || undefined,
+        recipeYield: 1,
         recipeIngredient: getRecipeIngredientLines(recipe),
         recipeInstructions: recipe.steps.map((step) => ({
           '@type': 'HowToStep',
@@ -121,7 +125,6 @@ export function getRouteStructuredData(pathname, metadata) {
           ...(step.imageUrl ? { image: step.imageUrl } : {})
         })),
         nutrition,
-        ...(recipe.servingWeight ? { recipeYield: recipe.servingWeight } : {}),
         author: {
           '@type': 'Organization',
           name: '식품의약품안전처',

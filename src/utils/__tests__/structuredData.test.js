@@ -51,10 +51,26 @@ describe('structuredData', () => {
     expect(schema.image.length).toBeGreaterThan(0);
     expect(schema.recipeIngredient.length).toBeGreaterThan(0);
     expect(schema.recipeInstructions).toHaveLength(recipe.steps.length);
+    expect(schema.recipeYield).toBe(1);
+    expect(schema.keywords).toContain('저염 레시피');
     expect(schema.author.name).toBe('식품의약품안전처');
     expect(schema.isBasedOn).toBe(recipe.sourceUrl);
     expect(schema.isPartOf['@id']).toBe('https://xn--wh1bs8l5xa003adme.com/#website');
     expect(schema).not.toHaveProperty('aggregateRating');
+  });
+
+  it('defines the source-backed one-serving yield for every public recipe', () => {
+    publicRecipeCatalog.forEach((recipe) => {
+      const pathname = getPublicRecipePath(recipe);
+      const [schema] = getRouteStructuredData(pathname, getRouteMetadata(pathname));
+
+      expect(schema.recipeYield).toBe(1);
+      expect(schema.keywords).toBeTruthy();
+      expect(schema).not.toHaveProperty('aggregateRating');
+      expect(schema).not.toHaveProperty('prepTime');
+      expect(schema).not.toHaveProperty('cookTime');
+      expect(schema).not.toHaveProperty('recipeCuisine');
+    });
   });
 
   it('emits CollectionPage and ItemList schemas for ingredient hubs', () => {

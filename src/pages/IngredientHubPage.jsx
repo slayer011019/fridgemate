@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { getPublicRecipePath } from '../features/recipes/publicRecipeCatalog';
 import { getIngredientHubBySlug } from '../features/recipes/recipeContentHubs';
+import { editorialReviewNote } from '../features/recipes/recipeEditorialContent';
 import NotFoundPage from './NotFoundPage';
 
 function IngredientHubPage() {
@@ -29,6 +30,36 @@ function IngredientHubPage() {
           </Link>
         }
       />
+
+      {hub.comparison ? (
+        <section className="card space-y-5" aria-labelledby="recipe-comparison-heading">
+          <div>
+            <p className="kicker">메뉴 선택 도움</p>
+            <h2 id="recipe-comparison-heading" className="mt-1.5 text-xl font-semibold text-slate-900">같은 재료, 어떤 메뉴를 고를까요?</h2>
+            <p className="mt-2 text-sm leading-7 text-slate-700">{hub.comparison.intro}</p>
+          </div>
+          <div className="grid gap-4">
+            {hub.comparison.rows.map((row) => (
+              <article key={row.recipeId} className="soft-panel space-y-3">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  <Link className="underline decoration-green-700/40 underline-offset-4 hover:text-brand-700" to={row.editorial.path}>
+                    {row.editorial.recipe.name}
+                  </Link>
+                </h3>
+                <dl className="grid gap-3 text-sm leading-6 sm:grid-cols-2">
+                  <div><dt className="font-semibold text-slate-900">원문 사용량</dt><dd>{row.usage}</dd></div>
+                  <div><dt className="font-semibold text-slate-900">함께 준비할 재료</dt><dd>{row.additionalIngredients}</dd></div>
+                  <div><dt className="font-semibold text-slate-900">조리 도구</dt><dd>{row.editorial.equipment.join(' · ')}</dd></div>
+                  <div><dt className="font-semibold text-slate-900">이럴 때 선택</dt><dd>{row.decision}</dd></div>
+                </dl>
+                <Link className="btn-secondary" to={row.editorial.path}>전체 재료와 조리법 확인</Link>
+              </article>
+            ))}
+          </div>
+          <p className="text-sm leading-7 text-slate-700">{hub.comparison.takeaway}</p>
+          <p className="text-xs leading-6 muted">{editorialReviewNote} 원문 대조: {hub.comparison.reviewedAt}. 분량과 출처는 각 상세에서 확인할 수 있습니다.</p>
+        </section>
+      ) : null}
 
       <section className="card space-y-4">
         <div>

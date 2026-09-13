@@ -37,6 +37,10 @@ for (const pathname of PUBLIC_ROUTES) {
   assert(/<h1(?:\s|>)/i.test(html), `${pathname} has no prerendered h1`);
   assert(html.includes('<!--seo-prerender-start-->'), `${pathname} has no prerendered body marker`);
   assert(html.includes('application/ld+json'), `${pathname} has no structured data`);
+  if (metadata.recipe) {
+    assert(html.includes('"recipeYield":1'), `${pathname} is missing its one-serving recipe yield`);
+    assert(html.includes('"keywords":"'), `${pathname} is missing recipe keywords`);
+  }
   assert(
     !html.includes('googletagmanager.com'),
     `${pathname} loads Google Analytics before the visitor has granted consent`

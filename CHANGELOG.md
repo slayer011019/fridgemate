@@ -65,6 +65,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added a source-backed one-serving `recipeYield`, visible serving basis, truthful low-sodium recipe keywords, and post-build assertions for every public recipe without inventing ratings, times, or cuisines.
 - Added an evidence-based PC/mobile production sync drill covering propagation, idempotency, newest-edit conflicts, offline stale writes, tombstone protection, and disposable-account cleanup.
 - Added a production database backup and restore runbook with explicit evidence gates, separate-project restoration, aggregate validation, RLS/runtime-role checks, and tenant-isolation smoke tests.
 - Added a scheduled production uptime workflow that validates the minimized public health response every 15 minutes and can also be run manually.
