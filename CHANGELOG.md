@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Preserved the remaining root AdSense work and the intentionally failing main-first recommendation exercise on `codex/weekly-meal-plan`, with scope, file hashes and verification notes. This is a pre-fix practice state, not a production release or a replacement for the newer main integration.
 - Added a local-first weekly dinner planner at `/meal-plan` with 16 source-qualified menu compositions, 1–2-person preferences, ingredient exclusions, meal-date expiry matching, replacements, locks, skipped-day restoration, and non-quantitative food-group guidance.
 - Added scoped IndexedDB v2 meal-plan storage with ingredient-preserving upgrades, blocked-tab recovery, stale-write rejection, account-deletion cleanup, and explicit local-only/no-inventory-deduction boundaries.
 - Added meal-plan domain, persistence, hook and browser regression coverage; kept the new personal route out of public SEO output and documented deferred shopping, measured consumption and nutrition work.

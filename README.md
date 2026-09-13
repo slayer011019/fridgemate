@@ -328,6 +328,8 @@ npm run export:recommendation-training -- --format=csv --output=data/training/re
 
 ## 검사와 테스트
 
+이 브랜치(`codex/weekly-meal-plan`)에는 루트에 남아 있던 작업과 **아직 해결하지 않은 추천 정책 실습**을 보관합니다. 실습 두 파일은 39개 통과·17개 예상 실패 상태이며 일반 테스트도 실패 종료합니다. 최신 main 및 주간 식단 통합 PR #48을 대체하거나 이 브랜치를 그대로 운영 배포하지 마세요. [보존 범위·검증 결과·재현 방법](docs/recommendation-agent-exercise-state-2026-09-13.md)을 먼저 확인하세요.
+
 주간 식단 확인: `npm run dev` 실행 후 `/meal-plan`에서 식단 생성 → 메뉴 교체 → 고정 → 다시 추천 → 새로고침을 확인합니다. 로그인·로그아웃을 해도 게스트/계정 식단이 각각 유지되고 냉장고 수량은 바뀌지 않아야 합니다.
 
 식단 브라우저 테스트만 실행하려면 `npx playwright test e2e/meal-plan.spec.js e2e/meal-plan-account.spec.js`를 사용합니다. 로컬에 `.worktrees/` 등 다른 체크아웃이 중첩되어 있으면 Vitest의 `--exclude '.worktrees/**'`, ESLint의 `--ignore-pattern '.worktrees/**'` 옵션으로 현재 프로젝트만 검사하세요.
