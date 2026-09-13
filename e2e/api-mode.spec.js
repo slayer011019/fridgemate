@@ -126,7 +126,15 @@ test('menu selection keeps a pending copy after 5xx and succeeds on explicit ret
   await gotoAndWait(page, '/recipes');
 
   const firstCard = page.locator('article').filter({ has: page.getByRole('button', { name: '오늘 먹기' }) }).first();
+  // A full navigation must not interrupt the local write or the simulated 5xx request.
+  const failedSave = page.waitForResponse((response) =>
+    response.request().method() === 'PUT'
+    && new URL(response.url()).pathname.startsWith('/api/menu-decisions/')
+    && response.status() === 503
+  );
   await firstCard.getByRole('button', { name: '오늘 먹기' }).click();
+  await failedSave;
+  await expect(page.getByRole('button', { name: '선택됨' }).first()).toBeVisible();
   await gotoAndWait(page, '/');
   await expect(page.getByRole('button', { name: '서버 저장 다시 시도' })).toBeVisible({
     timeout: 10_000

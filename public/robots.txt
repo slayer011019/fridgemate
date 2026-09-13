@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /account
+Disallow: /meal-plan
 Disallow: /import
 Disallow: /ingredients
 Disallow: /login

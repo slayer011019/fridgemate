@@ -1,9 +1,11 @@
 import { compactIngredientTombstone } from '../utils/syncStrategy';
 
 const DB_NAME_PREFIX = 'fridgemate-db';
-const DB_VERSION = 2;
+// Version 2 existed with menu decisions on main and meal plans on the feature branch.
+const DB_VERSION = 3;
 const INGREDIENT_STORE_NAME = 'ingredients';
 const MENU_DECISION_STORE_NAME = 'menuDecisions';
+const MEAL_PLAN_STORE_NAME = 'mealPlans';
 const DEFAULT_SCOPE = 'guest';
 const databasePromises = new Map();
 
@@ -29,10 +31,16 @@ function openDatabase(scopeOrOptions) {
   const databaseName = getDatabaseName(scopeOrOptions);
 
   if (!databasePromises.has(databaseName)) {
+    let abandoned = false;
     const databasePromise = new Promise((resolve, reject) => {
       const request = window.indexedDB.open(databaseName, DB_VERSION);
 
       request.onupgradeneeded = () => {
+        if (abandoned) {
+          request.transaction.abort();
+          return;
+        }
+
         const database = request.result;
 
         if (!database.objectStoreNames.contains(INGREDIENT_STORE_NAME)) {
@@ -45,48 +53,94 @@ function openDatabase(scopeOrOptions) {
         if (!database.objectStoreNames.contains(MENU_DECISION_STORE_NAME)) {
           database.createObjectStore(MENU_DECISION_STORE_NAME, { keyPath: 'decisionDate' });
         }
+
+        if (!database.objectStoreNames.contains(MEAL_PLAN_STORE_NAME)) {
+          database.createObjectStore(MEAL_PLAN_STORE_NAME, { keyPath: 'id' });
+        }
       };
 
       request.onsuccess = () => {
         const database = request.result;
 
-        database.onversionchange = () => {
+        if (abandoned) {
           database.close();
+          return;
+        }
 
+        const releaseConnection = () => {
+          database.close();
           if (databasePromises.get(databaseName) === databasePromise) {
             databasePromises.delete(databaseName);
           }
         };
-
+        database.onversionchange = releaseConnection;
+        database.onclose = releaseConnection;
         resolve(database);
       };
-      request.onerror = () => {
-        if (databasePromises.get(databaseName) === databasePromise) {
-          databasePromises.delete(databaseName);
-        }
-
-        reject(request.error);
+      request.onblocked = () => {
+        abandoned = true;
+        reject(new Error('다른 탭에서 이전 저장소를 사용 중입니다. 오늘뭐먹지 탭을 닫은 뒤 다시 시도해주세요.'));
       };
+      request.onerror = () => reject(request.error);
     });
 
     databasePromises.set(databaseName, databasePromise);
+    databasePromise.catch(() => {
+      if (databasePromises.get(databaseName) === databasePromise) {
+        databasePromises.delete(databaseName);
+      }
+    });
   }
 
   return databasePromises.get(databaseName);
 }
 
-function runTransaction(mode, handler, scopeOrOptions, storeName = INGREDIENT_STORE_NAME) {
+function runStoreTransaction(storeName, mode, handler, scopeOrOptions) {
   return openDatabase(scopeOrOptions).then((database) => {
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(storeName, mode);
-      const store = transaction.objectStore(storeName);
-      const request = handler(store);
+      let request;
+
+      try {
+        request = handler(transaction.objectStore(storeName), transaction);
+      } catch (error) {
+        transaction.abort();
+        reject(error);
+      }
 
       transaction.oncomplete = () => resolve(request?.result);
-      transaction.onerror = () => reject(transaction.error);
-      transaction.onabort = () => reject(transaction.error);
+      transaction.onerror = () => reject(transaction.error || new Error('로컬 저장에 실패했습니다. 다시 시도해주세요.'));
+      transaction.onabort = () => reject(transaction.error || new Error('로컬 저장이 취소됐습니다. 다시 시도해주세요.'));
     });
   });
+}
+
+function runTransaction(mode, handler, scopeOrOptions, storeName = INGREDIENT_STORE_NAME) {
+  return runStoreTransaction(storeName, mode, handler, scopeOrOptions);
+}
+
+export function runMealPlanTransaction(mode, handler, scopeOrOptions) {
+  return runStoreTransaction(MEAL_PLAN_STORE_NAME, mode, handler, scopeOrOptions);
+}
+
+export function clearMealPlans(scopeOrOptions) {
+  return runMealPlanTransaction('readwrite', (store) => store.clear(), scopeOrOptions);
+}
+
+// Account deletion clears private stores together; ordinary ingredient replacement must not erase plans.
+export function clearAccountLocalData(scopeOrOptions) {
+  return openDatabase(scopeOrOptions).then((database) => new Promise((resolve, reject) => {
+    const transaction = database.transaction(
+      [INGREDIENT_STORE_NAME, MENU_DECISION_STORE_NAME, MEAL_PLAN_STORE_NAME],
+      'readwrite'
+    );
+    transaction.objectStore(INGREDIENT_STORE_NAME).clear();
+    transaction.objectStore(MENU_DECISION_STORE_NAME).clear();
+    transaction.objectStore(MEAL_PLAN_STORE_NAME).clear();
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('로컬 데이터 삭제가 취소됐습니다.'));
+  }));
 }
 
 export function getAllIngredients(scopeOrOptions) {

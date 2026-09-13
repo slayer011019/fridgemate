@@ -130,6 +130,7 @@ export async function clearLocalUserData(userId) {
   for (const cleanupDatabase of [
     () => indexedDb.clearIngredients({ scope: storageScope }),
     () => indexedDb.clearMenuDecisions({ scope: storageScope }),
+    () => indexedDb.clearMealPlans({ scope: storageScope }),
     () => indexedDb.deleteDatabase({ scope: storageScope })
   ]) {
     try {

@@ -10,6 +10,7 @@ import IngredientHubPage from './pages/IngredientHubPage';
 import IngredientFormPage from './pages/IngredientFormPage';
 import IngredientsPage from './pages/IngredientsPage';
 import LoginPage from './pages/LoginPage';
+import MealPlanPage from './pages/MealPlanPage';
 import NotFoundPage from './pages/NotFoundPage';
 import PrivacyPage from './pages/PrivacyPage';
 import PublicRecipePage from './pages/PublicRecipePage';
@@ -28,6 +29,7 @@ const pages = {
   IngredientFormPage,
   IngredientsPage,
   LoginPage,
+  MealPlanPage,
   NotFoundPage,
   PrivacyPage,
   PublicRecipePage,

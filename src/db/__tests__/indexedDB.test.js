@@ -32,7 +32,7 @@ async function loadIndexedDbModule() {
 
 function openRawDatabase(name) {
   return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(name, 2);
+    const request = window.indexedDB.open(name);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -325,8 +325,9 @@ describe('indexedDB utilities', () => {
       { decisionDate: '2026-08-30', clientId: 'decision-1' },
       { scope: 'user:user-1' }
     );
+    await db.runMealPlanTransaction('readwrite', (store) => store.put({ id: 'week:2026-09-14' }), { scope: 'user:user-1' });
     const blockingConnection = await new Promise((resolve, reject) => {
-      const request = window.indexedDB.open('fridgemate-db__user_user-1', 2);
+      const request = window.indexedDB.open('fridgemate-db__user_user-1');
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -334,9 +335,11 @@ describe('indexedDB utilities', () => {
     try {
       await db.clearIngredients({ scope: 'user:user-1' });
       await db.clearMenuDecisions({ scope: 'user:user-1' });
+      await db.clearMealPlans({ scope: 'user:user-1' });
 
       expect(await db.getAllIngredients({ scope: 'user:user-1' })).toEqual([]);
       expect(await db.getMenuDecision('2026-08-30', { scope: 'user:user-1' })).toBeUndefined();
+      expect(await db.runMealPlanTransaction('readonly', (store) => store.getAll(), { scope: 'user:user-1' })).toEqual([]);
       await expect(db.deleteDatabase({ scope: 'user:user-1' })).rejects.toThrow(/blocked/i);
     } finally {
       blockingConnection.close();
