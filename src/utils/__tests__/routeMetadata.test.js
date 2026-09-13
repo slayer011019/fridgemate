@@ -13,7 +13,7 @@ describe('routeMetadata', () => {
     expect(recipes.indexable).toBe(true);
   });
 
-  it.each(['/login', '/signup', '/account', '/ingredients/new', '/ingredients/item-id/edit', '/import'])(
+  it.each(['/login', '/signup', '/account', '/meal-plan', '/ingredients/new', '/ingredients/item-id/edit', '/import'])(
     'keeps functional route %s out of the search index',
     (pathname) => {
       const metadata = getRouteMetadata(pathname);

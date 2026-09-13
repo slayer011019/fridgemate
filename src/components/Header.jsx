@@ -4,6 +4,7 @@ import { isOcrEnabled } from '../utils/backendConfig';
 
 const navItems = [
   { label: '\uD648', shortLabel: '\uD648', icon: '\u2302', to: '/', match: (pathname) => pathname === '/' },
+  { label: '주간 식단', shortLabel: '주간 식단', icon: '▦', to: '/meal-plan', match: (pathname) => pathname === '/meal-plan' },
   {
     label: '\uB0C9\uC7A5\uACE0 \uBCF4\uAE30',
     shortLabel: '\uB0C9\uC7A5\uACE0',

@@ -43,6 +43,17 @@
 - 식품안전나라 원문에서 공개용으로 선별한 레시피 100개와 재료·조리 단계·영양 정보 상세 페이지
 - 각 상세 페이지의 canonical URL, 사이트맵 항목, 출처 기반 `Recipe` JSON-LD
 
+### 주간 저녁 식단
+
+- 상단 **주간 식단** 또는 `/meal-plan`에서 1~2인 가구의 7일 저녁을 생성합니다.
+- 16개 기본 메뉴 조합에서 보유 재료·식사일 기준 유통기한·기피 재료를 반영하고 반복을 완화합니다. 메뉴 하나 교체, 고정, 외식·건너뛰기, 다시 포함하기를 지원합니다.
+- 식사 인원·기피 재료·집에서 먹는 날을 주별로 저장합니다. 고정한 메뉴는 다시 추천해도 유지하며 새 조건과 충돌하면 확인 안내를 표시합니다.
+- 재료 이름 일치는 분량 확보를 뜻하지 않습니다. 재료별 필요량, 기한 미확인 재고, 한 주의 총수요는 미확인으로 안내하고 실제 냉장고 수량과 기존 장보기 목록은 변경하지 않습니다.
+- 식품군 표시는 선택한 구성 재료에 근거한 안내이며, KDRI 영양 충족 평가나 열량·탄단지 계산이 아닙니다. 카탈로그의 분량·영양 전문가 검수는 아직 완료되지 않았습니다.
+- IndexedDB v2의 `mealPlans` 저장소에 `guest` / `user:<id>` 범위별로 보관하며 기존 v1 재료를 보존합니다. 저장 실패·다른 탭의 수정 충돌을 알리고 오래된 식단을 덮어쓰지 않습니다.
+- 현재 브라우저에만 저장됩니다. 게스트 재료 가져오기, 서버 동기화, JSON 백업·내보내기에 식단은 포함되지 않으며, 계정 삭제 시 현재 기기의 해당 계정 식단도 정리합니다.
+- 후속 범위: 식단 유래 장보기, 확인된 분량 차감, 공식 데이터 기반 정량 영양, 월간 식단. [구현 계획과 현재 범위](docs/MEAL_PLANNING_IMPLEMENTATION_PLAN.md)를 참고하세요.
+
 ### 계정과 동기화
 
 - JWT 기반 회원가입, 로그인, 로그아웃, 세션 복구
@@ -70,7 +81,7 @@
 ### 검색 노출 경계
 
 - 홈, 메뉴 추천, 서비스 소개, 문의, 개인정보 처리 안내와 식약처 공개 레시피 100개는 빌드 시 본문과 경로별 메타·JSON-LD를 HTML로 프리렌더합니다.
-- 재료, OCR 가져오기, 로그인, 회원가입, 계정 화면은 Vercel `X-Robots-Tag`와 `robots.txt`에서 색인을 차단합니다.
+- 재료, 주간 식단, OCR 가져오기, 로그인, 회원가입, 계정 화면은 Vercel `X-Robots-Tag`와 `robots.txt`에서 색인을 차단합니다.
 - `npm run build`의 postbuild 단계는 공개 HTML의 `h1`, canonical, structured data와 기능 화면의 빈 `noindex` 앱 셸을 자동 검증합니다.
 - Google, 네이버, Bing의 URL-prefix 소유권 인증은 각각 `VITE_GOOGLE_SITE_VERIFICATION`, `VITE_NAVER_SITE_VERIFICATION`, `VITE_BING_SITE_VERIFICATION` 값이 있을 때 정적 `<meta>` 태그로 빌드되고 postbuild에서 검증됩니다.
 - 재료별 공개 허브 6개와 냉장고 활용 가이드 2개를 포함해 총 113개 공개 URL을 프리렌더하며, `/recipes`에서 100개 레시피 상세 URL을 모두 내부 링크합니다.
@@ -316,6 +327,10 @@ npm run export:recommendation-training -- --format=csv --output=data/training/re
 이 데이터는 자동 학습에 사용되지 않으며, 일반 앱 실행에도 필요하지 않습니다.
 
 ## 검사와 테스트
+
+주간 식단 확인: `npm run dev` 실행 후 `/meal-plan`에서 식단 생성 → 메뉴 교체 → 고정 → 다시 추천 → 새로고침을 확인합니다. 로그인·로그아웃을 해도 게스트/계정 식단이 각각 유지되고 냉장고 수량은 바뀌지 않아야 합니다.
+
+식단 브라우저 테스트만 실행하려면 `npx playwright test e2e/meal-plan.spec.js e2e/meal-plan-account.spec.js`를 사용합니다. 로컬에 `.worktrees/` 등 다른 체크아웃이 중첩되어 있으면 Vitest의 `--exclude '.worktrees/**'`, ESLint의 `--ignore-pattern '.worktrees/**'` 옵션으로 현재 프로젝트만 검사하세요.
 
 필수 검사:
 

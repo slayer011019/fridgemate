@@ -43,6 +43,7 @@ export const PUBLIC_ROUTES = Object.freeze([
 ]);
 
 const FUNCTIONAL_PATH_PATTERNS = [
+  /^\/meal-plan$/,
   /^\/ingredients(?:\/.*)?$/,
   /^\/import$/,
   /^\/login$/,
@@ -100,8 +101,8 @@ export function getRouteMetadata(pathname = '/') {
 
   if (FUNCTIONAL_PATH_PATTERNS.some((pattern) => pattern.test(pathname))) {
     return {
-      title: '오늘뭐먹지',
-      description: '오늘뭐먹지의 냉장고 관리 기능 화면입니다.',
+      title: pathname === '/meal-plan' ? '우리 집 주간 식단 | 오늘뭐먹지' : '오늘뭐먹지',
+      description: pathname === '/meal-plan' ? '냉장고 재료와 취향으로 한 주 저녁 식단을 만들고 이 기기에 저장하세요.' : '오늘뭐먹지의 냉장고 관리 기능 화면입니다.',
       canonical: `${SITE_ORIGIN}${pathname}`,
       indexable: false,
       notFound: false

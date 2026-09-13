@@ -172,7 +172,7 @@ export async function deleteAccountWithSession(
   let localCleanupComplete = true;
 
   try {
-    await indexedDb.clearIngredients({ scope: buildUserStorageScope(user.id) });
+    await indexedDb.clearAccountLocalData({ scope: buildUserStorageScope(user.id) });
     clearGuestImportDecision(user.id);
   } catch {
     localCleanupComplete = false;

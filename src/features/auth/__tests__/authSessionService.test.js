@@ -10,7 +10,7 @@ const authApiMocks = {
 };
 
 const indexedDbMocks = {
-  clearIngredients: vi.fn()
+  clearAccountLocalData: vi.fn()
 };
 
 vi.mock('../../../api/authApi.js', () => ({
@@ -23,14 +23,14 @@ vi.mock('../../../api/authApi.js', () => ({
 }));
 
 vi.mock('../../../db/indexedDB.js', () => ({
-  clearIngredients: (...args) => indexedDbMocks.clearIngredients(...args)
+  clearAccountLocalData: (...args) => indexedDbMocks.clearAccountLocalData(...args)
 }));
 
 describe('authSessionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    indexedDbMocks.clearIngredients.mockResolvedValue(undefined);
+    indexedDbMocks.clearAccountLocalData.mockResolvedValue(undefined);
   });
 
   it('restores a server-verified session without persisting identity in localStorage', async () => {
@@ -264,7 +264,7 @@ describe('authSessionService', () => {
     });
 
     expect(authApiMocks.deleteAccount).toHaveBeenCalledWith('StrongPassphrase123!');
-    expect(indexedDbMocks.clearIngredients).toHaveBeenCalledWith({ scope: 'user:user-1' });
+    expect(indexedDbMocks.clearAccountLocalData).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(window.localStorage.getItem('fridgemate-guest-import:user-1')).toBeNull();
     expect(window.localStorage.getItem('fridgemate-auth-session-present:v1')).toBeNull();
     expect(setSession).toHaveBeenLastCalledWith(null);
@@ -290,7 +290,22 @@ describe('authSessionService', () => {
       })
     ).rejects.toBe(deletionError);
 
-    expect(indexedDbMocks.clearIngredients).not.toHaveBeenCalled();
+    expect(indexedDbMocks.clearAccountLocalData).not.toHaveBeenCalled();
     expect(setSession).not.toHaveBeenCalled();
+  });
+
+  it('reports incomplete local cleanup rather than claiming all private data was removed', async () => {
+    authApiMocks.deleteAccount.mockResolvedValue(null);
+    indexedDbMocks.clearAccountLocalData.mockRejectedValueOnce(new Error('Storage unavailable'));
+    const { deleteAccountWithSession } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+    const setError = vi.fn();
+    const result = await deleteAccountWithSession('password', {
+      backendEnabled: true, user: { id: 'user-1' }, setSession, setError,
+      setGuestImportPrompt: vi.fn(), defaultGuestImportPrompt: {}
+    });
+    expect(result).toEqual({ localCleanupComplete: false });
+    expect(setSession).toHaveBeenLastCalledWith(null);
+    expect(setError).toHaveBeenLastCalledWith(expect.stringContaining('브라우저 사이트 데이터를 삭제'));
   });
 });

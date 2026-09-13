@@ -146,7 +146,7 @@ export async function waitForIngredientNames(page, scope, expectedNames) {
 
       function openDatabase(name) {
         return new Promise((resolve, reject) => {
-          const request = window.indexedDB.open(name, 1);
+          const request = window.indexedDB.open(name);
           request.onsuccess = () => resolve(request.result);
           request.onerror = () => reject(request.error);
         });
@@ -174,7 +174,7 @@ export async function waitForIngredientNames(page, scope, expectedNames) {
 export async function readBrowserIngredients(page, scope) {
   return page.evaluate(async (scopeName) => {
     const safeScope = String(scopeName || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const request = window.indexedDB.open(`fridgemate-db__${safeScope}`, 1);
+    const request = window.indexedDB.open(`fridgemate-db__${safeScope}`);
     const database = await new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -194,7 +194,7 @@ export async function writeBrowserIngredients(page, scope, ingredients) {
   await page.evaluate(
     async ({ scopeName, items }) => {
       const safeScope = String(scopeName || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const request = window.indexedDB.open(`fridgemate-db__${safeScope}`, 1);
+      const request = window.indexedDB.open(`fridgemate-db__${safeScope}`);
       const database = await new Promise((resolve, reject) => {
         request.onupgradeneeded = () => {
           if (!request.result.objectStoreNames.contains('ingredients')) {

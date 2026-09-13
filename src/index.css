@@ -176,6 +176,84 @@
   .touch-pan-x {
     touch-action: pan-x;
   }
+
+  .meal-plan-page :is(button, summary, a):focus-visible {
+    @apply outline-none ring-2 ring-brand-700 ring-offset-2;
+  }
+
+  .meal-plan-page button:disabled {
+    @apply cursor-not-allowed opacity-50;
+    transform: none;
+  }
+
+  .meal-plan-week-nav {
+    @apply flex flex-wrap items-center justify-between gap-3 border-y border-brand-100 py-4;
+  }
+
+  .meal-plan-settings {
+    @apply rounded-lg border border-brand-100 bg-white p-4 sm:p-5;
+  }
+
+  .meal-plan-action {
+    @apply inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-brand-500 hover:text-brand-700;
+  }
+
+  .meal-plan-day-choice {
+    @apply relative flex min-h-12 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-500;
+  }
+
+  .meal-plan-day-choice.is-selected {
+    @apply border-brand-500 bg-brand-50 text-brand-700;
+  }
+
+  .meal-plan-day-choice:focus-within {
+    @apply ring-2 ring-brand-700 ring-offset-2;
+  }
+
+  .meal-plan-day-choice input {
+    @apply absolute inset-0 m-0 h-full w-full cursor-pointer opacity-0;
+  }
+
+  .meal-plan-day-choice.is-selected span::before {
+    content: '✓';
+    @apply mr-1 text-[10px];
+  }
+
+  .meal-plan-board {
+    @apply overflow-hidden rounded-lg border border-brand-100 bg-white;
+  }
+
+  .meal-plan-day {
+    @apply flex gap-4 border-b border-brand-100 p-4 last:border-b-0 sm:gap-6 sm:p-5;
+  }
+
+  .meal-plan-day-muted {
+    background: #f8faf8;
+  }
+
+  .meal-plan-date {
+    @apply flex w-12 shrink-0 flex-col gap-1 text-brand-700 sm:w-16;
+  }
+
+  .meal-plan-group {
+    @apply inline-flex items-center rounded border border-brand-100 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700;
+  }
+
+  .meal-plan-ingredients {
+    @apply border-t border-slate-100 pt-3;
+  }
+
+  .meal-plan-empty {
+    @apply flex flex-col items-center rounded-lg border border-dashed border-brand-100 bg-white px-5 py-10 text-center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meal-plan-page *, .meal-plan-page *::before, .meal-plan-page *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @media (min-width: 1280px) {

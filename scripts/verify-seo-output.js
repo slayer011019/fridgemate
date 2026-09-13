@@ -49,7 +49,7 @@ for (const pathname of PUBLIC_ROUTES) {
   const canonical = getRouteMetadata(pathname).canonical.replaceAll('&', '&amp;');
   assert(sitemap.includes(`<loc>${canonical}</loc>`), `${pathname} is missing from sitemap.xml`);
 }
-for (const privatePath of ['/account', '/import', '/ingredients', '/login', '/signup']) {
+for (const privatePath of ['/account', '/import', '/ingredients', '/login', '/signup', '/meal-plan']) {
   assert(!sitemap.includes(`${privatePath}</loc>`), `${privatePath} must not appear in sitemap.xml`);
 }
 
