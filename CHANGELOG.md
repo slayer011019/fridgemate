@@ -9,6 +9,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Added the dated AdSense follow-up and separate recommendation-exercise archive notes, clarified historical versus current release status, and linked the records without importing the intentionally failing practice code into main.
 - Added explicit public recipe quick picks from the best ingredient matches, repeat exclusion, filter resets, and exact preparation links without inventory writes; includes component and desktop/mobile journey coverage.
 
 - Restored 100 public recipe details, six ingredient hubs, two guides, and 113 prerendered routes on the latest security baseline. Added ingredient exploration before signup or inventory registration, exact recipe links, and an opt-in preparation checklist without automatic inventory writes.

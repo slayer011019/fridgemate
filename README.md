@@ -386,6 +386,8 @@ npm run ingredients:scrub-tombstones -- --apply --confirm-database-host=DB_HOST
 
 식단 브라우저 테스트만 실행하려면 `npx playwright test e2e/meal-plan.spec.js e2e/meal-plan-account.spec.js`를 사용합니다. 로컬에 `.worktrees/` 등 다른 체크아웃이 중첩되어 있으면 Vitest의 `--exclude '.worktrees/**'`, ESLint의 `--ignore-pattern '.worktrees/**'` 옵션으로 현재 프로젝트만 검사하세요.
 
+학습용 추천 중복 정책 실습은 [별도 보존 커밋의 기록과 재현 제약](docs/recommendation-agent-exercise-state-2026-09-13.md)을 참고하세요. 의도적으로 실패하는 실습 테스트는 main의 테스트 묶음에 포함하지 않습니다. 그 기록의 39개 통과·17개 실패는 현재 main의 검증 결과가 아닙니다.
+
 필수 검사:
 
 ```bash
@@ -427,6 +429,8 @@ FridgeMate/
 - [Semantic staging 실행 절차](docs/STAGING_SEMANTIC_RUNBOOK.md)
 - [배포 체크리스트](docs/DEPLOY_CHECKLIST.md)
 - [AdSense 설정](docs/ADSENSE_SETUP.md)
+- [공개 콘텐츠·추천 경험 개선 계획](docs/adsense-improvement-plan.md)
+- [2026-09-08 AdSense 후속 점검 기록](docs/adsense-followup-2026-09-08.md)
 - [AI 기능과 안전 경계](docs/AI_FEATURES.md)
 - [레시피 데이터 가져오기](docs/recipe-seeding.md)
 - [로드맵](docs/ROADMAP.md)
