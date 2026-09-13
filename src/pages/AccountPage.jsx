@@ -145,6 +145,7 @@ function AccountPage() {
             서버에 저장된 계정 정보, 재료, 오늘 메뉴, 팬트리, 취향 설정, 추천 및 제품 이벤트를 JSON 파일로 받을 수
             있습니다. 인증 토큰과 비밀번호 해시는 포함하지 않습니다.
           </p>
+          <p className="mt-2 text-sm leading-6 muted">주간 식단은 이 기기에만 저장되며 서버 백업과 내 데이터 내려받기에는 포함되지 않습니다.</p>
         </div>
 
         {privacyStatus ? (
@@ -205,7 +206,7 @@ function AccountPage() {
               />
             </div>
             <p className="text-sm leading-6 text-rose-800">
-              서버의 계정 및 연결 데이터와 이 기기에 남은 해당 계정의 재료 캐시를 삭제합니다. 삭제 후 복구할 수
+              서버의 계정 및 연결 데이터와 이 기기에 남은 해당 계정의 재료 캐시·주간 식단을 삭제합니다. 삭제 후 복구할 수
               없습니다.
             </p>
             <button className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800" type="submit">

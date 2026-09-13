@@ -13,6 +13,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 - Restored 100 public recipe details, six ingredient hubs, two guides, and 113 prerendered routes on the latest security baseline. Added ingredient exploration before signup or inventory registration, exact recipe links, and an opt-in preparation checklist without automatic inventory writes.
 - Added reviewed selection, preparation, and substitution notes for six recipes, comparisons for tofu and mushroom hubs, and two complete leftover-ingredient examples. Added desktop/mobile public-flow coverage and a deployment verifier that compares live page bodies, metadata, links, sitemap entries, and real 404 responses with the current build.
+- Added a local-first weekly dinner planner at `/meal-plan` with 16 source-qualified menu compositions, 1–2-person preferences, ingredient exclusions, meal-date expiry matching, replacements, locks, skipped-day restoration, and non-quantitative food-group guidance.
+- Added scoped IndexedDB v3 meal-plan storage with ingredient- and daily-menu-preserving upgrades, blocked-tab recovery, stale-write rejection, account-deletion cleanup, and explicit local-only/no-inventory-deduction boundaries.
+- Added meal-plan domain, persistence, hook and browser regression coverage; kept the new personal route out of public SEO output and documented deferred shopping, measured consumption and nutrition work.
+
 - Added a reproducible MFDS/MAFRA recipe dataset validation script and an evidence-backed source-selection report for Korean home-cooking candidates.
 - Added a cost-controlled daily production database backup workflow that validates the pinned Supabase owner/TLS target, verifies a custom-format dump, encrypts it to an offline recovery key, uploads only ciphertext with a checksum, and expires GitHub artifacts after 14 days.
 - Added a read-only Free-plan backup preflight that validates the exact Supabase project and session/direct host, requires an empty encrypted output directory outside the repository, detects missing CLI/Docker prerequisites, and never prints the database URL or password.

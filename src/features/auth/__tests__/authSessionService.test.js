@@ -12,6 +12,7 @@ const authApiMocks = {
 const indexedDbMocks = {
   clearIngredients: vi.fn(),
   clearMenuDecisions: vi.fn(),
+  clearMealPlans: vi.fn(),
   deleteDatabase: vi.fn()
 };
 const scopeStateMocks = {
@@ -30,6 +31,7 @@ vi.mock('../../../api/authApi.js', () => ({
 vi.mock('../../../db/indexedDB.js', () => ({
   clearIngredients: (...args) => indexedDbMocks.clearIngredients(...args),
   clearMenuDecisions: (...args) => indexedDbMocks.clearMenuDecisions(...args),
+  clearMealPlans: (...args) => indexedDbMocks.clearMealPlans(...args),
   deleteDatabase: (...args) => indexedDbMocks.deleteDatabase(...args)
 }));
 
@@ -43,6 +45,7 @@ describe('authSessionService', () => {
     window.localStorage.clear();
     indexedDbMocks.clearIngredients.mockResolvedValue(undefined);
     indexedDbMocks.clearMenuDecisions.mockResolvedValue(undefined);
+    indexedDbMocks.clearMealPlans.mockResolvedValue(undefined);
     indexedDbMocks.deleteDatabase.mockResolvedValue(undefined);
     scopeStateMocks.clearScopeState.mockReturnValue(true);
   });
@@ -214,6 +217,7 @@ describe('authSessionService', () => {
     expect(setSession).toHaveBeenCalledWith(null);
     expect(indexedDbMocks.clearIngredients).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(indexedDbMocks.clearMenuDecisions).toHaveBeenCalledWith({ scope: 'user:user-1' });
+    expect(indexedDbMocks.clearMealPlans).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(indexedDbMocks.deleteDatabase).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(scopeStateMocks.clearScopeState).toHaveBeenCalledWith('user:user-1');
     expect(window.localStorage.getItem('fridgemate-pantry-ownership:v2:user:user-1')).toBeNull();
@@ -338,6 +342,7 @@ describe('authSessionService', () => {
     expect(authApiMocks.deleteAccount).toHaveBeenCalledWith('StrongPassphrase123!');
     expect(indexedDbMocks.clearIngredients).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(indexedDbMocks.clearMenuDecisions).toHaveBeenCalledWith({ scope: 'user:user-1' });
+    expect(indexedDbMocks.clearMealPlans).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(indexedDbMocks.deleteDatabase).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(scopeStateMocks.clearScopeState).toHaveBeenCalledWith('user:user-1');
     expect(window.localStorage.getItem('fridgemate-guest-import:user-1')).toBeNull();
@@ -376,6 +381,7 @@ describe('authSessionService', () => {
     expect(result).toEqual({ localCleanupComplete: false });
     expect(indexedDbMocks.clearIngredients).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(indexedDbMocks.clearMenuDecisions).toHaveBeenCalledWith({ scope: 'user:user-1' });
+    expect(indexedDbMocks.clearMealPlans).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(window.localStorage.getItem('fridgemate-guest-import:user-1')).toBeNull();
     expect(window.localStorage.getItem('fridgemate-import-corrections:v2:user:user-1')).toBeNull();
     expect(setSession).toHaveBeenLastCalledWith(null);
@@ -403,6 +409,7 @@ describe('authSessionService', () => {
 
     expect(result).toEqual({ localCleanupComplete: false });
     expect(indexedDbMocks.clearMenuDecisions).toHaveBeenCalledWith({ scope: 'user:user-1' });
+    expect(indexedDbMocks.clearMealPlans).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(indexedDbMocks.deleteDatabase).toHaveBeenCalledWith({ scope: 'user:user-1' });
     expect(window.localStorage.getItem('fridgemate-import-corrections:v2:user:user-1')).toBeNull();
     expect(setSession).toHaveBeenLastCalledWith(null);
@@ -430,7 +437,23 @@ describe('authSessionService', () => {
 
     expect(indexedDbMocks.clearIngredients).not.toHaveBeenCalled();
     expect(indexedDbMocks.clearMenuDecisions).not.toHaveBeenCalled();
+    expect(indexedDbMocks.clearMealPlans).not.toHaveBeenCalled();
     expect(indexedDbMocks.deleteDatabase).not.toHaveBeenCalled();
     expect(setSession).not.toHaveBeenCalled();
+  });
+
+  it('reports incomplete local cleanup rather than claiming all private data was removed', async () => {
+    authApiMocks.deleteAccount.mockResolvedValue(null);
+    indexedDbMocks.clearMealPlans.mockRejectedValueOnce(new Error('Storage unavailable'));
+    const { deleteAccountWithSession } = await import('../authSessionService.js');
+    const setSession = vi.fn();
+    const setError = vi.fn();
+    const result = await deleteAccountWithSession('password', {
+      backendEnabled: true, user: { id: 'user-1' }, setSession, setError,
+      setGuestImportPrompt: vi.fn(), defaultGuestImportPrompt: {}
+    });
+    expect(result).toEqual({ localCleanupComplete: false });
+    expect(setSession).toHaveBeenLastCalledWith(null);
+    expect(setError).toHaveBeenLastCalledWith(expect.stringContaining('브라우저 사이트 데이터를 삭제'));
   });
 });
