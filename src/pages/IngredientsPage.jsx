@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import IngredientFilters from '../components/IngredientFilters';
 import IngredientList from '../components/IngredientList';
+import InventoryQuantityReview from '../components/InventoryQuantityReview';
 import PageHeader from '../components/PageHeader';
 import ShoppingListPanel from '../components/ShoppingListPanel';
+import ShoppingNotesPanel from '../components/ShoppingNotesPanel';
 import {
   defaultIngredientFilters,
   filterIngredients,
@@ -12,7 +14,9 @@ import {
   getDuplicateIngredientCleanupPlan
 } from '../features/ingredients/ingredientSelectors';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useAuth } from '../hooks/useAuth';
 import { useIngredients } from '../hooks/useIngredients';
+import { getInventorySourceToken } from '../features/mealPlans/inventoryQuantityDomain';
 import { getDaysToExpiryBucket } from '../utils/analytics';
 import { isOcrEnabled } from '../utils/backendConfig';
 import { ingredientCategories, storageTypes } from '../utils/ingredientOptions';
@@ -27,7 +31,8 @@ function getTodayDateString() {
 }
 
 function IngredientsPage() {
-  const { ingredients, loading, error, removeIngredient, updateIngredient } = useIngredients();
+  const { ingredients, loading, error, removeIngredient, updateIngredient, loadIngredients } = useIngredients();
+  const { storageScope, loading: authLoading } = useAuth();
   const { trackEvent } = useAnalytics();
   const ocrEnabled = isOcrEnabled();
   const [filters, setFilters] = useState(defaultIngredientFilters);
@@ -36,6 +41,8 @@ function IngredientsPage() {
   const shoppingListItems = useMemo(() => getConsumedIngredients(ingredients), [ingredients]);
   const activeIngredientCount = useMemo(() => ingredients.filter((ingredient) => !ingredient.consumed).length, [ingredients]);
   const duplicateCleanupPlan = useMemo(() => getDuplicateIngredientCleanupPlan(ingredients), [ingredients]);
+  const quantityResetKey = useMemo(() => JSON.stringify(ingredients.map(getInventorySourceToken)), [ingredients]);
+  const refreshAfterReceipt = useCallback(() => loadIngredients({ force: true }), [loadIngredients]);
 
   const handleFilterChange = useCallback((field, value) => {
     setFilters((current) => ({ ...current, [field]: value }));
@@ -195,6 +202,10 @@ function IngredientsPage() {
           </p>
         </section>
       ) : null}
+
+      <InventoryQuantityReview scope={storageScope} resetKey={quantityResetKey} disabled={loading || authLoading} />
+
+      <ShoppingNotesPanel scope={storageScope} resetKey={quantityResetKey} disabled={loading || authLoading} onInventoryApplied={refreshAfterReceipt} />
 
       {!loading ? (
         <ShoppingListPanel

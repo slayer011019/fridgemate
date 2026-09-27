@@ -128,9 +128,7 @@ export async function clearLocalUserData(userId) {
   const storageScope = buildUserStorageScope(userId);
 
   for (const cleanupDatabase of [
-    () => indexedDb.clearIngredients({ scope: storageScope }),
-    () => indexedDb.clearMenuDecisions({ scope: storageScope }),
-    () => indexedDb.clearMealPlans({ scope: storageScope }),
+    () => indexedDb.clearAccountLocalData({ scope: storageScope }),
     () => indexedDb.deleteDatabase({ scope: storageScope })
   ]) {
     try {

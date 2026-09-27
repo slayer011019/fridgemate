@@ -151,7 +151,8 @@ describe('weekly generation and snapshots', () => {
   });
 
   it('shows empty slots and an explanation if every candidate is excluded', () => {
-    const plan = generate({ preferences: { ...preferences, excludedIngredients: ['밥', '파스타면'] } });
+    // Raw rice and Chinese noodles remain separate from cooked rice and pasta.
+    const plan = generate({ preferences: { ...preferences, excludedIngredients: ['밥', '파스타면', '소면', '쌀', '중화면'] } });
     expect(plan.slots.every((slot) => slot.status === 'empty' && slot.templateKey === null)).toBe(true);
     expect(plan.slots[0].reason).toContain('메뉴가 없어요');
   });
@@ -249,14 +250,14 @@ describe('menu changes, locks and skipped dates', () => {
   });
 
   it('explains when no replacement meets current preferences', () => {
-    const plan = generate({ preferences: { ...preferences, excludedIngredients: ['밥', '파스타면'] } });
+    const plan = generate({ preferences: { ...preferences, excludedIngredients: ['밥', '파스타면', '소면', '쌀', '중화면'] } });
     const next = replaceMealPlanSlot(plan, plan.slots[0].id, { now });
     expect(next.slots[0].status).toBe('empty');
     expect(next.slots[0].reason).toContain('다른 메뉴가 없어요');
   });
 
   it('keeps the selected dinner and displays a notice when it is the only eligible option', () => {
-    const plan = generate({ preferences: { ...preferences, excludedIngredients: ['밥', '토마토'] } });
+    const plan = generate({ preferences: { ...preferences, excludedIngredients: ['밥', '토마토', '소면', '쌀', '중화면', '두유'] } });
     expect(plan.slots[0].templateKey).toBe('local-meal:broccoli-pasta');
     const next = replaceMealPlanSlot(plan, plan.slots[0].id, { now });
     expect(next.slots[0].templateKey).toBe(plan.slots[0].templateKey);
@@ -319,7 +320,7 @@ describe('menu changes, locks and skipped dates', () => {
   it('does not restore excluded ingredients from a previously skipped snapshot', () => {
     const plan = generate();
     const skipped = setMealPlanSlotSkipped(plan, plan.slots[0].id, true, { now });
-    const withExclusions = { ...skipped, preferences: { ...skipped.preferences, excludedIngredients: ['밥', '파스타면'] } };
+    const withExclusions = { ...skipped, preferences: { ...skipped.preferences, excludedIngredients: ['밥', '파스타면', '소면', '쌀', '중화면'] } };
     const restored = setMealPlanSlotSkipped(withExclusions, plan.slots[0].id, false, { now });
     expect(restored.slots[0].status).toBe('empty');
     expect(restored.slots[0].templateKey).toBeNull();
