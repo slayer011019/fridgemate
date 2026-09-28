@@ -1,5 +1,7 @@
 // Offline, consent-prepared pilot exports only. This module reads no browser
 // storage, emits no events, and cannot establish consent or anonymity itself.
+import { parsePilotInstant } from './mealPlanPilotPolicy.js';
+
 const INVALID = '파일럿 자료의 형식·관측 범위·이벤트 연결을 확인해주세요.';
 const DAY = 86400000;
 const WEEK = 7 * DAY;
@@ -34,9 +36,8 @@ function array(value, maximum) {
 }
 
 function instant(value) {
-  check(typeof value === 'string' && /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value));
-  const time = Date.parse(value);
-  check(Number.isFinite(time) && new Date(time).toISOString() === value);
+  const time = parsePilotInstant(value);
+  check(time !== null);
   return time;
 }
 

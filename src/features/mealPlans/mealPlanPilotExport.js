@@ -1,7 +1,7 @@
 import { summarizeMealPlanPilot, validatePilotDataset } from './mealPlanPilotMetrics.js';
+import { LOCAL_PILOT_POLICY, LOCAL_PILOT_RETENTION_MS, parsePilotInstant } from './mealPlanPilotPolicy.js';
 
 const INVALID = '로컬 파일럿 내보내기의 형식·범위·보관 기간을 확인해주세요.';
-const DAYS_35 = 35 * 24 * 60 * 60 * 1000;
 const FIELDS = ['schemaVersion', 'exportKind', 'measurementUnit', 'policyVersion', 'startedAt', 'expiresAt', 'dataset'];
 
 function check(condition) {
@@ -9,9 +9,8 @@ function check(condition) {
 }
 
 function instant(value) {
-  check(typeof value === 'string' && /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value));
-  const time = Date.parse(value);
-  check(Number.isFinite(time) && new Date(time).toISOString() === value);
+  const time = parsePilotInstant(value);
+  check(time !== null);
   return time;
 }
 
@@ -24,10 +23,10 @@ export function validateLocalMealPlanPilotExport(input) {
       && [Object.prototype, null].includes(Object.getPrototypeOf(input)));
     check(Reflect.ownKeys(input).length === FIELDS.length && FIELDS.every(key => Object.hasOwn(input, key)));
     check(input.schemaVersion === 1 && input.exportKind === 'fridgemate-local-meal-plan-pilot'
-      && input.measurementUnit === 'browser-scope' && input.policyVersion === 'local-pilot-35d-v1');
+      && input.measurementUnit === 'browser-scope' && input.policyVersion === LOCAL_PILOT_POLICY);
     const startedAt = instant(input.startedAt);
     const expiresAt = instant(input.expiresAt);
-    check(expiresAt === startedAt + DAYS_35);
+    check(expiresAt === startedAt + LOCAL_PILOT_RETENTION_MS);
     const dataset = validatePilotDataset(input.dataset);
     check(dataset.subjects.length === 1 && dataset.subjects[0].observedFrom === input.startedAt
       && dataset.subjects[0].firstGenerationKnown === false && instant(dataset.exportedAt) < expiresAt);

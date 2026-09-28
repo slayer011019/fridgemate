@@ -1,4 +1,5 @@
-const PERIOD = 35 * 24 * 60 * 60 * 1000;
+import { LOCAL_PILOT_RETENTION_MS, parsePilotInstant, createPilotVersion } from './mealPlanPilotPolicy.js';
+
 const DEADLINE = 5000;
 const PREFIX = 'fridgemate-db__';
 const STORE = 'mealPlanPilot';
@@ -10,9 +11,8 @@ function scopeForName(name) {
 }
 
 function instant(value) {
-  if (typeof value !== 'string' || !/^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) throw new Error();
-  const time = Date.parse(value);
-  if (!Number.isFinite(time) || new Date(time).toISOString() !== value) throw new Error();
+  const time = parsePilotInstant(value);
+  if (time === null) throw new Error();
   return time;
 }
 
@@ -27,14 +27,8 @@ function expired(row, scope, now) {
   if (row.status !== 'active') throw new Error();
   const started = instant(row.startedAt);
   const expiry = instant(row.expiresAt);
-  if (expiry !== started + PERIOD) throw new Error();
+  if (expiry !== started + LOCAL_PILOT_RETENTION_MS) throw new Error();
   return now >= expiry;
-}
-
-function version() {
-  const bytes = new Uint8Array(16);
-  globalThis.crypto.getRandomValues(bytes);
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function purgeDatabase(factory, name, scope) {
@@ -88,7 +82,7 @@ function purgeDatabase(factory, name, scope) {
             // Queuing and opening can cross the retention boundary. Payloads
             // need not be valid to delete an expired, valid session header.
             if (!expired(read.result, scope, Date.now())) return;
-            const marker = { id: 'session', schemaVersion: 1, scope, status: 'expired', version: version() };
+            const marker = { id: 'session', schemaVersion: 1, scope, status: 'expired', version: createPilotVersion() };
             store.clear();
             store.put(marker);
             didExpire = true;

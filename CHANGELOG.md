@@ -42,6 +42,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Changed
 
+- Separated weekly meal editing/display from the page workspace and centralized existing pilot timestamp/retention/version primitives without changing state keys, transaction boundaries, error contracts, or product behavior. Compared the current implementation with the supplied PRD v3; overdue-plan holds, atomic consumption corrections and first-entry gaps remain explicit follow-up work rather than being silently included in this refactor. See `docs/PRD_V3_ALIGNMENT_AND_REFACTOR.md`.
 - Updated recipe-search documentation to separate historical staged-backfill checkpoints from the final 1,166-current-vector state.
 
 ### Fixed

@@ -1,8 +1,7 @@
 import { runMealPlanPilotTransaction } from '../../db/indexedDB';
 import { validateLocalMealPlanPilotExport } from './mealPlanPilotExport';
+import { LOCAL_PILOT_POLICY, LOCAL_PILOT_RETENTION_MS, parsePilotInstant, createPilotVersion } from './mealPlanPilotPolicy.js';
 
-const POLICY = 'local-pilot-35d-v1';
-const PERIOD = 35 * 24 * 60 * 60 * 1000;
 const ERROR = '파일럿 설정을 확인하거나 저장하지 못했어요. 새로 확인한 뒤 다시 시도해주세요.';
 const CLOSED_KEYS = ['id', 'schemaVersion', 'scope', 'status', 'version'];
 const ACTIVE_KEYS = [...CLOSED_KEYS, 'policyVersion', 'startedAt', 'expiresAt', 'subjectId', 'kind',
@@ -24,17 +23,9 @@ function scopeValue(scope) {
 }
 
 function instant(value) {
-  check(typeof value === 'string' && /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value));
-  const time = Date.parse(value);
-  check(Number.isFinite(time) && new Date(time).toISOString() === value);
+  const time = parsePilotInstant(value);
+  check(time !== null);
   return time;
-}
-
-function newVersion() {
-  // No deterministic account hashing and no fallback to Math.random.
-  const bytes = new Uint8Array(16);
-  globalThis.crypto.getRandomValues(bytes);
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function envelope(row, exportedAt) {
@@ -58,7 +49,7 @@ function view(row) {
 }
 
 function close(store, scope, status) {
-  const row = { id: 'session', schemaVersion: 1, scope, status, version: newVersion() };
+  const row = { id: 'session', schemaVersion: 1, scope, status, version: createPilotVersion() };
   // Clear the whole dedicated store, including malformed/unexpected rows. Keep
   // only a fresh generation barrier so delayed pre-withdrawal writes cannot win.
   store.clear();
@@ -82,13 +73,13 @@ function current(rows, store, scope, now) {
   }
   const started = instant(row.startedAt);
   const expiry = instant(row.expiresAt);
-  check(expiry === started + PERIOD);
+  check(expiry === started + LOCAL_PILOT_RETENTION_MS);
   // Expire all event/alias material together, never prune an original away from
   // a later reversal. An expired malformed payload must not prolong retention.
   if (instant(now) >= expiry) return close(store, scope, 'expired');
   check(rows.length === 1);
   exact(row, ACTIVE_KEYS);
-  check(row.policyVersion === POLICY && row.kind === (scope === 'guest' ? 'guest' : 'account'));
+  check(row.policyVersion === LOCAL_PILOT_POLICY && row.kind === (scope === 'guest' ? 'guest' : 'account'));
   envelope(row, now);
   return row;
 }
@@ -131,15 +122,15 @@ export async function grantMealPlanPilotConsent(input) {
   // Do not promise next-startup cleanup on browsers that cannot enumerate the
   // existing account databases. Reading/withdrawing old consent remains possible.
   check(typeof window !== 'undefined' && typeof window.indexedDB?.databases === 'function');
-  check(accepted === true && policyVersion === POLICY
+  check(accepted === true && policyVersion === LOCAL_PILOT_POLICY
     && (expectedVersion === null || (typeof expectedVersion === 'string' && /^[a-f0-9]{32}$/.test(expectedVersion))));
   const result = await access(scope, (previous, store, now) => {
     // A stale grant must not roll back a just-completed expiry purge.
     if (previous?.status === 'active' || (previous?.version ?? null) !== expectedVersion) return null;
-    const expiresAt = new Date(instant(now) + PERIOD).toISOString();
+    const expiresAt = new Date(instant(now) + LOCAL_PILOT_RETENTION_MS).toISOString();
     instant(expiresAt);
-    const row = { id: 'session', schemaVersion: 1, scope, status: 'active', version: newVersion(), policyVersion: POLICY,
-      startedAt: now, expiresAt, subjectId: `sub_${newVersion()}`, kind: scope === 'guest' ? 'guest' : 'account',
+    const row = { id: 'session', schemaVersion: 1, scope, status: 'active', version: createPilotVersion(), policyVersion: LOCAL_PILOT_POLICY,
+      startedAt: now, expiresAt, subjectId: `sub_${createPilotVersion()}`, kind: scope === 'guest' ? 'guest' : 'account',
       observedThrough: now, firstGenerationKnown: false, gaps: [], events: [] };
     envelope(row, now);
     store.put(row);
