@@ -151,64 +151,48 @@ export function runMealPlanPilotTransaction(mode, handler, scopeOrOptions) {
   return runStoreTransaction(MEAL_PLAN_PILOT_STORE_NAME, mode, handler, scopeOrOptions);
 }
 
-export function runInventoryReceiptTransaction(mode, handler, scopeOrOptions) {
+function runLinkedStoreTransaction(storeNames, mode, handler, scopeOrOptions, errorMessages) {
   return openDatabase(scopeOrOptions).then((database) => new Promise((resolve, reject) => {
-    const transaction = database.transaction([
-      INGREDIENT_STORE_NAME, INVENTORY_QUANTITY_STORE_NAME, SHOPPING_STORE_NAME, INVENTORY_EVENT_STORE_NAME
-    ], mode);
+    const transaction = database.transaction(Object.values(storeNames), mode);
     let output;
     transaction.oncomplete = () => resolve(output?.result);
-    transaction.onerror = () => reject(transaction.error || new Error('구매 반영 저장에 실패했습니다.'));
-    transaction.onabort = () => reject(transaction.error || new Error('구매 반영 저장이 취소됐습니다.'));
+    transaction.onerror = () => reject(transaction.error || new Error(errorMessages.failed));
+    transaction.onabort = () => reject(transaction.error || new Error(errorMessages.aborted));
     try {
-      output = handler({ ingredients: transaction.objectStore(INGREDIENT_STORE_NAME),
-        quantities: transaction.objectStore(INVENTORY_QUANTITY_STORE_NAME),
-        shopping: transaction.objectStore(SHOPPING_STORE_NAME),
-        events: transaction.objectStore(INVENTORY_EVENT_STORE_NAME) }, transaction);
-    } catch (error) { transaction.abort(); reject(error); }
+      const stores = Object.fromEntries(Object.entries(storeNames)
+        .map(([alias, name]) => [alias, transaction.objectStore(name)]));
+      output = handler(stores, transaction);
+    } catch (error) {
+      transaction.abort();
+      reject(error);
+    }
   }));
+}
+
+export function runInventoryReceiptTransaction(mode, handler, scopeOrOptions) {
+  return runLinkedStoreTransaction({
+    ingredients: INGREDIENT_STORE_NAME, quantities: INVENTORY_QUANTITY_STORE_NAME,
+    shopping: SHOPPING_STORE_NAME, events: INVENTORY_EVENT_STORE_NAME
+  }, mode, handler, scopeOrOptions, {
+    failed: '구매 반영 저장에 실패했습니다.', aborted: '구매 반영 저장이 취소됐습니다.'
+  });
 }
 
 export function runMealCookingTransaction(mode, handler, scopeOrOptions) {
-  return openDatabase(scopeOrOptions).then((database) => new Promise((resolve, reject) => {
-    const transaction = database.transaction([
-      INGREDIENT_STORE_NAME, INVENTORY_QUANTITY_STORE_NAME, MEAL_PLAN_STORE_NAME, INVENTORY_EVENT_STORE_NAME
-    ], mode);
-    let output;
-    transaction.oncomplete = () => resolve(output?.result);
-    transaction.onerror = () => reject(transaction.error || new Error('조리 기록 저장에 실패했습니다.'));
-    transaction.onabort = () => reject(transaction.error || new Error('조리 기록 저장이 취소됐습니다.'));
-    try {
-      output = handler({
-        ingredients: transaction.objectStore(INGREDIENT_STORE_NAME),
-        quantities: transaction.objectStore(INVENTORY_QUANTITY_STORE_NAME),
-        mealPlans: transaction.objectStore(MEAL_PLAN_STORE_NAME),
-        events: transaction.objectStore(INVENTORY_EVENT_STORE_NAME)
-      }, transaction);
-    } catch (error) {
-      transaction.abort();
-      reject(error);
-    }
-  }));
+  return runLinkedStoreTransaction({
+    ingredients: INGREDIENT_STORE_NAME, quantities: INVENTORY_QUANTITY_STORE_NAME,
+    mealPlans: MEAL_PLAN_STORE_NAME, events: INVENTORY_EVENT_STORE_NAME
+  }, mode, handler, scopeOrOptions, {
+    failed: '조리 기록 저장에 실패했습니다.', aborted: '조리 기록 저장이 취소됐습니다.'
+  });
 }
 
 export function runInventoryQuantityTransaction(mode, handler, scopeOrOptions) {
-  return openDatabase(scopeOrOptions).then((database) => new Promise((resolve, reject) => {
-    const transaction = database.transaction([INGREDIENT_STORE_NAME, INVENTORY_QUANTITY_STORE_NAME], mode);
-    let request;
-    transaction.oncomplete = () => resolve(request?.result);
-    transaction.onerror = () => reject(transaction.error || new Error('재고량 저장에 실패했습니다.'));
-    transaction.onabort = () => reject(transaction.error || new Error('재고량 저장이 취소됐습니다.'));
-    try {
-      request = handler({
-        ingredients: transaction.objectStore(INGREDIENT_STORE_NAME),
-        quantities: transaction.objectStore(INVENTORY_QUANTITY_STORE_NAME)
-      }, transaction);
-    } catch (error) {
-      transaction.abort();
-      reject(error);
-    }
-  }));
+  return runLinkedStoreTransaction({
+    ingredients: INGREDIENT_STORE_NAME, quantities: INVENTORY_QUANTITY_STORE_NAME
+  }, mode, handler, scopeOrOptions, {
+    failed: '재고량 저장에 실패했습니다.', aborted: '재고량 저장이 취소됐습니다.'
+  });
 }
 
 export function readMealPlanningSnapshot(scopeOrOptions) {

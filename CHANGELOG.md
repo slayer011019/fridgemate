@@ -42,6 +42,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Changed
 
+- Extracted account privacy UI and recipe request validation, and shared the existing linked-store and embedding-check transaction plumbing without changing public APIs, authorization, scoring, schema, or transaction semantics. Added 42 behavior-preservation tests; the final 2,246 unit/integration and 52 browser cases pass. Recorded audit coverage and three independently reproduced pre-existing error-boundary issues separately in `docs/CODEBASE_REFACTOR_2026-09-28.md`.
 - Separated weekly meal editing/display from the page workspace and centralized existing pilot timestamp/retention/version primitives without changing state keys, transaction boundaries, error contracts, or product behavior. Compared the current implementation with the supplied PRD v3; overdue-plan holds, atomic consumption corrections and first-entry gaps remain explicit follow-up work rather than being silently included in this refactor. See `docs/PRD_V3_ALIGNMENT_AND_REFACTOR.md`.
 - Updated recipe-search documentation to separate historical staged-backfill checkpoints from the final 1,166-current-vector state.
 
