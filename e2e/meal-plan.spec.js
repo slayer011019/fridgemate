@@ -29,6 +29,43 @@ async function readStoredWeek(page) {
   }), weekStart);
 }
 
+for (const viewport of [{ name: 'mobile', width: 390, height: 844 }, { name: 'desktop', width: 1280, height: 900 }]) {
+  test(`ACQ-01 public introduction starts a guest plan without registration on ${viewport.name}`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-09-14T08:00:00.000Z'));
+    await page.setViewportSize(viewport);
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
+    await seedBrowserState(page);
+    await gotoAndWait(page, '/about');
+    const main = page.getByRole('main');
+    const start = main.getByRole('link', { name: '이번 주 식단 만들기', exact: true });
+    await expect(start).toHaveAttribute('href', '/meal-plan');
+    await expect(main).toContainText('오늘뭐먹지');
+    await expect(main).toContainText('FridgeMate');
+    await expect(main.getByRole('link', { name: '메뉴부터 둘러보기', exact: true })).toHaveAttribute('href', '/recipes');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index,follow');
+    expect(await readBrowserIngredients(page, 'guest')).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`public-introduction-${viewport.name}.png`), fullPage: true });
+
+    await start.focus(); await expect(start).toBeFocused(); await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/meal-plan$/);
+    await page.getByLabel('주 시작일').fill(weekStart);
+    await page.getByLabel('식사 인원').selectOption('2');
+    for (const day of ['화', '수', '목', '금', '토', '일']) await page.getByLabel(`${day}요일 저녁`, { exact: true }).uncheck();
+    await page.getByRole('button', { name: '한 주 식단 만들기', exact: true }).click();
+    await waitForSave(page);
+    expect((await readStoredWeek(page)).confirmed).toBeNull();
+    await page.getByRole('button', { name: '이 식단 확정', exact: true }).click();
+    await expect(page.getByText('식단을 확정했어요.', { exact: true })).toBeVisible();
+    expect((await readStoredWeek(page)).confirmed.preferences).toEqual({ servings: 2, excludedIngredients: [], dinnerDays: [0] });
+    expect(await readBrowserIngredients(page, 'guest')).toEqual([]);
+    expect(await page.evaluate(() => localStorage.getItem('fridgemate-auth-session'))).toBeNull();
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /^noindex(?:,|$)/);
+    await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+}
+
 test('FR-00 a guest starts from home and makes a chosen-days plan without registering inventory', async ({ page }, testInfo) => {
   await page.clock.setFixedTime(new Date('2026-09-14T08:00:00.000Z'));
   await page.setViewportSize({ width: 390, height: 844 });
