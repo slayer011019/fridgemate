@@ -31,6 +31,39 @@ describe('local cooking event validation', () => {
     expect(events.assertMealCookingEvent?.(saved, 'user:alice_1-2')).toEqual(saved);
   });
 
+  it.each([{ lines: [line()] }, { lines: [] }])('accepts a replacement consumption, including an explicitly confirmed zero usage: %j', ({ lines }) => {
+    const saved = { ...event('consumption'), cookingId: 'cooking:original', replacesId: 'consumption:original', lines };
+    const before = structuredClone(saved);
+    expect(events.assertMealCookingEvent(saved, 'guest')).toStrictEqual(before);
+    expect(saved).toStrictEqual(before);
+  });
+
+  it.each([{ lines: [line()] }, { lines: [] }])('accepts the inverse of a replacement consumption without requiring the initial operation suffix: %j', ({ lines }) => {
+    const saved = { ...event('consumption-reversal'), reversesId: 'consumption:corrected', lines };
+    expect(events.assertMealCookingEvent(saved, 'guest')).toStrictEqual(saved);
+  });
+
+  it('accepts an atomic correction inverse linked to its same-operation replacement', () => {
+    const saved = { ...event('consumption-reversal'), replacementConsumptionId: 'consumption:one' };
+    expect(events.assertMealCookingEvent(saved, 'guest')).toStrictEqual(saved);
+  });
+
+  it.each([
+    ['replacement with wrong prior namespace', { kind: 'consumption', cookingId: 'cooking:original', replacesId: 'cooking:original' }],
+    ['replacement without prior id', { kind: 'consumption', replacesId: null }],
+    ['replacement with undefined prior id', { kind: 'consumption', replacesId: undefined }],
+    ['self-replacement', { kind: 'consumption', replacesId: 'consumption:one' }],
+    ['replacement without original cooking id', { kind: 'consumption', cookingId: 'cooking:', replacesId: 'consumption:original' }],
+    ['inverse with another operation replacement', { kind: 'consumption-reversal', replacementConsumptionId: 'consumption:other' }],
+    ['inverse with null replacement', { kind: 'consumption-reversal', replacementConsumptionId: null }],
+    ['inverse with undefined replacement', { kind: 'consumption-reversal', replacementConsumptionId: undefined }],
+    ['replacement pointer on original cooking', { kind: 'cooking', replacesId: 'consumption:original' }],
+    ['inverse replacement pointer on consumption', { kind: 'consumption', replacementConsumptionId: 'consumption:other' }],
+  ])('rejects malformed correction metadata: %s', (_label, patch) => {
+    const saved = { ...event(patch.kind), ...patch };
+    expect(() => events.assertMealCookingEvent(saved, 'guest')).toThrow();
+  });
+
   it.each([
     ['foreign scope', saved => { saved.scope = 'user:alice'; }],
     ['unsupported scope', saved => { saved.scope = 'guest/other'; }, 'guest/other'],
@@ -89,7 +122,7 @@ describe('local cooking event validation', () => {
   });
 
   it.each([
-    ['consumption-reversal', { reversesId: 'consumption:other' }],
+    ['consumption-reversal', { reversesId: 'consumption:bad/id' }],
     ['consumption-reversal', { cookingId: 'cooking:' }],
     ['consumption-reversal', { reversesId: 'receipt:original' }],
     ['consumption-reversal', { lines: [ { ...line(), amount: 0 } ] }],

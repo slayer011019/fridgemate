@@ -64,6 +64,48 @@ async function setup(scope = 'guest', options = {}) {
   return { scope, db, plans, changes, quantities, cooking, ingredient, request, preview, review, addWeek };
 }
 
+// A persisted correction chain, independent of the correction command under
+// development. The original 150g consumption stays immutable; its inverse and
+// replacement 100g consumption belong to one later operation.
+async function seedCorrectedCooking(s, { reversed = false } = {}) {
+  const row = (await s.quantities.getInventoryQuantitySnapshot(s.scope)).inventory[0];
+  await s.cooking.recordMealCooking({ scope: s.scope, weekStart: WEEK, slotId: SLOT, operationId: 'actual',
+    expectedPlanRevision: 2, usageMode: 'measured', completeUsageConfirmed: true,
+    usages: [{ ingredientId: row.id, amount: 150, unit: 'g', expectedRevision: row.quantityRevision, expectedSourceToken: row.sourceToken }] });
+  const before = await state(s.scope);
+  const original = before.inventoryEvents.find(event => event.id === 'consumption:actual');
+  const common = { schemaVersion: 1, scope: s.scope, weekStart: WEEK, slotId: SLOT, cookingId: 'cooking:actual',
+    operationId: 'corrected', requestKey: '{"actual":100}', createdAt: '2026-09-21T09:01:00.000Z' };
+  const replacement = { ...common, id: 'consumption:corrected', kind: 'consumption', replacesId: original.id,
+    lines: original.lines.map(line => ({ ...line, amount: 100 })) };
+  const inverse = { ...common, id: 'consumption-reversal:corrected', kind: 'consumption-reversal',
+    reversesId: original.id, replacementConsumptionId: replacement.id, lines: structuredClone(original.lines) };
+  const terminal = { ...common, id: 'consumption-reversal:terminal', kind: 'consumption-reversal',
+    operationId: 'terminal', requestKey: '{"reverse":true}', createdAt: '2026-09-21T09:02:00.000Z',
+    reversesId: replacement.id, lines: structuredClone(replacement.lines) };
+  await s.db.runMealCookingTransaction('readwrite', ({ mealPlans, events }) => {
+    events.add(inverse);
+    events.add(replacement);
+    if (reversed) events.add(terminal);
+    const read = mealPlans.get(`week:${WEEK}`);
+    read.onsuccess = () => {
+      const record = read.result;
+      record.revision = 4;
+      record.confirmed.revision = 4;
+      Object.assign(record.confirmed.slots[0].cooking, {
+        consumptionId: replacement.id, inventoryStatus: reversed ? 'reversed' : 'applied',
+        reversalId: reversed ? terminal.id : null,
+      });
+      mealPlans.put(record);
+    };
+  }, s.scope);
+  // Use a separately confirmed current count, not historical-event arithmetic,
+  // to supply the planning reader's valid inventory snapshot.
+  await s.db.saveIngredient({ ...s.ingredient, quantity: reversed ? '300g' : '200g' }, s.scope);
+  await s.review(reversed ? 300 : 200);
+  return { original, replacement, inverse, terminal };
+}
+
 describe('explicit atomic meal plan changes', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -563,6 +605,97 @@ describe('explicit atomic meal plan changes', () => {
     });
     const before = await state();
     await expect(s.preview({ ...s.request, slotId: '2026-09-22:dinner' })).rejects.toThrow();
+    expect(await state()).toEqual(before);
+  });
+
+  it.each(['move', 'readjust'])('preserves a corrected consumption leaf when approving a %s of another dinner', async kind => {
+    const s = await setup();
+    await seedCorrectedCooking(s);
+    const before = await state();
+    const request = kind === 'move' ? { ...s.request, slotId: '2026-09-22:dinner' }
+      : { scope: 'guest', weekStart: WEEK, kind, pantryItems: [] };
+    const pending = s.preview(request);
+    await expect(pending).resolves.toMatchObject({ canApply: true });
+    const preview = await pending;
+    expect(preview.plans[0].slots[0].cooking).toEqual({ id: 'cooking:actual', recordedAt: NOW,
+      inventoryStatus: 'applied', consumptionId: 'consumption:corrected', reversalId: null });
+    expect(await state()).toEqual(before);
+    await s.changes.confirmMealPlanChange(preview);
+    const after = await state();
+    expect(after.mealPlans[0].confirmed.slots[0]).toEqual(before.mealPlans[0].confirmed.slots[0]);
+    expect(after.mealPlans[0].archives.at(-1)).toEqual(before.mealPlans[0].confirmed);
+    for (const store of STORES.filter(name => name !== 'mealPlans')) expect(after[store]).toEqual(before[store]);
+    expect(after.inventoryEvents.find(event => event.id === 'cooking:actual').consumptionId).toBe('consumption:actual');
+  });
+
+  it.each(['move', 'readjust'])('requires a fresh %s preview after the real usage-correction command commits', async kind => {
+    const s = await setup();
+    let row = (await s.quantities.getInventoryQuantitySnapshot()).inventory[0];
+    await s.cooking.recordMealCooking({ scope: 'guest', weekStart: WEEK, slotId: SLOT, operationId: 'actual',
+      expectedPlanRevision: 2, usageMode: 'measured', completeUsageConfirmed: true,
+      usages: [{ ingredientId: row.id, amount: 150, unit: 'g', expectedRevision: row.quantityRevision, expectedSourceToken: row.sourceToken }] });
+    const request = kind === 'move' ? { ...s.request, slotId: '2026-09-22:dinner' }
+      : { scope: 'guest', weekStart: WEEK, kind, pantryItems: [] };
+    const oldPreview = await s.preview(request);
+    row = (await s.quantities.getInventoryQuantitySnapshot()).inventory[0];
+    const check = { ingredientId: row.id, expectedRevision: row.quantityRevision, expectedSourceToken: row.sourceToken };
+    await s.cooking.correctMealConsumption({ scope: 'guest', weekStart: WEEK, slotId: SLOT, operationId: 'corrected',
+      cookingId: 'cooking:actual', expectedPlanRevision: 3, expectedConsumptionId: 'consumption:actual',
+      completeUsageConfirmed: true, inventory: [check], usages: [{ ...check, amount: 100, unit: 'g' }] });
+    const corrected = await state();
+    expect((await s.quantities.getInventoryQuantitySnapshot()).inventory[0]).toMatchObject({ amount: 200, quantityStatus: 'verified' });
+    await expect(s.changes.confirmMealPlanChange(oldPreview)).rejects.toThrow();
+    expect(await state()).toEqual(corrected);
+    const fresh = await s.preview(request);
+    expect(fresh).toMatchObject({ canApply: true });
+    await s.changes.confirmMealPlanChange(fresh);
+    const after = await state();
+    expect(after.mealPlans[0].confirmed.slots[0].cooking).toEqual({ id: 'cooking:actual', recordedAt: NOW,
+      consumptionId: 'consumption:corrected', inventoryStatus: 'applied', reversalId: null });
+    for (const store of STORES.filter(name => name !== 'mealPlans')) expect(after[store]).toEqual(corrected[store]);
+  });
+
+  it.each(['move', 'readjust'])('preserves the terminal inverse of a corrected consumption when approving a %s', async kind => {
+    const s = await setup();
+    await seedCorrectedCooking(s, { reversed: true });
+    const before = await state();
+    const pending = s.preview(kind === 'move' ? { ...s.request, slotId: '2026-09-22:dinner' }
+      : { scope: 'guest', weekStart: WEEK, kind, pantryItems: [] });
+    await expect(pending).resolves.toMatchObject({ canApply: true });
+    const preview = await pending;
+    expect(preview.plans[0].slots[0].cooking).toEqual({ id: 'cooking:actual', recordedAt: NOW,
+      inventoryStatus: 'reversed', consumptionId: 'consumption:corrected', reversalId: 'consumption-reversal:terminal' });
+    await s.changes.confirmMealPlanChange(preview);
+    const after = await state();
+    expect(after.mealPlans[0].confirmed.slots[0]).toEqual(before.mealPlans[0].confirmed.slots[0]);
+    for (const store of STORES.filter(name => name !== 'mealPlans')) expect(after[store]).toEqual(before[store]);
+  });
+
+  it.each([
+    ['superseded consumption and its correction inverse', false, {
+      consumptionId: 'consumption:actual', inventoryStatus: 'reversed', reversalId: 'consumption-reversal:corrected',
+    }],
+    ['superseded consumption after a terminal inverse', true, {
+      consumptionId: 'consumption:actual', inventoryStatus: 'reversed', reversalId: 'consumption-reversal:terminal',
+    }],
+    ['replacement treated as reversed by its internal correction inverse', false, {
+      consumptionId: 'consumption:corrected', inventoryStatus: 'reversed', reversalId: 'consumption-reversal:corrected',
+    }],
+    ['terminally reversed replacement still marked applied', true, {
+      consumptionId: 'consumption:corrected', inventoryStatus: 'applied', reversalId: null,
+    }],
+  ])('rejects a cooked slot pointing to %s without changing any stores', async (_label, reversed, damage) => {
+    const s = await setup();
+    await seedCorrectedCooking(s, { reversed });
+    await s.db.runMealCookingTransaction('readwrite', ({ mealPlans }) => {
+      const read = mealPlans.get(`week:${WEEK}`);
+      read.onsuccess = () => {
+        Object.assign(read.result.confirmed.slots[0].cooking, damage);
+        mealPlans.put(read.result);
+      };
+    });
+    const before = await state();
+    await expect(s.preview({ ...s.request, slotId: '2026-09-22:dinner' })).rejects.toThrow('조리 상태');
     expect(await state()).toEqual(before);
   });
 

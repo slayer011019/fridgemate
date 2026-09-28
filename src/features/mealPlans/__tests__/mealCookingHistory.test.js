@@ -25,6 +25,21 @@ function cancel(operationId = 'cancel', originalId = 'one') {
     reversesId: `cooking:${originalId}` };
 }
 
+function correction(operationId = 'adjust', original = measured()[1], lines = [{ ...line(), amount: 100 }]) {
+  const common = { ...base, scope: original.scope, weekStart: original.weekStart, slotId: original.slotId,
+    operationId, requestKey: JSON.stringify({ action: 'correct', operationId }), cookingId: original.cookingId };
+  return [
+    { ...common, kind: 'consumption-reversal', id: `consumption-reversal:${operationId}`,
+      reversesId: original.id, replacementConsumptionId: `consumption:${operationId}`, lines: structuredClone(original.lines) },
+    { ...common, kind: 'consumption', id: `consumption:${operationId}`, replacesId: original.id, lines: structuredClone(lines) },
+  ];
+}
+
+function finalInverse(consumption, operationId = 'final-undo') {
+  return { ...inverse(operationId), cookingId: consumption.cookingId, reversesId: consumption.id,
+    lines: structuredClone(consumption.lines) };
+}
+
 describe('linked immutable cooking history', () => {
   it.each(['guest/other', undefined])('rejects invalid scope %s even when no events have been stored', scope => {
     let failure;
@@ -96,5 +111,117 @@ describe('linked immutable cooking history', () => {
     try { events.assertMealCookingHistory?.(make(), 'guest'); } catch (error) { failure = error; }
     // Missing functionality is an assertion failure, never a throwing import/function false positive.
     expect(failure).toBeInstanceOf(Error);
+  });
+});
+
+describe('atomic consumption correction history', () => {
+  it.each([
+    ['one replacement', () => [...measured(), ...correction()]],
+    ['repeated replacement', () => { const first = correction(); return [...measured(), ...first, ...correction('again', first[1])]; }],
+    ['zero actual use', () => [...measured(), ...correction('zero', measured()[1], [])]],
+    ['replacement after zero use', () => { const zero = correction('zero', measured()[1], []); return [...measured(), ...zero, ...correction('again', zero[1])]; }],
+    ['standalone reversal of latest replacement', () => { const pair = correction(); return [...measured(), ...pair, finalInverse(pair[1])]; }],
+    ['standalone reversal of zero use', () => { const pair = correction('zero', measured()[1], []); return [...measured(), ...pair, finalInverse(pair[1])]; }],
+    ['cancelled corrected cooking', () => { const pair = correction(); return [...measured(), ...pair, finalInverse(pair[1]), cancel()]; }],
+    ['new cooking after corrected cancellation', () => { const pair = correction(); return [...measured(), ...pair, finalInverse(pair[1]), cancel(), ...measured('later')]; }],
+  ])('accepts %s without mutating original events', (_label, build) => {
+    const history = build();
+    const before = structuredClone(history);
+    expect(events.assertMealCookingHistory(history, 'guest')).toStrictEqual(before);
+    expect(history).toStrictEqual(before);
+  });
+
+  it('follows reciprocal links regardless of event order or inverse line/property order', () => {
+    const first = correction();
+    first[0].lines = first[0].lines.reverse().map(item => Object.fromEntries(Object.entries(item).reverse()));
+    const second = correction('again', first[1]);
+    const history = [second[1], first[0], measured()[1], second[0], measured()[0], first[1]];
+    expect(events.assertMealCookingHistory(history, 'guest')).toStrictEqual(history);
+  });
+
+  it.each([
+    ['missing correction inverse', () => [...measured(), correction()[1]]],
+    ['missing replacement consumption', () => [...measured(), correction()[0]]],
+    ['inverse without reciprocal replacement pointer', () => { const pair = correction(); delete pair[0].replacementConsumptionId; return [...measured(), ...pair]; }],
+    ['replacement points to different prior consumption', () => { const pair = correction(); pair[1].replacesId = 'consumption:other'; return [...measured(), ...pair]; }],
+    ['mixed correction requests', () => { const pair = correction(); pair[1].requestKey = '{"action":"another"}'; return [...measured(), ...pair]; }],
+    ['mixed correction scopes', () => { const pair = correction(); pair[1].scope = 'user:other'; return [...measured(), ...pair]; }],
+    ['mixed correction slots', () => { const pair = correction(); pair[1].slotId = '2026-09-17:dinner'; return [...measured(), ...pair]; }],
+    ['mixed correction cooking links', () => { const pair = correction(); pair[1].cookingId = 'cooking:other'; return [...measured(), ...pair]; }],
+    ['changed original cooking pointer', () => { const history = [...measured(), ...correction()]; history[0].consumptionId = 'consumption:adjust'; return history; }],
+    ['two replacements of one consumption', () => [...measured(), ...correction(), ...correction('branch')]],
+    ['replacement after standalone reversal', () => [...measured(), inverse(), ...correction()]],
+    ['replacement after cancelled cooking', () => [...measured(), inverse(), cancel(), ...correction()]],
+    ['cancelled correction with latest consumption still applied', () => [...measured(), ...correction(), cancel()]],
+    ['empty inverse for nonempty prior consumption', () => { const pair = correction(); pair[0].lines = []; return [...measured(), ...pair]; }],
+    ['changed correction inverse amount', () => { const pair = correction(); pair[0].lines[0].amount = 149; return [...measured(), ...pair]; }],
+    ['orphan cyclic replacement component', () => {
+      const first = correction('cycle-a');
+      const second = correction('cycle-b', first[1]);
+      first[0].reversesId = second[1].id;
+      first[0].lines = structuredClone(second[1].lines);
+      first[1].replacesId = second[1].id;
+      return [...measured(), ...first, ...second];
+    }],
+  ])('rejects %s', (_label, build) => {
+    expect(() => events.assertMealCookingHistory(build(), 'guest')).toThrow();
+  });
+});
+
+describe('current state of an immutable cooking history', () => {
+  function state(history, id = 'cooking:one') {
+    expect(events.getMealCookingState).toBeTypeOf('function');
+    return events.getMealCookingState(history, id);
+  }
+
+  it('returns the original legacy cooking and its active consumption', () => {
+    const history = measured();
+    expect(state(history)).toStrictEqual({ cooking: history[0], consumption: history[1], reversal: null,
+      cancelled: false, inventoryStatus: 'applied' });
+  });
+
+  it('returns unmeasured cooking without inventing inventory usage', () => {
+    const cooking = unmeasured();
+    expect(state([cooking], cooking.id)).toStrictEqual({ cooking, consumption: null, reversal: null,
+      cancelled: false, inventoryStatus: 'needs-review' });
+  });
+
+  it('returns the latest consumption rather than a replaced consumption or intermediate reversal', () => {
+    const original = measured();
+    const first = correction();
+    const second = correction('again', first[1]);
+    const history = [...original, ...first, ...second].reverse();
+    const before = structuredClone(history);
+    expect(state(history)).toStrictEqual({ cooking: original[0], consumption: second[1], reversal: null,
+      cancelled: false, inventoryStatus: 'applied' });
+    expect(history).toStrictEqual(before);
+  });
+
+  it('keeps a zero-use correction applied until its latest consumption is explicitly reversed', () => {
+    const original = measured();
+    const pair = correction('zero', original[1], []);
+    expect(state([...original, ...pair])).toStrictEqual({ cooking: original[0], consumption: pair[1], reversal: null,
+      cancelled: false, inventoryStatus: 'applied' });
+    const undo = finalInverse(pair[1]);
+    expect(state([...original, ...pair, undo])).toStrictEqual({ cooking: original[0], consumption: pair[1], reversal: undo,
+      cancelled: false, inventoryStatus: 'reversed' });
+  });
+
+  it('keeps cancellation distinct from a consumption-only reversal', () => {
+    const original = measured();
+    const pair = correction();
+    const undo = finalInverse(pair[1]);
+    expect(state([...original, ...pair, undo, cancel()])).toStrictEqual({ cooking: original[0], consumption: pair[1],
+      reversal: undo, cancelled: true, inventoryStatus: 'reversed' });
+    const unknown = unmeasured();
+    expect(state([unknown, cancel('unknown-cancel', 'unknown')], unknown.id)).toStrictEqual({ cooking: unknown, consumption: null,
+      reversal: null, cancelled: true, inventoryStatus: 'needs-review' });
+  });
+
+  it('validates all history before returning null for an unknown cooking id', () => {
+    expect(state([], 'cooking:absent')).toBeNull();
+    expect(state(measured(), 'cooking:absent')).toBeNull();
+    expect(() => state([measured()[1]], 'cooking:absent')).toThrow();
+    expect(() => state([...measured(), ...measured('other').map(item => ({ ...item, scope: 'user:other' }))], 'cooking:absent')).toThrow();
   });
 });

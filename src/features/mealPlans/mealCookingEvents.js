@@ -15,8 +15,8 @@ function day(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
 }
 
-function assertLines(lines) {
-  if (!Array.isArray(lines) || lines.length === 0) throw new Error(INVALID);
+function assertLines(lines, allowEmpty = false) {
+  if (!Array.isArray(lines) || (!allowEmpty && lines.length === 0)) throw new Error(INVALID);
   const ids = new Set();
   for (const line of lines) {
     if (!object(line) || !text(line.inventoryId) || ids.has(line.inventoryId)
@@ -49,17 +49,23 @@ export function assertMealCookingEvent(event, scope) {
   let request;
   try { request = JSON.parse(event.requestKey); } catch { throw new Error(INVALID); }
   if (!object(request)) throw new Error(INVALID);
+  if ((Object.hasOwn(event, 'replacesId') && event.kind !== 'consumption')
+    || (Object.hasOwn(event, 'replacementConsumptionId') && event.kind !== 'consumption-reversal')) throw new Error(INVALID);
 
   if (event.kind === 'cooking') {
     if (!['applied', 'needs-review'].includes(event.inventoryStatus)
       || event.consumptionId !== (event.inventoryStatus === 'applied' ? `consumption:${event.operationId}` : null)) throw new Error(INVALID);
   } else if (event.kind === 'consumption') {
-    if (event.cookingId !== `cooking:${event.operationId}`) throw new Error(INVALID);
-    assertLines(event.lines);
+    const replacement = Object.hasOwn(event, 'replacesId');
+    if (replacement ? (!link(event.cookingId, 'cooking') || !link(event.replacesId, 'consumption') || event.replacesId === event.id)
+      : event.cookingId !== `cooking:${event.operationId}`) throw new Error(INVALID);
+    assertLines(event.lines, replacement);
   } else if (event.kind === 'consumption-reversal') {
     if (!link(event.cookingId, 'cooking') || !link(event.reversesId, 'consumption')
-      || event.reversesId.slice('consumption:'.length) !== event.cookingId.slice('cooking:'.length)) throw new Error(INVALID);
-    assertLines(event.lines);
+      || (Object.hasOwn(event, 'replacementConsumptionId')
+        && event.replacementConsumptionId !== `consumption:${event.operationId}`)) throw new Error(INVALID);
+    // Empty inverses are valid only when history confirms a zero-use replacement.
+    assertLines(event.lines, true);
   } else if (!link(event.reversesId, 'cooking')) throw new Error(INVALID);
   return event;
 }
@@ -77,9 +83,7 @@ function sameMeal(left, right) {
   return left.scope === right.scope && left.weekStart === right.weekStart && left.slotId === right.slotId;
 }
 
-/** Check linked history before a mutation. Structural validation alone cannot
- * prove that an applied consumption exists or that its inverse was used once. */
-export function assertMealCookingHistory(events, scope) {
+function inspectMealCookingHistory(events, scope) {
   if (!Array.isArray(events) || typeof scope !== 'string'
     || (scope !== 'guest' && !/^user:[A-Za-z0-9_-]+$/.test(scope))) throw new Error(INVALID);
   const byId = new Map();
@@ -95,11 +99,18 @@ export function assertMealCookingHistory(events, scope) {
       const consumption = byId.get(event.consumptionId);
       if (consumption?.kind !== 'consumption' || consumption.cookingId !== event.id
         || !sameMeal(consumption, event) || consumption.operationId !== event.operationId
-        || consumption.requestKey !== event.requestKey) throw new Error(INVALID);
+        || consumption.requestKey !== event.requestKey || Object.hasOwn(consumption, 'replacesId')) throw new Error(INVALID);
     } else if (event.kind === 'consumption') {
       const cooking = byId.get(event.cookingId);
-      if (cooking?.kind !== 'cooking' || cooking.inventoryStatus !== 'applied' || cooking.consumptionId !== event.id
-        || !sameMeal(cooking, event) || cooking.operationId !== event.operationId
+      if (cooking?.kind !== 'cooking' || cooking.inventoryStatus !== 'applied' || !sameMeal(cooking, event)) throw new Error(INVALID);
+      if (Object.hasOwn(event, 'replacesId')) {
+        const previous = byId.get(event.replacesId);
+        const inverse = byId.get(`consumption-reversal:${event.operationId}`);
+        if (previous?.kind !== 'consumption' || previous.cookingId !== cooking.id || !sameMeal(previous, event)
+          || inverse?.kind !== 'consumption-reversal' || inverse.reversesId !== previous.id
+          || inverse.replacementConsumptionId !== event.id || inverse.cookingId !== cooking.id
+          || !sameMeal(inverse, event) || inverse.requestKey !== event.requestKey) throw new Error(INVALID);
+      } else if (cooking.consumptionId !== event.id || cooking.operationId !== event.operationId
         || cooking.requestKey !== event.requestKey) throw new Error(INVALID);
     } else if (event.kind === 'consumption-reversal') {
       const consumption = byId.get(event.reversesId);
@@ -109,6 +120,12 @@ export function assertMealCookingHistory(events, scope) {
         || inverses.has(consumption.id) || consumption.lines.length !== event.lines.length) throw new Error(INVALID);
       const originalLines = new Map(consumption.lines.map(line => [line.inventoryId, line]));
       if (!event.lines.every(line => sameStoredValue(line, originalLines.get(line.inventoryId)))) throw new Error(INVALID);
+      if (Object.hasOwn(event, 'replacementConsumptionId')) {
+        const replacement = byId.get(event.replacementConsumptionId);
+        if (replacement?.kind !== 'consumption' || replacement.replacesId !== consumption.id
+          || replacement.cookingId !== cooking.id || !sameMeal(replacement, event)
+          || replacement.operationId !== event.operationId || replacement.requestKey !== event.requestKey) throw new Error(INVALID);
+      }
       inverses.set(consumption.id, event);
     } else if (event.kind === 'cooking-reversal') {
       const cooking = byId.get(event.reversesId);
@@ -117,14 +134,45 @@ export function assertMealCookingHistory(events, scope) {
     }
   }
   const activeSlots = new Set();
+  const reached = new Set();
+  const states = new Map();
   for (const event of events) {
     if (event.kind !== 'cooking') continue;
-    if (cancellations.has(event.id)) {
-      if (event.inventoryStatus === 'applied' && !inverses.has(event.consumptionId)) throw new Error(INVALID);
+    let consumption = byId.get(event.consumptionId) || null;
+    while (consumption) {
+      if (reached.has(consumption.id)) throw new Error(INVALID);
+      reached.add(consumption.id);
+      const inverse = inverses.get(consumption.id);
+      if (!inverse?.replacementConsumptionId) break;
+      consumption = byId.get(inverse.replacementConsumptionId);
+    }
+    const reversal = consumption ? inverses.get(consumption.id) || null : null;
+    const cancelled = cancellations.has(event.id);
+    if (cancelled) {
+      if (consumption && !reversal) throw new Error(INVALID);
     } else {
       if (activeSlots.has(event.slotId)) throw new Error(INVALID);
       activeSlots.add(event.slotId);
     }
+    states.set(event.id, { cooking: event, consumption, reversal, cancelled,
+      inventoryStatus: !consumption ? 'needs-review' : reversal ? 'reversed' : 'applied' });
   }
+  // Reciprocal links alone could form a disconnected cycle. Every consumption
+  // must be reachable exactly once from an immutable initial cooking pointer.
+  if (reached.size !== events.filter(event => event.kind === 'consumption').length) throw new Error(INVALID);
+  return states;
+}
+
+/** Check linked history before a mutation, including atomic correction pairs. */
+export function assertMealCookingHistory(events, scope) {
+  inspectMealCookingHistory(events, scope);
   return events;
+}
+
+/** Read current state from a single-scope history. Callers choose the authorized
+ * scope; this helper validates all events even when the requested id is absent. */
+export function getMealCookingState(history, cookingId) {
+  if (!Array.isArray(history)) throw new Error(INVALID);
+  if (history.length === 0) return null;
+  return inspectMealCookingHistory(history, history[0]?.scope).get(cookingId) || null;
 }

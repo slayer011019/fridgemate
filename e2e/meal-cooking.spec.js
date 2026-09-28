@@ -286,3 +286,111 @@ test('an aborted cooking transaction never shows success and its UI retry applie
   await form.getByRole('button', { name: '실제 사용량으로 조리 기록', exact: true }).click();
   await expectSingleConsumption(page);
 });
+
+async function receiveLaterChicken(page) {
+  const notes = page.getByRole('region', { name: '장보기 메모', exact: true });
+  await notes.getByRole('button', { name: '장보기 메모 열기', exact: true }).click();
+  const purchase = notes.getByRole('form', { name: '구매 메모 작성', exact: true });
+  await purchase.getByLabel('구매한 품목의 출처', { exact: true }).selectOption({ label: '식단: 닭고기 (50g)' });
+  await purchase.getByLabel('실제로 산 양', { exact: true }).fill('500g 한 팩');
+  await purchase.getByRole('button', { name: '구매 메모 저장', exact: true }).click();
+  const receipts = notes.getByRole('region', { name: '구매 메모 이력', exact: true });
+  await receipts.getByText('입고할 양 확인', { exact: true }).click();
+  const receive = receipts.getByRole('form', { name: '구매 반영 · 닭고기', exact: true });
+  await receive.getByLabel('확인한 구매량', { exact: true }).fill('500');
+  await receive.getByLabel('입고 상태', { exact: true }).selectOption('raw');
+  await receive.getByLabel('보관 장소', { exact: true }).selectOption('냉장');
+  await receive.getByLabel('유통기한(모르면 비워두기)', { exact: true }).fill('2026-09-30');
+  await receive.getByRole('button', { name: '확인한 구매량을 재고에 반영', exact: true }).click();
+  await expect(receipts.getByText('입고 당시 500g · 현재 남은 양은 냉장고에서 확인해 주세요.', { exact: true })).toBeVisible();
+}
+
+async function openCorrection(page) {
+  await historyMeal(page).getByRole('button', { name: '실제 사용량 정정', exact: true }).click();
+  return panel(page).getByRole('form', { name: `실제 사용량 정정 · ${WEEK} 저녁`, exact: true });
+}
+
+test('correcting actual 150g to 100g keeps the later 500g receipt and the cooking fact on mobile', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await start(page);
+  const actual = await actual150(page);
+  await actual.getByRole('button', { name: '실제 사용량으로 조리 기록', exact: true }).click();
+  const cooked = await expectSingleConsumption(page);
+  await page.reload(); await page.getByLabel('주 시작일').fill(WEEK);
+  await receiveLaterChicken(page);
+  const before = await readState(page);
+  const receiptStock = before.ingredients.find(item => item.id !== 'cooking-stock');
+  await meal(page).getByRole('button', { name: '조리 기록 확인', exact: true }).click();
+  const correction = await openCorrection(page);
+  const amount = correction.getByLabel('닭고기 (1번 재고) 정정할 사용량 (g)', { exact: true });
+  await expect(amount).toHaveValue('150');
+  await amount.fill('100');
+  await expect(correction.getByRole('region', { name: '정정 후 재고 미리보기' })).toContainText('150g + 150g − 100g = 200g');
+  expect(await readState(page)).toEqual(before);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await correction.screenshot({ path: testInfo.outputPath('consumption-correction-mobile.png') });
+  await correction.getByRole('checkbox', { name: '정정할 실제 사용량을 모두 확인했어요', exact: true }).check();
+  await correction.getByRole('button', { name: '정정한 사용량으로 재고 반영', exact: true }).dblclick();
+  await expect(panel(page).getByText('실제 사용량을 정정했어요. 조리 기록은 유지돼요.', { exact: true })).toBeVisible();
+  const corrected = await readState(page);
+  expect(corrected.ingredients.find(item => item.id === 'cooking-stock').quantity).toBe('200g');
+  expect(corrected.ingredients.find(item => item.id === receiptStock.id)).toEqual(receiptStock);
+  expect(corrected.inventoryQuantities.filter(item => item.status === 'verified').reduce((sum, item) => sum + item.amount, 0)).toBe(700);
+  expect(corrected.inventoryEvents.filter(event => event.kind === 'cooking')).toEqual(cooked.inventoryEvents.filter(event => event.kind === 'cooking'));
+  expect(corrected.inventoryEvents.filter(event => event.kind === 'consumption')).toHaveLength(2);
+  expect(corrected.mealPlans[0].confirmed.slots[0].status).toBe('cooked');
+  await page.reload(); await page.getByLabel('주 시작일').fill(WEEK);
+  await meal(page).getByRole('button', { name: '조리 기록 확인', exact: true }).click();
+  await expect((await openCorrection(page)).getByLabel('닭고기 (1번 재고) 정정할 사용량 (g)', { exact: true })).toHaveValue('100');
+  expect(errors).toEqual([]);
+});
+
+test('an aborted correction retains input and retries once; explicit zero usage keeps verified stock', async ({ page }) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await start(page);
+  const actual = await actual150(page);
+  await actual.getByRole('button', { name: '실제 사용량으로 조리 기록', exact: true }).click();
+  await expectSingleConsumption(page);
+  const correction = await openCorrection(page);
+  await correction.getByRole('spinbutton').fill('100');
+  await correction.getByRole('checkbox', { name: '정정할 실제 사용량을 모두 확인했어요', exact: true }).check();
+  const before = await readState(page);
+  // Only the IndexedDB commit fails. The real correction form, history checks,
+  // repository, earlier stock writes and the eventual rollback remain in use.
+  await page.evaluate(() => {
+    const original = IDBObjectStore.prototype.add;
+    IDBObjectStore.prototype.add = function (value, ...args) {
+      const request = original.call(this, value, ...args);
+      if (this.name === 'inventoryEvents' && value?.kind === 'consumption' && value.replacesId) {
+        IDBObjectStore.prototype.add = original;
+        this.transaction.abort();
+      }
+      return request;
+    };
+  });
+  const save = correction.getByRole('button', { name: '정정한 사용량으로 재고 반영', exact: true });
+  await save.click(); await expect(save).toBeEnabled();
+  await expect(correction.getByRole('alert')).toContainText(/실패|취소|저장/);
+  await expect(correction.getByRole('spinbutton')).toHaveValue('100');
+  expect(await readState(page)).toEqual(before);
+  await save.click();
+  await expect(panel(page).getByText('실제 사용량을 정정했어요. 조리 기록은 유지돼요.', { exact: true })).toBeVisible();
+  expect((await readState(page)).inventoryEvents.filter(event => event.kind === 'consumption')).toHaveLength(2);
+  const zero = await openCorrection(page);
+  await zero.getByRole('spinbutton').fill('0');
+  await zero.getByRole('checkbox', { name: '정정할 실제 사용량을 모두 확인했어요', exact: true }).check();
+  await zero.getByRole('button', { name: '정정한 사용량으로 재고 반영', exact: true }).click();
+  await expect(historyMeal(page).getByText('기록한 사용량 0 · 재고 차감 없음', { exact: true })).toBeVisible();
+  const zeroed = await readState(page);
+  expect(zeroed.ingredients.find(item => item.id === 'cooking-stock').quantity).toBe('300g');
+  expect(zeroed.mealPlans[0].confirmed.slots[0].status).toBe('cooked');
+  await historyMeal(page).getByRole('button', { name: '재고 반영 취소', exact: true }).click();
+  await expect(panel(page).getByText('기록한 사용량이 0이라 재고량과 수량 확인 상태는 바꾸지 않아요. 조리 기록은 남아요.', { exact: true })).toBeVisible();
+  await panel(page).getByRole('button', { name: '재고 반영 취소 확인', exact: true }).click();
+  await expect(historyMeal(page).getByText('재고 반영 취소됨 · 재고 변경 없음', { exact: true })).toBeVisible();
+  const reversed = await readState(page);
+  expect(reversed.ingredients).toEqual(zeroed.ingredients);
+  expect(reversed.inventoryQuantities).toEqual(zeroed.inventoryQuantities);
+  expect(errors).toEqual([]);
+});

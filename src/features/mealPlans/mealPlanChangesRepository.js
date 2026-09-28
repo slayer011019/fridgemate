@@ -3,7 +3,7 @@ import { assertMealPlanRecord } from './mealPlanRepository';
 import { assertMealPlanExclusions, generateMealPlan, getWeekStart, moveMealPlanSlot, readjustRemainingMealPlan } from './mealPlanDomain';
 import { allocateMealPlanInventory } from './mealPlanAllocation';
 import { assertInventoryQuantityReview, projectInventoryQuantity } from './inventoryQuantityDomain';
-import { assertMealCookingEvent, assertMealCookingHistory, isMealCookingEventId } from './mealCookingEvents';
+import { assertMealCookingEvent, assertMealCookingHistory, getMealCookingState, isMealCookingEventId } from './mealCookingEvents';
 import { assertReceipt } from '../shopping/shoppingRepository';
 
 const INVALID = '식단 변경 요청을 확인해주세요.';
@@ -75,7 +75,6 @@ function context(scope, raw) {
 function assertConfirmedCooking(records, history) {
   const cancelled = new Set(history.filter(event => event.kind === 'cooking-reversal').map(event => event.reversesId));
   const cooking = new Map(history.filter(event => event.kind === 'cooking').map(event => [event.id, event]));
-  const reversals = new Map(history.filter(event => event.kind === 'consumption-reversal').map(event => [event.cookingId, event]));
   for (const event of cooking.values()) {
     if (cancelled.has(event.id)) continue;
     const confirmed = records.find(record => record.weekStart === event.weekStart)?.confirmed;
@@ -91,11 +90,11 @@ function assertConfirmedCooking(records, history) {
     for (const slot of record.confirmed?.slots ?? []) {
       if (slot.status !== 'cooked') continue;
       const event = cooking.get(slot.cooking.id);
-      const reversal = reversals.get(event?.id);
+      const current = event && getMealCookingState(history, event.id);
       if (!event || cancelled.has(event.id) || event.weekStart !== record.weekStart || event.slotId !== slot.id
         || !same(slot.cooking, { id: event.id, recordedAt: event.createdAt,
-          inventoryStatus: reversal ? 'reversed' : event.inventoryStatus,
-          consumptionId: event.consumptionId, reversalId: reversal?.id ?? null })) {
+          inventoryStatus: current.inventoryStatus,
+          consumptionId: current.consumption?.id ?? null, reversalId: current.reversal?.id ?? null })) {
         throw new Error('확정 식단의 조리 상태와 저장된 소비 이력이 일치하지 않아요. 기존 기록은 유지했어요.');
       }
     }

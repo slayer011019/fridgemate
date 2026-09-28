@@ -3,7 +3,7 @@ import { assertMealPlanRecord } from './mealPlanRepository';
 import { getWeekStart } from './mealPlanDomain';
 import { assertInventoryQuantityReview, invalidateInventoryQuantityReview, projectInventoryQuantity, validateInventoryQuantityValues } from './inventoryQuantityDomain';
 import { prepareConsumption, prepareConsumptionReversal } from './inventoryConsumptionDomain';
-import { assertMealCookingEvent, assertMealCookingHistory, isMealCookingEventId } from './mealCookingEvents';
+import { assertMealCookingEvent, assertMealCookingHistory, getMealCookingState, isMealCookingEventId } from './mealCookingEvents';
 import { assertReceipt } from '../shopping/shoppingRepository';
 
 const INVALID = '조리 기록 요청을 확인해주세요.';
@@ -17,8 +17,8 @@ function stockCheck(value) {
   return { ingredientId: value.ingredientId, expectedRevision: value.expectedRevision, expectedSourceToken: value.expectedSourceToken };
 }
 
-function checkedList(values, measured) {
-  if (!Array.isArray(values) || !values.length) throw new Error(INVALID);
+function checkedList(values, measured, allowEmpty = false) {
+  if (!Array.isArray(values) || (!allowEmpty && !values.length)) throw new Error(INVALID);
   const ids = new Set();
   const result = [];
   for (const value of values) {
@@ -58,7 +58,18 @@ function requestValues(input, action) {
   } else {
     if (typeof value.cookingId !== 'string' || !/^cooking:[A-Za-z0-9_-]{1,120}$/.test(value.cookingId)) throw new Error(INVALID);
     request.cookingId = value.cookingId;
-    if (action === 'consumption-reversal') request.inventory = checkedList(value.inventory, false);
+    if (action === 'consumption-reversal' || action === 'consumption-correction') {
+      request.inventory = checkedList(value.inventory, false, true);
+      if (value.expectedConsumptionId !== undefined || action === 'consumption-correction') {
+        if (typeof value.expectedConsumptionId !== 'string' || !/^consumption:[A-Za-z0-9_-]{1,120}$/.test(value.expectedConsumptionId)) throw new Error(INVALID);
+        request.expectedConsumptionId = value.expectedConsumptionId;
+      }
+    }
+    if (action === 'consumption-correction') {
+      if (value.completeUsageConfirmed !== true) throw new Error('정정할 실제 사용량을 모두 확인해주세요.');
+      request.completeUsageConfirmed = true;
+      request.usages = checkedList(value.usages, true, true);
+    }
   }
   return { ...request, operationId: value.operationId, requestKey: JSON.stringify(request) };
 }
@@ -117,6 +128,16 @@ function replaceRecordedSlot(record, slotId, update, now, required = true) {
   return assertMealPlanRecord(next, record.scope, record.weekStart);
 }
 
+function checkedRecordedSlot(record, slotId, state) {
+  const slot = record?.confirmed?.slots.find(item => item.id === slotId);
+  if (slot && (slot.status !== 'cooked' || slot.cooking.id !== state.cooking.id
+    || slot.cooking.recordedAt !== state.cooking.createdAt
+    || slot.cooking.consumptionId !== (state.consumption?.id ?? null)
+    || slot.cooking.inventoryStatus !== state.inventoryStatus
+    || slot.cooking.reversalId !== (state.reversal?.id ?? null))) throw new Error(CONFLICT);
+  return slot;
+}
+
 function invalidatePossibleUsage(slot, data, scope, stores) {
   const lines = slot.components.flatMap(component => [
     ...component.ingredients.filter(line => !(line.optional && line.selected !== true)),
@@ -163,20 +184,26 @@ function recordCooking(request, data, stores, now) {
 }
 
 function reverseCooking(request, data, stores, now, action) {
-  const original = data.history.find(event => event.id === request.cookingId && event.kind === 'cooking');
+  const state = getMealCookingState(data.history, request.cookingId);
+  const original = state?.cooking;
   if (!original || original.slotId !== request.slotId || original.weekStart !== request.weekStart) throw new Error(INVALID);
-  const prior = data.history.find(event => event.kind === action
-    && (action === 'consumption-reversal' ? event.cookingId === original.id : event.reversesId === original.id));
+  const prior = action === 'consumption-reversal' ? state.reversal
+    : data.history.find(event => event.kind === 'cooking-reversal' && event.reversesId === original.id);
   if (prior) return replay(prior, request, data.record);
   if ((data.record?.revision ?? 0) !== request.expectedPlanRevision) throw new Error(CONFLICT);
   if (data.history.some(event => event.kind === 'cooking-reversal' && event.reversesId === original.id)) throw new Error(CONFLICT);
+  const currentSlot = checkedRecordedSlot(data.record, request.slotId, state);
   let event;
   if (action === 'consumption-reversal') {
-    const consumption = data.history.find(item => item.id === original.consumptionId && item.kind === 'consumption');
+    const consumption = state.consumption;
     if (!consumption || consumption.cookingId !== original.id) throw new Error('취소할 소비 반영이 없어요.');
+    if ((request.expectedConsumptionId !== undefined || consumption.replacesId !== undefined)
+      && request.expectedConsumptionId !== consumption.id) throw new Error(CONFLICT);
     if (request.inventory.length !== consumption.lines.length
       || request.inventory.some(check => !consumption.lines.some(line => line.inventoryId === check.ingredientId))) throw new Error(INVALID);
-    const prepared = prepareConsumptionReversal({ ...request, now, originalEvent: consumption, inventory: request.inventory.map(data.originalStock) });
+    const prepared = consumption.lines.length
+      ? prepareConsumptionReversal({ ...request, now, originalEvent: consumption, inventory: request.inventory.map(data.originalStock) })
+      : { changes: [], event: { reversesId: consumption.id, lines: [] } };
     for (const change of prepared.changes) {
       stores.ingredients.put(change.ingredient);
       // Cooking remains asserted: restored physical amounts are not a fresh count.
@@ -184,13 +211,11 @@ function reverseCooking(request, data, stores, now, action) {
     }
     event = newEvent(action, request, now, { ...prepared.event, cookingId: original.id });
   } else {
-    if (original.inventoryStatus === 'applied' && !data.history.some(item => item.kind === 'consumption-reversal' && item.cookingId === original.id)) {
+    if (state.inventoryStatus === 'applied') {
       throw new Error('먼저 재고 반영을 취소해주세요. 조리 기록 취소만으로 재고를 되돌리지 않아요.');
     }
     event = newEvent(action, request, now, { reversesId: original.id });
   }
-  const currentSlot = data.record?.confirmed?.slots.find(item => item.id === request.slotId);
-  if (currentSlot?.status === 'cooked' && currentSlot.cooking.id !== original.id) throw new Error(CONFLICT);
   // Deleting a plan must neither erase stock history nor prevent its correction.
   const record = currentSlot?.status === 'cooked' ? replaceRecordedSlot(data.record, request.slotId, slot => {
     if (action === 'consumption-reversal') return { ...slot, cooking: { ...slot.cooking, inventoryStatus: 'reversed', reversalId: event.id } };
@@ -198,6 +223,58 @@ function reverseCooking(request, data, stores, now, action) {
     return { ...planned, status: 'planned' };
   }, now) : data.record;
   if (record !== data.record) stores.mealPlans.put(record);
+  stores.events.add(event);
+  return { record, event };
+}
+
+function correctConsumption(request, data, stores, now) {
+  const state = getMealCookingState(data.history, request.cookingId);
+  if (!state || state.cooking.weekStart !== request.weekStart || state.cooking.slotId !== request.slotId) throw new Error(INVALID);
+  // Another tab can acknowledge an identical committed correction, but never
+  // apply its inverse again or silently overwrite a different new quantity.
+  const priorInverse = data.history.find(event => event.kind === 'consumption-reversal'
+    && event.reversesId === request.expectedConsumptionId && event.replacementConsumptionId);
+  if (priorInverse) return replay(data.history.find(event => event.id === priorInverse.replacementConsumptionId), request, data.record);
+  if (state.cancelled || state.inventoryStatus !== 'applied' || state.consumption?.id !== request.expectedConsumptionId
+    || (data.record?.revision ?? 0) !== request.expectedPlanRevision) throw new Error(CONFLICT);
+  const consumption = state.consumption;
+  if (request.inventory.length !== consumption.lines.length
+    || request.inventory.some(check => !consumption.lines.some(line => line.inventoryId === check.ingredientId))) throw new Error(INVALID);
+  // Validate every new-use token against the committed pre-correction stock,
+  // before substituting the in-memory inverse balance for a shared batch.
+  for (const usage of request.usages) {
+    const entry = data.originalStock(usage);
+    if (!entry.ingredient) throw new Error(CONFLICT);
+    const current = projectInventoryQuantity(entry.ingredient, entry.review, request.scope);
+    if (current.quantityStatus !== 'verified' || current.quantityRevision !== usage.expectedRevision
+      || current.sourceToken !== usage.expectedSourceToken) throw new Error(CONFLICT);
+  }
+  const inverse = consumption.lines.length
+    ? prepareConsumptionReversal({ ...request, now, originalEvent: consumption, inventory: request.inventory.map(data.originalStock) })
+    : { changes: [], event: { reversesId: consumption.id, lines: [] } };
+  const finalChanges = new Map(inverse.changes.map(change => [change.ingredient.id, change]));
+  const replacement = request.usages.length ? prepareConsumption({ ...request, now, changes: request.usages.map(usage => {
+    const restored = finalChanges.get(usage.ingredientId);
+    const entry = restored ? { ...restored, expectedRevision: restored.review.revision, expectedSourceToken: restored.review.sourceToken }
+      : data.originalStock(usage);
+    return { ...entry, amount: usage.amount, unit: usage.unit };
+  }) }) : { changes: [], event: { lines: [] } };
+  for (const change of replacement.changes) finalChanges.set(change.ingredient.id, change);
+  const event = newEvent('consumption', request, now, { ...replacement.event,
+    cookingId: state.cooking.id, replacesId: consumption.id });
+  const reversal = newEvent('consumption-reversal', request, now, { ...inverse.event,
+    cookingId: state.cooking.id, replacementConsumptionId: event.id });
+  assertMealCookingHistory([...data.history, reversal, event], request.scope);
+  const slot = checkedRecordedSlot(data.record, request.slotId, state);
+  const record = slot ? replaceRecordedSlot(data.record, request.slotId, current => ({ ...current,
+    cooking: { ...current.cooking, consumptionId: event.id } }), now) : data.record;
+  // Persist only final amounts. No observer can see the inverse-only balance.
+  for (const change of finalChanges.values()) {
+    stores.ingredients.put(change.ingredient);
+    stores.quantities.put(change.review);
+  }
+  if (record !== data.record) stores.mealPlans.put(record);
+  stores.events.add(reversal);
   stores.events.add(event);
   return { record, event };
 }
@@ -214,11 +291,14 @@ async function perform(input, action) {
         if (--remaining) return;
         try {
           const data = context(request, ...reads.map(item => item.result));
-          const previous = data.history.find(event => event.id === `${action}:${request.operationId}`);
+          const eventKind = action === 'consumption-correction' ? 'consumption' : action;
+          const previous = data.history.find(event => event.id === `${eventKind}:${request.operationId}`);
           if (previous) output.result = replay(previous, request, data.record);
           else {
             const now = new Date().toISOString();
-            output.result = action === 'cooking' ? recordCooking(request, data, stores, now) : reverseCooking(request, data, stores, now, action);
+            output.result = action === 'cooking' ? recordCooking(request, data, stores, now)
+              : action === 'consumption-correction' ? correctConsumption(request, data, stores, now)
+                : reverseCooking(request, data, stores, now, action);
           }
         } catch (error) { failure = error; transaction.abort(); }
       };
@@ -230,6 +310,7 @@ async function perform(input, action) {
 export const recordMealCooking = input => perform(input, 'cooking');
 export const reverseMealConsumption = input => perform(input, 'consumption-reversal');
 export const cancelMealCooking = input => perform(input, 'cooking-reversal');
+export const correctMealConsumption = input => perform(input, 'consumption-correction');
 
 /** Read one committed version for cooking forms and history. Retain history when
  * a plan was cleared so its consumption can still be corrected explicitly. */
