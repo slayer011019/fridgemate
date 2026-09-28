@@ -75,6 +75,30 @@ npm run test:e2e:preview -- --workers=2 --retries=0 --reporter=list,json --outpu
 
 브라우저 JSON 경로는 각 실행의 `PLAYWRIGHT_JSON_OUTPUT_NAME`으로 지정했다. 단위 검사 → 개발 서버 브라우저 → 빌드 → 빌드 브라우저 순서였으며, lint만 개발 서버 브라우저 검사 후반에 겹쳤다.
 
+## PR #55에서 발견한 차단과 후속 수정
+
+`b31ff17`의 Linux CI는 단위·통합 2,989개, 개발 서버 브라우저 107개, 빌드 브라우저 48개, lint·build·Prisma 검증/생성을 통과했다. production dependency audit와 secret scan도 통과했다. 그러나 **CodeQL 분석 job의 성공과 분석 결과 체크는 별개**다. 결과 체크에 high 경고 2개가 발생해 PR이 차단됐으며 이를 전체 CI 성공으로 보고하지 않는다.
+
+- `e2e/analytics-consent.spec.js`의 URL 정규식은 호스트 앞부분과 URL 시작을 제한하지 않았다. 테스트용 요청 감지 패턴이지 앱의 접근 허가 로직은 아니다. 기존 패턴으로 위장 호스트·경로/쿼리에 포함된 주소를 잘못 감지하는 4개 assertion 실패를 확인했다. E2E가 실제 사용하는 패턴을 작은 공용 테스트 보조 파일로 옮기고 HTTPS URL 시작과 정확한 호스트 경계를 제한했다. 정상 4개·비대상 7개, 총 11개가 통과한다.
+- `scripts/analyze-meal-plan-pilot.mjs`의 경로 `lstat` → `open` 사이에 입력이 FIFO로 교체되면 쓰기측을 기다리며 멈췄다. 실제 임시 파일·child process를 사용하는 회귀에서 기존 25개 통과와 `ETIMEDOUT` assertion 1개 실패를 확인했다. `O_NOFOLLOW | O_NONBLOCK`으로 열고 **실제 열린 descriptor**에서 일반 파일·단일 링크·12MiB 제한을 확인하도록 고쳤다. 읽기 전후 크기/시간 검사·최대 읽기량·비공개 오류·출력 독점 생성은 유지했고 26개가 두 번 통과했다.
+- 첫 FIFO GREEN 시도에는 child 인자가 CLI 진입점도 실행하게 한 테스트 fixture 오류가 있었다. 인자를 바로잡은 뒤 기존 구현에서 유효 RED를 다시 확인했다. 이 중간 오류를 코드 결함 재현 성공으로 세지 않는다.
+- 파일 입력의 기준은 사전 경로 검사 시점의 inode가 아니라 open 시점의 descriptor다. 부모 디렉터리 교체 경합까지 격리하는 샌드박스가 아니며, 비정규 파일도 열고 나서 거절할 수 있다. `O_NOFOLLOW`는 마지막 경로 요소만 보호한다.
+
+수정 후 새 전체 단위·통합 검사는 **233파일 / 3,001개**(실패·skip·todo 0), 개발 서버 브라우저 **107개**, 실제 빌드 브라우저 **48개**(둘 다 retry/skip/flaky 0), lint·build가 통과했다. 명령과 환경은 앞의 검증과 동일하며 증거 파일 이름은 `unit/e2e/built-security-final-01`, 최종 동결 뒤 lint·build는 `security-final-02`로 구분한다. 추가 12개는 URL 경계 11개와 파일 경합 1개다.
+
+위 수정은 메뉴 정책·파일럿 새 기능·운영 배포 설정을 바꾸지 않는다. 최신 원격 결과는 [PR #55 검사](https://github.com/slayer011019/fridgemate/pull/55/checks)에서 해당 커밋과 함께 확인해야 한다.
+
+## 자동 Preview의 공개 HTTP 검사
+
+GitHub deployment 메타데이터로 `b31ff17`의 Vercel 대상이 `Preview`, `production_environment:false`임을 확인했다. 기존 `verify:public-deployment` 검사기를 해당 URL에 실행했다.
+
+- 홈은 HTTP 200이며 본문·메타·링크 차이는 없었지만 Preview의 `X-Robots-Tag: noindex` 때문에 운영 색인 기준에서는 실패다.
+- 나머지 공개 경로 112개, 사이트맵, 없는 경로 4개는 다른 origin으로 이동해 검사를 중단했다. `/about`을 별도로 HEAD 조회한 결과 운영 도메인으로 가는 HTTP 308이었다.
+- 근거는 기존 `vercel.json`의 모든 `*.vercel.app` 호스트를 운영 도메인으로 보내는 규칙이다. 리다이렉트 목적지를 따라가 운영 페이지를 Preview 성공으로 계산하지 않았다.
+- 검사기 원본 결과는 **0/113, exit 1**이다. Preview의 의도된 noindex와 기존 호스트 리다이렉트 때문에 운영 기준 검증을 완료할 수 없으며, 이를 운영 사이트 장애나 출시 스모크 성공으로 해석하지 않는다.
+
+이 단계에서 리다이렉트·운영 환경변수는 변경하지 않았다. 별도 local-only 파일럿을 선택할 경우, 계측 동의와 분리된 빌드/후보 정책 및 실제 테스트 가능한 Preview 호스트 범위를 먼저 정해야 한다.
+
 ## PR 이후 출시 게이트
 
 1. 현재 브랜치를 원격에 보존하고 main 대상 PR에서 Linux CI, 의존성 감사, secret scan, CodeQL을 확인한다. 위 macOS 결과를 원격 CI 결과로 대신하지 않는다.

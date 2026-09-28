@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, readFile, writeFile, stat, symlink, link, mkdir, access, rm, realpath } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, stat, lstat, symlink, link, mkdir, access, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -183,6 +183,45 @@ describe('offline meal-plan pilot analysis files', () => {
     await link(args.input, linked);
     await expect(analyze({ ...args, input: linked })).rejects.toThrow();
     await expect(access(args.output)).rejects.toThrow();
+  });
+
+  it('rejects an input replaced with a FIFO at open without waiting for a writer', async () => {
+    const args = await fixture();
+    // Keep the real filesystem and analysis code. A child bounds the broken
+    // blocking open; only the race timing at its syscall boundary is injected.
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import fs from 'node:fs/promises';
+      import { execFileSync } from 'node:child_process';
+      import { pathToFileURL } from 'node:url';
+      const [serialized, entry] = process.argv.slice(1);
+      const args = JSON.parse(serialized);
+      const open = fs.open.bind(fs);
+      fs.open = async (file, ...options) => {
+        if (file === args.input) {
+          await fs.unlink(file);
+          execFileSync('mkfifo', [file]);
+          console.log('fifo-ready');
+        }
+        return open(file, ...options);
+      };
+      const { analyzePilotFile } = await import(pathToFileURL(entry).href);
+      try {
+        await analyzePilotFile(args);
+        console.log('unexpected-success');
+        process.exitCode = 2;
+      } catch (error) {
+        console.log(JSON.stringify({ outcome: 'rejected', message: error.message }));
+      }
+    `, JSON.stringify(args), resolve('scripts/analyze-meal-plan-pilot.mjs')],
+    { encoding: 'utf8', timeout: 3000 });
+
+    expect(result.stdout).toContain('fifo-ready');
+    expect((await lstat(args.input)).isFIFO()).toBe(true);
+    await expect(access(args.output)).rejects.toThrow();
+    expect(result.error?.code).not.toBe('ETIMEDOUT');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('"outcome":"rejected"');
+    expect(result.stdout + result.stderr).not.toContain(args.input);
   });
 
   it.each(['input', 'output'])('rejects a symlinked parent for %s', async role => {

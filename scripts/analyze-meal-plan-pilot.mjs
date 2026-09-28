@@ -29,13 +29,12 @@ async function verifiedParent(file) {
 async function readDataset(input) {
   const file = jsonPath(input);
   await verifiedParent(file);
-  const previous = await fs.lstat(file);
-  if (!previous.isFile() || previous.isSymbolicLink() || previous.nlink !== 1 || previous.size > MAX_BYTES) throw new Error(FAILURE);
-  const handle = await fs.open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+  // Validate the opened descriptor, not a pathname snapshot. Nonblocking open
+  // prevents a substituted FIFO from waiting for a writer before validation.
+  const handle = await fs.open(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const before = await handle.stat();
-    if (!before.isFile() || before.nlink !== 1 || before.dev !== previous.dev || before.ino !== previous.ino
-      || before.size > MAX_BYTES) throw new Error(FAILURE);
+    if (!before.isFile() || before.nlink !== 1 || before.size > MAX_BYTES) throw new Error(FAILURE);
     // Bound allocation even if another process grows the file after stat.
     const buffer = Buffer.alloc(MAX_BYTES + 1);
     let length = 0;

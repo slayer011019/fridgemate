@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { validateLocalMealPlanPilotExport } from '../src/features/mealPlans/mealPlanPilotExport.js';
 import { gotoAndWait, seedBrowserState } from './support/testApp';
+import { GOOGLE_ANALYTICS_REQUEST_PATTERN } from './support/analyticsRequestPattern.js';
 
 async function pilotBrowserState(page) {
   return page.evaluate(() => new Promise((resolve, reject) => {
@@ -41,7 +42,7 @@ test('local pilot records only opted-in outcomes and manually exports without en
   await page.setViewportSize({ width: 390, height: 844 });
   await seedBrowserState(page);
   let analyticsRequests = 0;
-  await page.route(/https:\/\/.*(?:googletagmanager|google-analytics)\.com\//, async route => {
+  await page.route(GOOGLE_ANALYTICS_REQUEST_PATTERN, async route => {
     analyticsRequests += 1;
     await route.abort();
   });
