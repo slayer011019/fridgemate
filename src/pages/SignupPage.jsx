@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useAuth } from '../hooks/useAuth';
@@ -10,16 +10,24 @@ const defaultForm = {
   password: ''
 };
 
-function SignupPage() {
+function SignupSession() {
   const navigate = useNavigate();
   const { backendEnabled, isAuthenticated, loading, signup } = useAuth();
   const { trackEvent } = useAnalytics();
   const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
   const publicSignupEnabled = isPublicSignupEnabled();
 
-  if (isAuthenticated) {
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  // Let an active submit finish its feedback before the authenticated redirect.
+  if (isAuthenticated && !submitting) {
     return <Navigate replace to="/account" />;
   }
 
@@ -33,19 +41,31 @@ function SignupPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!mounted.current || pending.current || loading || !backendEnabled || !publicSignupEnabled || isAuthenticated) return;
+    const requestPath = window.location.pathname;
+    const requestHistoryKey = window.history.state?.key;
+    const isCurrentPage = () => mounted.current && window.location.pathname === requestPath
+      && window.history.state?.key === requestHistoryKey;
+    pending.current = true;
     setSubmitting(true);
     setError('');
+    let completed = false;
 
     try {
       await signup(form);
+      if (!isCurrentPage()) return;
       trackEvent('signup_completed', {
         source_screen: 'signup'
       });
       navigate('/account', { replace: true });
+      completed = true;
     } catch (nextError) {
-      setError(nextError.message || '\uD68C\uC6D0\uAC00\uC785\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.');
+      if (isCurrentPage()) setError(nextError.message || '\uD68C\uC6D0\uAC00\uC785\uC5D0 \uC2E4\uD328\uD588\uC5B4\uC694.');
     } finally {
-      setSubmitting(false);
+      if (!completed && isCurrentPage()) {
+        pending.current = false;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -104,6 +124,11 @@ function SignupPage() {
       </form> : null}
     </div>
   );
+}
+
+function SignupPage() {
+  const location = useLocation();
+  return <SignupSession key={location.key} />;
 }
 
 export default SignupPage;

@@ -5,9 +5,11 @@ import { useAuth } from '../hooks/useAuth';
 import { useIngredients } from '../hooks/useIngredients';
 import { useMenuDecision } from '../hooks/useMenuDecision';
 import PreferenceSettingsPanel from '../components/PreferenceSettingsPanel';
+import { captureAuthContext } from '../features/auth/authSessionContext';
 
 function AccountPage() {
   const { deleteAccount, dismissGuestImport, error, guestImportPrompt, importGuestIngredients, logout, user } = useAuth();
+  const privacyContext = captureAuthContext();
   const [secureLogoutPending, setSecureLogoutPending] = useState(false);
   const { guestDecisionAvailable, importGuestDecision, syncing: menuDecisionSyncing } = useMenuDecision();
   const {
@@ -90,7 +92,11 @@ function AccountPage() {
         </p>
       </section>
 
-      <AccountPrivacyPanel deleteAccount={deleteAccount} />
+      <AccountPrivacyPanel
+        key={JSON.stringify([user?.id, privacyContext.generation, privacyContext.changeToken])}
+        ownerContext={privacyContext}
+        deleteAccount={deleteAccount}
+      />
 
       <PreferenceSettingsPanel />
 

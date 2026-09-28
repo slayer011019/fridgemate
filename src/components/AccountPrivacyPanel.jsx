@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { exportUserData } from '../api/authApi';
+import { captureAuthContext, isAuthContextCurrent } from '../features/auth/authSessionContext';
 
-function AccountPrivacyPanel({ deleteAccount }) {
+function AccountPrivacyPanel({ deleteAccount, ownerContext = captureAuthContext() }) {
   const [privacyStatus, setPrivacyStatus] = useState('');
   const [privacyError, setPrivacyError] = useState('');
   const [exportPassword, setExportPassword] = useState('');
@@ -9,44 +10,74 @@ function AccountPrivacyPanel({ deleteAccount }) {
   const [showDeleteForm, setShowDeleteForm] = useState(false);
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
+  const mounted = useRef(false);
+  const panel = useRef(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  // Fence browser-side effects, not requests already received by the server.
+  const isCurrent = () => mounted.current && panel.current?.isConnected && isAuthContextCurrent(ownerContext)
+    && !ownerContext.transitioning && !ownerContext.blocked;
 
   const handleDataExport = async (event) => {
     event.preventDefault();
-    if (pendingRef.current) return;
+    if (pendingRef.current || !isCurrent()) return;
     pendingRef.current = true;
     setPending(true);
     setPrivacyError('');
     setPrivacyStatus('내 데이터를 준비하고 있습니다...');
+    const requestPath = window.location.pathname;
+    const requestEntry = window.history.state?.key;
+    const cancelAfterNavigation = () => {
+      // BrowserRouter can retain the previous route while the next lazy page loads.
+      if (window.location.pathname === requestPath && window.history.state?.key === requestEntry) return false;
+      setExportPassword('');
+      setPrivacyStatus('화면 이동으로 다운로드를 취소했습니다. 필요하면 다시 요청해 주세요.');
+      return true;
+    };
 
     try {
       const exportData = await exportUserData(exportPassword);
+      if (!isCurrent()) return;
+      if (cancelAfterNavigation()) return;
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
       const downloadUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
-      anchor.href = downloadUrl;
-      anchor.download = `fridgemate-data-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(downloadUrl);
+      try {
+        anchor.href = downloadUrl;
+        anchor.download = `fridgemate-data-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+      } finally {
+        anchor.remove();
+        URL.revokeObjectURL(downloadUrl);
+      }
       setExportPassword('');
       setPrivacyStatus('내 데이터 파일을 내려받았습니다.');
     } catch (nextError) {
+      if (!isCurrent()) return;
+      if (cancelAfterNavigation()) return;
       setPrivacyStatus('');
       setPrivacyError(nextError.message || '내 데이터를 내려받지 못했습니다.');
     } finally {
-      pendingRef.current = false;
-      setPending(false);
+      if (isCurrent()) {
+        pendingRef.current = false;
+        setPending(false);
+      }
     }
   };
 
   const handleAccountDeletion = async (event) => {
     event.preventDefault();
-    if (pendingRef.current) return;
+    if (pendingRef.current || !isCurrent()) return;
 
     if (!window.confirm('계정과 서버에 저장된 데이터를 영구 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) {
       return;
     }
+    if (!isCurrent()) return;
 
     pendingRef.current = true;
     setPending(true);
@@ -56,16 +87,19 @@ function AccountPrivacyPanel({ deleteAccount }) {
     try {
       await deleteAccount(deletePassword);
     } catch (nextError) {
+      if (!isCurrent()) return;
       setPrivacyStatus('');
       setPrivacyError(nextError.message || '계정을 삭제하지 못했습니다.');
     } finally {
-      pendingRef.current = false;
-      setPending(false);
+      if (isCurrent()) {
+        pendingRef.current = false;
+        setPending(false);
+      }
     }
   };
 
   return (
-    <section className="card space-y-4">
+    <section ref={panel} className="card space-y-4">
       <div>
         <p className="kicker">개인정보 관리</p>
         <h3 className="mt-2 text-xl font-semibold text-slate-900">내 데이터 내려받기와 계정 삭제</h3>
