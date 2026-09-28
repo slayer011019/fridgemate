@@ -54,8 +54,17 @@ for (const pathname of PUBLIC_ROUTES) {
   const canonical = getRouteMetadata(pathname).canonical.replaceAll('&', '&amp;');
   assert(sitemap.includes(`<loc>${canonical}</loc>`), `${pathname} is missing from sitemap.xml`);
 }
-for (const privatePath of ['/account', '/import', '/ingredients', '/login', '/signup', '/meal-plan']) {
+const privatePaths = ['/account', '/import', '/ingredients', '/login', '/signup', '/meal-plan', '/pilot'];
+const hosting = JSON.parse(await readFile(resolve(process.cwd(), 'vercel.json'), 'utf8'));
+const robots = await readFile(resolve(outputDirectory, 'robots.txt'), 'utf8');
+for (const privatePath of privatePaths) {
   assert(!sitemap.includes(`${privatePath}</loc>`), `${privatePath} must not appear in sitemap.xml`);
+  assert(hosting.rewrites.some(rule => rule.source === privatePath && rule.destination === '/_seo/app.html'),
+    `${privatePath} must serve the functional app shell on direct navigation`);
+  assert(hosting.headers.some(rule => rule.source === privatePath
+    && rule.headers.some(header => header.key.toLowerCase() === 'x-robots-tag' && header.value === 'noindex, nofollow, noarchive')),
+  `${privatePath} is missing its private-page response header`);
+  assert(robots.split(/\r?\n/).includes(`Disallow: ${privatePath}`), `${privatePath} is missing from robots.txt`);
 }
 
 const recipeIndexHtml = await readFile(resolve(outputDirectory, '_seo/recipes.html'), 'utf8');

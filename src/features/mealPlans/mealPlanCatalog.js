@@ -1,8 +1,10 @@
 import { seedRecipes } from '../../data/seedRecipes.js';
 import { normalizeIngredientName } from '../ingredients/ingredientDomain.js';
 import { FOOD_GROUP_RULE_VERSION, getMealFoodGroups } from '../nutrition/foodGroupRules.js';
+import { getReviewedDinnerCatalog } from './reviewedDinnerCatalog.js';
 
 export const MEAL_PLAN_CATALOG_VERSION = '2026-09-12.1';
+export const ACTIVE_MEAL_PLAN_CATALOG_VERSION = '2026-09-16.2';
 
 const QUANTITY_REASON = '기본 메뉴에는 재료별 사용량 근거가 없어 분량 확인이 필요해요.';
 const recipeById = new Map(seedRecipes.map((recipe) => [recipe.id, recipe]));
@@ -158,3 +160,7 @@ export const mealPlanCatalog = [
     recipeComponent('recipe-64', 'main', [], { 파스타면: ['grains'], 브로콜리: ['vegetables'] }),
   ]),
 ];
+
+export function getMealPlanCatalog() {
+  return [...mealPlanCatalog, ...getReviewedDinnerCatalog().templates];
+}
