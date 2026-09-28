@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { gotoAndWait, readBrowserIngredients, seedBrowserState } from './support/testApp';
+import { createIngredient, gotoAndWait, readBrowserIngredients, seedBrowserState } from './support/testApp';
 
 const ONE_PIXEL_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6OZsAAAAASUVORK5CYII=',
@@ -31,6 +31,132 @@ async function readPlanningStores(page) {
     };
   }));
 }
+
+async function writeOtherTabStock(page, ingredient) {
+  await page.evaluate(value => new Promise((resolve, reject) => {
+    const open = indexedDB.open('fridgemate-db__guest');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('ingredients', 'readwrite');
+      tx.objectStore('ingredients').put(value);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onabort = () => { db.close(); reject(tx.error); };
+    };
+  }), ingredient);
+}
+
+test('OCR replacement rolls back both stores on abort and retries without losing the reviewed input', async ({ page }, testInfo) => {
+  await page.clock.setFixedTime(new Date('2026-09-28T03:00:00.000Z'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const old = createIngredient('replace-tofu', { name: '두부', quantity: '300g', memo: '교체 전 기록' });
+  const unrelated = createIngredient('keep-onion', { name: '양파', quantity: '2개', memo: '보존할 기록' });
+  await seedBrowserState(page, { ingredients: [old, unrelated], ocrResult: { text: '두부 2팩' } });
+  await gotoAndWait(page, '/import');
+  await reviewReceipt(page);
+  await page.getByRole('textbox', { name: '수량', exact: true }).fill('2팩');
+  const replacement = page.getByRole('checkbox', { name: /기존 1개 항목/ });
+  const deletionNotice = replacement.locator('..').locator('span');
+  const visibleNotice = await deletionNotice.evaluate(node => ({
+    width: node.clientWidth, contentWidth: node.scrollWidth,
+    height: node.clientHeight, contentHeight: node.scrollHeight,
+  }));
+  expect(visibleNotice.contentWidth).toBeLessThanOrEqual(visibleNotice.width + 1);
+  expect(visibleNotice.contentHeight).toBeLessThanOrEqual(visibleNotice.height + 1);
+  await replacement.check();
+  const before = await readBrowserIngredients(page, 'guest');
+  const beforeStores = await readPlanningStores(page);
+  // Abort after the last sidecar write succeeds, not before replacement starts.
+  // Separate delete/add transactions would leave a partially replaced inventory.
+  await page.evaluate(() => {
+    window.__ocrLateAbortObserved = false;
+    const original = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (value, ...args) {
+      const request = original.call(this, value, ...args);
+      if (this.name === 'inventoryQuantities' && value?.id === 'replace-tofu') {
+        IDBObjectStore.prototype.put = original;
+        request.addEventListener('success', () => {
+          window.__ocrLateAbortObserved = true;
+          this.transaction.abort();
+        }, { once: true });
+      }
+      return request;
+    };
+  });
+  const save = page.getByRole('button', { name: '선택 항목 저장', exact: true });
+  await save.click();
+  await expect(save).toBeEnabled();
+  await expect(page.getByRole('status')).toContainText(/저장하지 못|취소|실패/);
+  expect(await page.evaluate(() => window.__ocrLateAbortObserved)).toBe(true);
+  await expect(page.getByRole('textbox', { name: '수량', exact: true })).toHaveValue('2팩');
+  await expect(page.getByRole('checkbox', { name: /기존 1개 항목/ })).toBeChecked();
+  expect(await readBrowserIngredients(page, 'guest')).toEqual(before);
+  expect(await readPlanningStores(page)).toEqual(beforeStores);
+  expect(await page.evaluate(() => localStorage.getItem('fridgemate-import-corrections:v2:guest'))).toBeNull();
+  await page.screenshot({ path: testInfo.outputPath('ocr-replacement-rollback-mobile.png'), fullPage: true });
+  await save.click();
+  await expect(page).toHaveURL(/\/ingredients$/);
+  const saved = await readBrowserIngredients(page, 'guest');
+  expect(saved).toHaveLength(2);
+  expect(saved.find(row => row.id === unrelated.id)).toEqual(unrelated);
+  expect(saved.some(row => row.id === old.id)).toBe(false);
+  expect(saved.find(row => row.name === '두부')).toEqual(expect.objectContaining({ quantity: '2팩' }));
+  const quantities = (await readPlanningStores(page)).quantities;
+  expect(quantities).toHaveLength(2);
+  expect(quantities.every(row => row.status === 'unverified' && row.revision === 1 && !Object.hasOwn(row, 'amount'))).toBe(true);
+  await page.reload();
+  expect(await readBrowserIngredients(page, 'guest')).toEqual(saved);
+  expect(errors).toEqual([]);
+});
+
+test('OCR double submission only replaces the reviewed batch and preserves a later same-name batch', async ({ page }) => {
+  const old = createIngredient('reviewed-tofu', { name: '두부', memo: '확인한 교체 대상' });
+  const later = createIngredient('later-tofu', { name: '두부', quantity: '500g', memo: '아직 확인하지 않은 별도 입고' });
+  await seedBrowserState(page, { ingredients: [old], ocrResult: { text: '두부 2팩' } });
+  await gotoAndWait(page, '/import');
+  await reviewReceipt(page);
+  await page.getByRole('textbox', { name: '수량', exact: true }).fill('2팩');
+  await page.getByRole('checkbox', { name: /기존 1개 항목/ }).check();
+  await writeOtherTabStock(page, later);
+  await page.getByRole('button', { name: '선택 항목 저장', exact: true }).evaluate(button => { button.click(); button.click(); });
+  await expect(page).toHaveURL(/\/ingredients$/);
+  const saved = await readBrowserIngredients(page, 'guest');
+  expect(saved).toHaveLength(2);
+  expect(saved.find(row => row.id === later.id)).toEqual(later);
+  expect(saved.some(row => row.id === old.id)).toBe(false);
+  expect(saved.filter(row => row.quantity === '2팩')).toHaveLength(1);
+  expect((await readPlanningStores(page)).quantities.every(row => row.revision === 1)).toBe(true);
+});
+
+test('OCR replacement rejects changed inventory and lets the user refresh and reconfirm without losing edits', async ({ page }) => {
+  const old = createIngredient('changed-tofu', { name: '두부', memo: '검토 당시' });
+  await seedBrowserState(page, { ingredients: [old], ocrResult: { text: '두부 2팩' } });
+  await gotoAndWait(page, '/import');
+  await reviewReceipt(page);
+  await page.getByRole('textbox', { name: '수량', exact: true }).fill('2팩');
+  await page.getByRole('checkbox', { name: /기존 1개 항목/ }).check();
+  const changed = { ...old, memo: '다른 탭에서 수정한 메모' };
+  await writeOtherTabStock(page, changed);
+  await page.getByRole('button', { name: '선택 항목 저장', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText(/바뀌|변경|다시/);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([changed]);
+  expect(await readPlanningStores(page)).toEqual({ plans: [], quantities: [], events: [] });
+  await expect(page.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('두부');
+  expect(await page.evaluate(() => localStorage.getItem('fridgemate-import-corrections:v2:guest'))).toBeNull();
+  await page.getByRole('button', { name: '재고 다시 확인', exact: true }).click();
+  const replace = page.getByRole('checkbox', { name: /기존 1개 항목/ });
+  await expect(replace).not.toBeChecked();
+  await expect(page.getByRole('textbox', { name: '수량', exact: true })).toHaveValue('2팩');
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([changed]);
+  await replace.check();
+  await page.getByRole('button', { name: '선택 항목 저장', exact: true }).click();
+  await expect(page).toHaveURL(/\/ingredients$/);
+  const saved = await readBrowserIngredients(page, 'guest');
+  expect(saved).toHaveLength(1);
+  expect(saved[0]).toEqual(expect.objectContaining({ name: '두부', quantity: '2팩' }));
+  expect(saved[0].id).not.toBe(old.id);
+});
 
 test('AT-00 two packs stay unmeasured and unsaved until the user reviews and saves them', async ({ page }) => {
   await seedBrowserState(page, { ocrResult: { text: '두부 2팩' } });

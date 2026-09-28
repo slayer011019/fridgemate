@@ -22,6 +22,7 @@ import {
 
 const FALLBACK_WARNING_MESSAGE =
   'The API connection is unstable, so FridgeMate is temporarily using the authenticated local cache.';
+const STALE_READ_MESSAGE = '재고 조회를 시작한 계정이나 요청이 바뀌었습니다. 다시 확인해주세요.';
 
 export function ensureIngredientId(ingredient) {
   const id = ingredient.id || crypto.randomUUID();
@@ -60,9 +61,10 @@ export function restoreIngredient(items, ingredient, index) {
 }
 
 export function createRepositoryCommandRunner({ useApi, setDataSource, setError }) {
-  return async function runRepositoryCommand(actionLabel, repositoryOperation) {
+  return async function runRepositoryCommand(actionLabel, repositoryOperation, { isCurrent = () => true } = {}) {
     try {
       const { result, source, usedFallback } = await repositoryOperation();
+      if (!isCurrent()) throw new Error(STALE_READ_MESSAGE);
 
       if (!useApi) {
         setDataSource('indexeddb');
@@ -81,6 +83,7 @@ export function createRepositoryCommandRunner({ useApi, setDataSource, setError 
       setError('');
       return { result, source, usedFallback };
     } catch (nextError) {
+      if (!isCurrent()) throw new Error(STALE_READ_MESSAGE);
       setError(nextError.message || 'Failed to process ingredient data.');
       throw nextError;
     }
@@ -100,6 +103,7 @@ export function createLoadIngredientsAction({
   useApi,
   syncEnabled,
   scopeRef,
+  isCurrentSession,
   commitIngredients,
   commitSyncSummary,
   runRepositoryCommand,
@@ -109,6 +113,9 @@ export function createLoadIngredientsAction({
 }) {
   return async function loadIngredients({ force = false } = {}) {
     const scopeState = getScopeState(storageScope);
+    const isSameSession = () => isCurrentSession() && scopeRef.current === storageScope
+      && getScopeState(storageScope) === scopeState;
+    if (!isSameSession()) throw new Error(STALE_READ_MESSAGE);
 
     if (!force && scopeState.loaded) {
       const hasPendingChanges = scopeState.syncSummary.pendingUploads.length > 0;
@@ -118,51 +125,64 @@ export function createLoadIngredientsAction({
       return scopeState.items;
     }
 
-    if (!force && scopeState.promise) {
+    if (!force && scopeState.promise && scopeState.loadRequest?.isCurrent()) {
+      const request = scopeState.loadRequest;
+      const isCurrent = () => isSameSession() && request.isCurrent();
       setLoading(true);
-
       try {
         const { items, sync } = await scopeState.promise;
-
-        if (scopeRef.current === storageScope) {
-          commitIngredients(items, storageScope);
-          commitSyncSummary(sync, storageScope);
-          const hasPendingChanges = sync.pendingUploads.length > 0;
-          setHasUnsyncedChanges(hasPendingChanges);
-          if (hasPendingChanges) setSyncStatus('dirty');
-        }
-
+        if (!isCurrent()) throw new Error(STALE_READ_MESSAGE);
+        // Another mounted provider may share the read but owns its own UI state.
+        commitIngredients(items, storageScope);
+        commitSyncSummary(sync, storageScope);
+        const hasPendingChanges = sync.pendingUploads.length > 0;
+        setHasUnsyncedChanges(hasPendingChanges);
+        if (hasPendingChanges) setSyncStatus('dirty');
         return items;
-      } finally {
-        if (scopeRef.current === storageScope) {
-          setLoading(false);
+      } catch (nextError) {
+        if (isSameSession() && scopeState.loadRequest === request && !request.isCurrent()) {
+          // The shared read's owner left. Read again in this still-active session;
+          // never reuse the snapshot captured for the abandoned owner.
+          return loadIngredients({ force: true });
         }
+        throw nextError;
+      } finally {
+        if (isCurrent()) setLoading(false);
       }
     }
 
+    const request = { isCurrent: () => isSameSession() && scopeState.loadRequest === request };
+    scopeState.loadRequest = request;
+    // A different account session must not reuse the pre-refresh cached rows.
+    scopeState.loaded = false;
     setLoading(true);
 
     const task = runRepositoryCommand('loadIngredients', () =>
       loadIngredientsFromRepository({
         scope: storageScope,
         useApi
-      })
+      }),
+      { isCurrent: request.isCurrent }
     ).then(async ({ result, source }) => {
+      if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
       let items = result || [];
       let nextSyncSummary = createEmptySyncSummary();
 
       if (source === 'api') {
         const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+        if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
         nextSyncSummary = await syncIngredientSnapshot({
           localIngredients,
           remoteIngredients: items
         });
+        if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
         items = getVisibleIngredients(nextSyncSummary.nextSnapshot);
         await syncIndexedDbCache('loadIngredients', () =>
           ingredientCache.replaceAll(nextSyncSummary.nextSnapshot, buildScopeOptions(storageScope))
         );
       } else if (syncEnabled) {
         const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+        if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
         const pendingUploads = getPendingIngredients(localIngredients);
         nextSyncSummary = {
           ...createEmptySyncSummary(),
@@ -182,20 +202,18 @@ export function createLoadIngredientsAction({
 
     try {
       const { items, sync } = await task;
-
-      if (scopeRef.current === storageScope) {
-        commitIngredients(items, storageScope);
-        commitSyncSummary(sync, storageScope);
-        const hasPendingChanges = sync.pendingUploads.length > 0;
-        setHasUnsyncedChanges(hasPendingChanges);
-        if (hasPendingChanges) setSyncStatus('dirty');
-      }
+      if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
+      commitIngredients(items, storageScope);
+      commitSyncSummary(sync, storageScope);
+      const hasPendingChanges = sync.pendingUploads.length > 0;
+      setHasUnsyncedChanges(hasPendingChanges);
+      if (hasPendingChanges) setSyncStatus('dirty');
 
       return items;
     } finally {
-      scopeState.promise = null;
+      if (scopeState.promise === task) scopeState.promise = null;
 
-      if (scopeRef.current === storageScope) {
+      if (request.isCurrent()) {
         setLoading(false);
       }
     }

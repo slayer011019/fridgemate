@@ -5,6 +5,7 @@ import ImportPage from '../ImportPage';
 import { IngredientsProvider } from '../../hooks/useIngredients';
 import * as authHook from '../../hooks/useAuth';
 import * as database from '../../db/indexedDB';
+import * as importRepository from '../../features/import/ingredientImportRepository';
 import { clearScopeState } from '../../features/ingredients/ingredientsScopeState';
 
 const SCOPE = 'user:import-storage-test';
@@ -31,6 +32,7 @@ async function extractImage(name = 'receipt.png') {
   await waitFor(() => expect(screen.getByRole('button', { name: '사진에서 재료 찾기' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: '사진에서 재료 찾기' }));
   await screen.findByRole('button', { name: '선택 항목 저장' });
+  await waitFor(() => expect(screen.getByRole('button', { name: '선택 항목 저장' })).toBeEnabled());
 }
 
 function rejectLearningWrites() {
@@ -121,7 +123,7 @@ describe('OCR auxiliary learning storage failures', () => {
     renderPage();
     await extractImage();
     fireEvent.change(screen.getByRole('textbox', { name: '이름' }), { target: { value: '손두부' } });
-    vi.spyOn(database, 'saveIngredients').mockRejectedValueOnce(new Error('재고 저장 실패'));
+    vi.spyOn(importRepository, 'commitIngredientImport').mockRejectedValueOnce(new Error('재고 저장 실패'));
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
 
     expect(await screen.findByText('재고 저장 실패')).toBeInTheDocument();
@@ -148,7 +150,7 @@ describe('OCR auxiliary learning storage failures', () => {
     await extractImage();
     fireEvent.change(screen.getByRole('textbox', { name: '이름' }), { target: { value: '손두부' } });
     fireEvent.change(screen.getByRole('textbox', { name: '수량' }), { target: { value: '3모' } });
-    vi.spyOn(database, 'saveIngredients').mockRejectedValueOnce(new Error('재고 저장 실패'));
+    vi.spyOn(importRepository, 'commitIngredientImport').mockRejectedValueOnce(new Error('재고 저장 실패'));
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
 
     expect(await screen.findByText('재고 저장 실패')).toBeInTheDocument();

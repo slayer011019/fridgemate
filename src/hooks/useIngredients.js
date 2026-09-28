@@ -12,6 +12,8 @@ import {
   getStoredLastSyncedAt
 } from '../features/ingredients/ingredientsScopeState';
 import { isBackendEnabled } from '../utils/backendConfig';
+import { commitIngredientImport } from '../features/import/ingredientImportRepository';
+import { getPendingIngredients } from '../utils/syncStrategy';
 import { useAuth } from './useAuth';
 
 const IngredientsContext = createContext(null);
@@ -33,6 +35,19 @@ export function IngredientsProvider({ children }) {
   const isSyncing = syncStatus === 'syncing';
   const ingredientsRef = useRef(ingredients);
   const scopeRef = useRef(storageScope);
+  const importMountedRef = useRef(true);
+  const importSessionRef = useRef({ scope: storageScope, syncEnabled: backendSyncAvailable });
+  if (importSessionRef.current.scope !== storageScope || importSessionRef.current.syncEnabled !== backendSyncAvailable) {
+    importSessionRef.current = { scope: storageScope, syncEnabled: backendSyncAvailable };
+  }
+  const importSession = importSessionRef.current;
+  const isCurrentLoadSession = useCallback(() => importMountedRef.current
+    && importSessionRef.current === importSession, [importSession]);
+
+  useEffect(() => {
+    importMountedRef.current = true;
+    return () => { importMountedRef.current = false; };
+  }, []);
 
   const clearError = useCallback(() => {
     setError('');
@@ -96,6 +111,36 @@ export function IngredientsProvider({ children }) {
     setSyncError(null);
   }, []);
 
+  const importIngredients = useCallback(async (command) => {
+    const cache = getScopeState(storageScope);
+    const isCurrent = () => importMountedRef.current && importSessionRef.current === importSession
+      && getScopeState(storageScope) === cache;
+    if (!isCurrent() || command?.scope !== storageScope || command?.syncEnabled !== backendSyncAvailable) {
+      throw new Error('가져오기 검토의 계정이나 저장 상태가 바뀌었어요. 다시 확인해 주세요.');
+    }
+    // The transaction owns validation and rollback. Do not optimistically remove
+    // replacement targets or turn a later refresh failure into a failed import.
+    // A return to this account while its acknowledgement is delayed must read
+    // storage, not reuse the pre-import cache. Keep the currently shown rows.
+    cache.loaded = false;
+    const result = await commitIngredientImport(command, { isCurrent });
+    if (isCurrent()) {
+      const pendingUploads = backendSyncAvailable ? getPendingIngredients(result.syncSnapshot) : [];
+      commitIngredients(result.ingredients, storageScope);
+      commitSyncSummary({ ...createEmptySyncSummary(), pendingUploads,
+        nextSnapshot: backendSyncAvailable ? result.syncSnapshot : [] }, storageScope);
+      setDataSource('indexeddb');
+      setHasUnsyncedChanges(pendingUploads.length > 0);
+      setSyncStatus(pendingUploads.length > 0 ? 'dirty' : 'idle');
+      setSyncError(null);
+    } else {
+      // A late acknowledgement may not repopulate a removed/replaced scope cache.
+      // If the old cache is reused later, require a fresh storage read instead.
+      cache.loaded = false;
+    }
+    return result;
+  }, [backendSyncAvailable, commitIngredients, commitSyncSummary, importSession, storageScope]);
+
   const loadIngredients = useMemo(
     () =>
       createLoadIngredientsAction({
@@ -103,6 +148,7 @@ export function IngredientsProvider({ children }) {
         useApi,
         syncEnabled: backendSyncAvailable,
         scopeRef,
+        isCurrentSession: isCurrentLoadSession,
         commitIngredients,
         commitSyncSummary,
         runRepositoryCommand,
@@ -110,7 +156,7 @@ export function IngredientsProvider({ children }) {
         setHasUnsyncedChanges,
         setSyncStatus
       }),
-    [backendSyncAvailable, commitIngredients, commitSyncSummary, runRepositoryCommand, storageScope, useApi]
+    [backendSyncAvailable, commitIngredients, commitSyncSummary, isCurrentLoadSession, runRepositoryCommand, storageScope, useApi]
   );
 
   useEffect(() => {
@@ -121,9 +167,8 @@ export function IngredientsProvider({ children }) {
       return;
     }
 
-    loadIngredients().catch(() => {
-      setLoading(false);
-    });
+    // The request owner settles loading; a stale initial read cannot end a new one.
+    loadIngredients().catch(() => {});
   }, [loadIngredients, storageScope]);
 
   const { addIngredient, updateIngredient, addIngredients, removeIngredient, findIngredient } = useMemo(
@@ -191,6 +236,7 @@ export function IngredientsProvider({ children }) {
       pullIngredientsFromServer,
       addIngredient,
       addIngredients,
+      importIngredients,
       updateIngredient,
       removeIngredient,
       findIngredient
@@ -204,6 +250,7 @@ export function IngredientsProvider({ children }) {
       findIngredient,
       hasUnsyncedChanges,
       ingredients,
+      importIngredients,
       isSyncing,
       lastSyncedAt,
       loadIngredients,
