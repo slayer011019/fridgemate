@@ -244,6 +244,8 @@ npm run dev
 
 백엔드 모드를 함께 사용할 때는 별도 터미널에서 실행합니다.
 
+설치 기준은 전체 저장소의 루트입니다. [격리된 실제 PostgreSQL 검사](docs/PRD_V3_LOCAL_POSTGRES_2026-09-29.md)에서 현재 Prisma 조합의 User 조회·커밋·롤백 6개를 새 임시 DB 두 개에서 확인했습니다. 전체 migration은 `pgvector` 부재로 중단됐으며, RLS·운영 인증·Workers/Hyperdrive 호환성이나 `server/` 단독 설치가 검증된 것은 아닙니다.
+
 ```bash
 npm run dev:server
 npm run dev
