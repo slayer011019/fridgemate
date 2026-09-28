@@ -19,7 +19,7 @@ export default defineConfig({
   projects: [
     {
       name: 'local-only',
-      testMatch: ['local-only.spec.js', 'ocr-import.spec.js', 'analytics-consent.spec.js', 'public-recipes.spec.js', 'meal-plan.spec.js', 'meal-plan-changes.spec.js', 'purchase-receiving.spec.js'],
+      testMatch: ['local-only.spec.js', 'seed-setup.spec.js', 'ocr-import.spec.js', 'analytics-consent.spec.js', 'public-recipes.spec.js', 'meal-plan.spec.js', 'meal-plan-changes.spec.js', 'purchase-receiving.spec.js'],
       use: {
         ...sharedUse,
         ...devices['Desktop Chrome'],
