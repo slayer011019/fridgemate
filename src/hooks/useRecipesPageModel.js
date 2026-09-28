@@ -53,7 +53,9 @@ function buildSectionStats({ loading, readyRecommendations, buyOneRecommendation
 }
 
 export function useRecipesPageModel() {
-  const { pantryStaples, pantryOwnership, pantrySummary, cyclePantryStatus } = usePantryStaples();
+  const { pantryStaples, pantryOwnership, pantrySummary, cyclePantryStatus, syncError: pantryError,
+    saving: pantrySaving, storageReady: pantryStorageReady, canRetrySave: pantryCanRetrySave,
+    reloadPantryOwnership, retryPantrySave } = usePantryStaples();
   const ownedPantryItems = useMemo(
     () =>
       pantryStaples
@@ -102,6 +104,12 @@ export function useRecipesPageModel() {
     pantryOwnership,
     pantrySummary,
     cyclePantryStatus,
+    pantryError,
+    pantrySaving,
+    pantryStorageReady,
+    pantryCanRetrySave,
+    reloadPantryOwnership,
+    retryPantrySave,
     ownedPantryItems,
     loading,
     ingredients,

@@ -21,6 +21,12 @@ function RecipesPage() {
     pantryOwnership,
     pantrySummary,
     cyclePantryStatus,
+    pantryError,
+    pantrySaving,
+    pantryStorageReady,
+    pantryCanRetrySave,
+    reloadPantryOwnership,
+    retryPantrySave,
     ownedPantryItems,
     loading,
     ingredients,
@@ -167,6 +173,10 @@ function RecipesPage() {
             pantryOwnership={pantryOwnership}
             pantrySummary={pantrySummary}
             onCycle={cyclePantryStatus}
+            error={pantryError}
+            disabled={pantrySaving || pantryStorageReady === false}
+            onRetry={reloadPantryOwnership}
+            onRetrySave={pantryCanRetrySave ? retryPantrySave : undefined}
           />
         </div>
       </section>
@@ -255,13 +265,17 @@ function RecipesPage() {
       </> : null}
       <PublicRecipeExplorer />
       {!hasInventory ? <details className="card">
-        <summary className="cursor-pointer py-2 font-semibold text-slate-900">보유 양념 설정 · {ownedPantryCount}개 보유</summary>
+        <summary className="cursor-pointer py-2 font-semibold text-slate-900">보유 양념 설정 · {pantryStorageReady === false ? '확인 필요' : `${ownedPantryCount}개 보유`}</summary>
         <p className="my-3 text-sm leading-6 text-slate-600">냉장고 재료를 등록하지 않아도 양념 보유 상태를 기록할 수 있어요. 저장한 양념은 내 재료 추천과 조리 전 준비 확인에 사용할 수 있습니다.</p>
         <PantryStaplesPanel
           items={pantryStaples}
           pantryOwnership={pantryOwnership}
           pantrySummary={pantrySummary}
           onCycle={cyclePantryStatus}
+          error={pantryError}
+          disabled={pantrySaving || pantryStorageReady === false}
+          onRetry={reloadPantryOwnership}
+          onRetrySave={pantryCanRetrySave ? retryPantrySave : undefined}
         />
       </details> : null}
       <section className="card space-y-3" aria-labelledby="all-public-recipes">

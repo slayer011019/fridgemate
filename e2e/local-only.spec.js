@@ -146,3 +146,73 @@ test('guest menu selection survives a reload without a server account', async ({
   await gotoAndWait(page, '/');
   await expect(page.getByRole('heading', { name: recipeName, exact: true })).toBeVisible();
 });
+
+test('pantry write failure preserves ownership and the same action can retry', async ({ page }, testInfo) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seedBrowserState(page, { ingredients: [createIngredient('pantry-fixture', { name: '계란' })] });
+  await gotoAndWait(page, '/recipes');
+  const salt = page.getByRole('button', { name: /^소금\s*(보유|미보유|모름)$/ });
+  await expect(salt).toHaveText(/모름/);
+  await salt.click();
+  await expect(salt).toHaveText(/소금\s*보유/);
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'fridgemate-pantry-ownership:v2:guest') {
+        throw new DOMException('Fixture full storage', 'QuotaExceededError');
+      }
+      return original.call(this, key, value);
+    };
+    window.__FRIDGEMATE_TEST__.restorePantryWrite = () => { Storage.prototype.setItem = original; };
+  });
+  await salt.click();
+  await expect(page.getByRole('alert').filter({ hasText: /팬트리/ })).toContainText(/저장하지 못/);
+  await expect(salt).toHaveText(/소금\s*보유/);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fridgemate-pantry-ownership:v2:guest'))))
+    .toEqual({ salt: 'owned' });
+  await page.getByRole('alert').filter({ hasText: /팬트리/ }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('pantry-storage-failure-mobile.png') });
+  await page.evaluate(() => window.__FRIDGEMATE_TEST__.restorePantryWrite());
+  await salt.click();
+  await expect(salt).toHaveText(/미보유/);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fridgemate-pantry-ownership:v2:guest'))))
+    .toEqual({ salt: 'missing' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(salt).toHaveText(/미보유/);
+  expect(errors).toEqual([]);
+});
+
+test('pantry unreadable storage is not silently replaced and explicit recheck recovers it', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await seedBrowserState(page);
+  await gotoAndWait(page, '/recipes');
+  await page.locator('summary').filter({ hasText: '보유 양념 설정' }).click();
+  const salt = page.getByRole('button', { name: /^소금\s*(보유|미보유|모름)$/ });
+  await salt.click();
+  await expect(salt).toHaveText(/소금\s*보유/);
+  await page.addInitScript(() => {
+    const original = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'fridgemate-pantry-ownership:v2:guest') {
+        throw new DOMException('Fixture denied storage', 'SecurityError');
+      }
+      return original.call(this, key);
+    };
+    window.restorePantryRead = () => { Storage.prototype.getItem = original; };
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('summary').filter({ hasText: '보유 양념 설정' })).toContainText('확인 필요');
+  await page.locator('summary').filter({ hasText: '보유 양념 설정' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: /팬트리/ })).toContainText(/불러오지 못/);
+  await expect(salt).toBeDisabled();
+  await page.evaluate(() => window.restorePantryRead());
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('fridgemate-pantry-ownership:v2:guest'))))
+    .toEqual({ salt: 'owned' });
+  await page.getByRole('button', { name: /팬트리.*다시/ }).click();
+  await expect(salt).toBeEnabled();
+  await expect(salt).toHaveText(/소금\s*보유/);
+  expect(errors).toEqual([]);
+});
