@@ -35,11 +35,11 @@ function deferred() {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-function Harness({ scope = 'guest', kind = 'move', pantryItems = [], afterChange }) {
+function Harness({ scope = 'guest', kind = 'move', pantryItems = [], today = WEEK, afterChange }) {
   const [changed, setChanged] = useState(false);
   const [closed, setClosed] = useState(false);
   return <StrictMode><p role="status">{changed ? '부모 화면 갱신됨' : '부모 화면 유지'}</p>
-    {closed ? <p>변경 창이 닫힘</p> : <MealPlanChangePanel {...{ scope, kind, pantryItems }} weekStart={WEEK} slotId={SLOT}
+    {closed ? <p>변경 창이 닫힘</p> : <MealPlanChangePanel {...{ scope, kind, pantryItems, today }} weekStart={WEEK} slotId={SLOT}
       onChanged={async () => { setChanged(true); await afterChange?.(); }} onClose={() => setClosed(true)} />}</StrictMode>;
 }
 async function showPreview() {
@@ -55,6 +55,31 @@ describe('MealPlanChangePanel user approval and stale results', () => {
     confirmMealPlanChange.mockResolvedValue({ records: [], weekStarts: [WEEK] });
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+  it('drops yesterday’s comparison and swap choice when the local day changes', async () => {
+    const view = render(<Harness />);
+    await showPreview();
+    view.rerender(<Harness today="2026-09-22" />);
+    expect(screen.queryByRole('button', { name: '변경안 확정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '두 메뉴 날짜 바꾸기' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('옮길 날짜')).toHaveAttribute('min', '2026-09-22');
+    expect(screen.getByLabelText('옮길 날짜')).toHaveValue('');
+    expect(confirmMealPlanChange).not.toHaveBeenCalled();
+  });
+
+  it('still refreshes an acknowledged write when midnight invalidates its comparison', async () => {
+    const saving = deferred();
+    confirmMealPlanChange.mockReturnValue(saving.promise);
+    const view = render(<Harness />);
+    await showPreview();
+    fireEvent.click(screen.getByRole('button', { name: '변경안 확정' }));
+    view.rerender(<Harness today="2026-09-22" />);
+    expect(screen.getByRole('button', { name: '변경 창 닫기' })).toBeDisabled();
+    await act(async () => { saving.resolve({ records: [], weekStarts: [WEEK] }); });
+    expect(screen.getByText('부모 화면 갱신됨')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '변경안 확정' })).not.toBeInTheDocument();
+    expect(confirmMealPlanChange).toHaveBeenCalledTimes(1);
+  });
 
   it('shows a read-only menu and quantity comparison without saving until approval', async () => {
     render(<Harness />);

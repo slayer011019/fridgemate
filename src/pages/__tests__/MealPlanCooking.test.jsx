@@ -39,8 +39,15 @@ async function seed() {
 function page() {
   return <StrictMode><MemoryRouter><IngredientsProvider><PantryStaplesProvider><MealPlanPage /></PantryStaplesProvider></IngredientsProvider></MemoryRouter></StrictMode>;
 }
+async function noticeReady() {
+  await waitFor(() => {
+    expect(screen.queryByText('식단을 불러오는 중이에요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '지난 끼니 확인' })).toHaveAttribute('aria-busy', 'false');
+  });
+}
 async function openMonday() {
   const article = within(await screen.findByRole('article', { name: `${WEEK} 저녁 식단` }));
+  await noticeReady();
   fireEvent.click(article.getByRole('button', { name: '만들어 먹었어요', exact: true }));
   return within(await screen.findByRole('form', { name: '조리 사용량 · 사용량 확인용 닭고기 한 끼' }));
 }
@@ -66,6 +73,7 @@ describe('weekly cooking through actual local storage', () => {
     save.focus();
     fireEvent.click(save); fireEvent.click(save);
     await screen.findByText('조리와 실제 사용량을 저장했어요.');
+    await noticeReady();
     expect(screen.getByRole('heading', { name: '조리와 재고 기록' })).toHaveFocus();
     expect((await getAllIngredients())[0]).toMatchObject({ quantity: '150g', memo: '보존 메모' });
     fireEvent.click(screen.getByRole('button', { name: '조리 창 닫기' }));
@@ -77,6 +85,7 @@ describe('weekly cooking through actual local storage', () => {
     await waitFor(() => expect(preview.getByText('50g', { exact: true })).toBeInTheDocument());
     view.unmount(); render(page());
     expect(within(await screen.findByRole('article', { name: `${WEEK} 저녁 식단` })).getByText('조리 기록됨')).toBeInTheDocument();
+    await noticeReady();
     expect((await getAllIngredients())[0].quantity).toBe('150g');
   });
 
@@ -84,6 +93,7 @@ describe('weekly cooking through actual local storage', () => {
     render(page()); const form = await openMonday();
     fireEvent.click(form.getByRole('button', { name: '사용량 없이 조리만 기록' }));
     await screen.findByText('조리만 기록했어요. 남은 재고량을 다시 확인해 주세요.');
+    await noticeReady();
     expect((await getInventoryQuantitySnapshot()).inventory[0]).toMatchObject({ quantity: '300g', amount: null, quantityStatus: 'unverified' });
     expect((await getMealPlan(WEEK)).confirmed.slots[0]).toMatchObject({ status: 'cooked', cooking: { inventoryStatus: 'needs-review' } });
     fireEvent.click(screen.getByRole('button', { name: '조리 창 닫기' }));
@@ -107,11 +117,13 @@ describe('weekly cooking through actual local storage', () => {
     expect((await getAllIngredients())[0].quantity).toBe('150g');
     fireEvent.click(screen.getByRole('button', { name: '재고 반영 취소 확인' }));
     await screen.findByText('재고 반영만 취소했어요. 조리 기록은 유지돼요.');
+    await noticeReady();
     expect((await getAllIngredients())[0].quantity).toBe('300g');
     expect(await getMealPlan(WEEK)).toBeNull();
     fireEvent.click(history.getByRole('button', { name: '조리 기록 취소', exact: true }));
     fireEvent.click(screen.getByRole('button', { name: '조리 기록 취소 확인' }));
     await screen.findByText('조리 기록을 취소했어요. 재고는 변경하지 않았어요.');
+    await noticeReady();
     expect(await getMealPlan(WEEK)).toBeNull();
     expect((await getInventoryQuantitySnapshot()).inventory[0].amount).toBeNull();
   });

@@ -217,6 +217,31 @@ function assertCookingPreserved(current, nextPlan) {
   });
 }
 
+function localDate(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function preservesOverdueDemand(confirmed, candidate) {
+  if (!candidate || !['planned', 'skipped'].includes(candidate.status)) return false;
+  // A skip is an explicit resolution, but must retain the source recipe and its
+  // quantities. Display notices and locking do not change the held demand.
+  return ['id', 'date', 'mealType', 'servings', 'templateKey', 'templateVersion', 'title', 'components', 'foodGroups']
+    .every(key => sameStoredValue(confirmed[key], candidate[key]));
+}
+
+export function getOverdueMealPlanDraftConflicts(record, today) {
+  if (!isDate(today)) throw new Error('지난 끼니를 확인할 날짜가 올바르지 않습니다.');
+  if (!record?.confirmed || !record.draft) return [];
+  return record.confirmed.slots.filter((slot, index) => slot.status === 'planned' && slot.date < today
+    && !preservesOverdueDemand(slot, record.draft.slots[index]));
+}
+
+function assertOverdueDemandPreserved(current, draft) {
+  if (getOverdueMealPlanDraftConflicts({ confirmed: current?.confirmed, draft }, localDate()).length) {
+    throw new Error('지난 미완료 끼니의 메뉴·분량은 일반 수정으로 바꿀 수 없습니다. 지난 끼니를 유지해 초안을 복구한 뒤 조리·건너뛰기·날짜 이동으로 확인해주세요.');
+  }
+}
+
 function assertActiveCookingPreserved(record, events, scope) {
   const history = [];
   for (const event of events) {
@@ -311,6 +336,7 @@ export async function saveMealPlan(plan, scope = 'guest', expectedRevision) {
   const snapshot = structuredClone(plan);
   return updateRecord(snapshot.weekStart, resolvedScope, expectedRevision, (current, revision, now) => {
     assertCookingPreserved(current, snapshot);
+    assertOverdueDemandPreserved(current, snapshot);
     return {
       id: snapshot.id, schemaVersion: RECORD_SCHEMA_VERSION, scope: resolvedScope, weekStart: snapshot.weekStart,
       revision, createdAt: current?.createdAt ?? now, updatedAt: now,
@@ -327,12 +353,30 @@ export async function confirmMealPlan(weekStart, scope = 'guest', expectedRevisi
   return updateRecord(weekStart, resolvedScope, expectedRevision, (current, revision, now) => {
     if (!current?.draft) throw new Error('확정할 초안이 없습니다. 식단을 먼저 만들어주세요.');
     assertCookingPreserved(current, current.draft);
+    assertOverdueDemandPreserved(current, current.draft);
     assertMealPlanExclusions(current.draft);
     // Confirmation records a menu choice, not verified quantities or inventory consumption.
     return {
       ...current, revision, updatedAt: now, draft: null, confirmed: current.draft,
       archives: current.confirmed ? [...current.archives, current.confirmed] : current.archives
     };
+  });
+}
+
+export async function restoreOverdueMealPlanDraft(weekStart, scope = 'guest', expectedRevision) {
+  const resolvedScope = resolveScope(scope);
+  assertWeekStart(weekStart);
+  assertExpectedRevision(expectedRevision);
+  return updateRecord(weekStart, resolvedScope, expectedRevision, (current, revision, now) => {
+    if (!current?.draft) throw new Error('복구할 초안이 없습니다. 최신 식단을 다시 불러와주세요.');
+    const conflicts = getOverdueMealPlanDraftConflicts(current, localDate());
+    if (!conflicts.length) throw new Error('복구할 지난 끼니 충돌이 없습니다. 최신 식단을 다시 불러와주세요.');
+    const ids = new Set(conflicts.map(slot => slot.id));
+    const draft = structuredClone(current.draft);
+    draft.slots = draft.slots.map((slot, index) => ids.has(slot.id) ? structuredClone(current.confirmed.slots[index]) : slot);
+    assertCookingPreserved(current, draft);
+    assertOverdueDemandPreserved(current, draft);
+    return { ...current, revision, updatedAt: now, draft: { ...draft, revision, updatedAt: now } };
   });
 }
 

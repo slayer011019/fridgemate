@@ -22,6 +22,54 @@ test('local-only mode keeps CRUD data in IndexedDB across reloads', async ({ pag
   await expect(page.getByText('우유')).toHaveCount(0);
 });
 
+test('blocked local and session storage getters keep public pages and guest IndexedDB CRUD available', async ({ page }) => {
+  const pageErrors = [];
+  const authRequests = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname.startsWith('/api/auth/')) authRequests.push(request.url());
+  });
+
+  // Fresh context: do not use the seed helper, which itself needs Web Storage.
+  // This runs before the real main entry and again on every reload; IndexedDB stays real.
+  await page.addInitScript(() => {
+    for (const storageType of ['localStorage', 'sessionStorage']) {
+      Object.defineProperty(window, storageType, {
+        configurable: true,
+        get() { throw new DOMException('Fixture storage access denied', 'SecurityError'); }
+      });
+    }
+  });
+  await gotoAndWait(page, '/');
+  await expect(page.getByRole('heading', { name: '남은 재료로 오늘 메뉴를 골라보세요' })).toBeVisible();
+
+  await gotoAndWait(page, '/ingredients/new');
+  await page.getByLabel('이름').fill('우유');
+  await page.getByLabel('수량').fill('1통');
+  await page.getByLabel('카테고리').selectOption('유제품');
+  await page.getByLabel('보관 방식').selectOption('냉장');
+  await page.getByLabel('구매일').fill('2026-09-28');
+  await page.getByRole('button', { name: '재료 추가', exact: true }).click();
+
+  await expect(page).toHaveURL(/\/ingredients$/);
+  await expect(page.getByText('우유', { exact: true })).toBeVisible();
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([
+    expect.objectContaining({ name: '우유', quantity: '1통', category: '유제품', storageType: '냉장' })
+  ]);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByText('우유', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '삭제', exact: true }).click();
+  await expect(page.getByText('우유', { exact: true })).toHaveCount(0);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([]);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: '재료를 빠르게 찾고, 지금 쓰실 것부터 정리하세요', exact: true })).toBeVisible();
+  await expect(page.getByText('우유', { exact: true })).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
+  expect(authRequests).toEqual([]);
+});
+
 test('shopping edits survive a local write failure and persist after automatic retry', async ({ page }) => {
   const ingredient = createIngredient('shopping-milk', {
     clientId: 'shopping-milk', name: '우유', category: '유제품', quantity: '1통', memo: '기존 메모', consumed: true

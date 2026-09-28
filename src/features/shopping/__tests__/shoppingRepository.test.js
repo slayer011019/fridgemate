@@ -23,7 +23,7 @@ describe('source-separated shopping persistence', () => {
   it('starts with empty scoped manual items and history without writing ingredient records', async () => {
     const { repository, db } = await setup();
     expect(await repository.getShoppingWorkspace('guest', TODAY)).toEqual({
-      scope: 'guest', manualItems: [], purchaseNotes: [], receipts: [], sources: [], checkedAt: NOW,
+      scope: 'guest', manualItems: [], purchaseNotes: [], receipts: [], sources: [], overdueMeals: [], checkedAt: NOW,
     });
     expect(await db.getAllIngredients()).toEqual([]);
   });
@@ -123,6 +123,20 @@ describe('source-separated shopping persistence', () => {
     expect(sources.find((item) => item.source === 'manual').quantityText).toBe('1팩');
     expect(sources.find((item) => item.source === 'repurchase').quantityText).toBe('두 공기');
     expect(new Set(sources.map((item) => item.sourceId)).size).toBe(3);
+  });
+
+  it('keeps overdue meals in a read-only confirmation list instead of purchase options', async () => {
+    const { repository, db } = await setup();
+    const { generateMealPlan } = await import('../../mealPlans/mealPlanDomain');
+    const { saveMealPlan, confirmMealPlan } = await import('../../mealPlans/mealPlanRepository');
+    const plan = generateMealPlan({ weekStart: TODAY, now: NOW, preferences: { servings: 1, dinnerDays: [0] } });
+    await saveMealPlan(plan, 'guest', 0);
+    await confirmMealPlan(TODAY, 'guest', 1);
+    const workspace = await repository.getShoppingWorkspace('guest', '2026-09-22');
+    // A meal is a confirmation task, not a grocery item that can be received.
+    expect(workspace.sources).toEqual([]);
+    expect(workspace.overdueMeals).toEqual([{ slotId: `${TODAY}:dinner`, date: TODAY, title: plan.slots[0].title }]);
+    expect(await db.getAllIngredients()).toEqual([]);
   });
 
   it('recalculates only plan rows when a dinner is skipped and preserves manual, purchased notes and physical inventory', async () => {

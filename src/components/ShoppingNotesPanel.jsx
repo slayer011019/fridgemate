@@ -80,8 +80,15 @@ function PurchaseForm({ sources, disabled, onSave }) {
   );
 }
 
-function ShoppingNotesSession({ scope, disabled, onInventoryApplied }) {
-  const [state, setState] = useState({ status: 'idle', snapshot: null, busy: false, notice: '', error: '', revision: 0 });
+function ShoppingNotesSession({ scope, today, disabled, onInventoryApplied }) {
+  const dayContext = useRef({ today });
+  if (dayContext.current.today !== today) dayContext.current = { today };
+  const renderedDay = dayContext.current;
+  const [storedState, setState] = useState({ day: renderedDay, status: 'idle', snapshot: null, busy: false, notice: '', error: '', revision: 0 });
+  // A date boundary invalidates only the read/form, not a committed receipt's
+  // acknowledgement. Do not key/remount the write session on today's date.
+  const state = storedState.day === renderedDay ? storedState : { ...storedState,
+    status: storedState.status === 'idle' ? 'idle' : 'stale', snapshot: null, notice: '', error: '' };
   const mountedRef = useRef(false);
   const operationRef = useRef(null);
   const generationRef = useRef(0);
@@ -100,16 +107,16 @@ function ShoppingNotesSession({ scope, disabled, onInventoryApplied }) {
     const operation = {};
     const generation = generationRef.current;
     operationRef.current = operation;
-    const current = () => mountedRef.current && operationRef.current === operation && generationRef.current === generation;
-    setState((previous) => ({ ...previous, status: kind === 'read' ? 'loading' : previous.status,
-      snapshot: kind === 'read' ? null : previous.snapshot, busy: true, notice: '', error: '' }));
+    const current = () => mountedRef.current && operationRef.current === operation && generationRef.current === generation && dayContext.current === renderedDay;
+    setState({ ...state, day: renderedDay, status: kind === 'read' ? 'loading' : state.status,
+      snapshot: kind === 'read' ? null : state.snapshot, busy: true, notice: '', error: '' });
     try {
       if (kind === 'manual') await saveManualShoppingItem({ scope, ...payload });
       else if (kind === 'remove') await removeManualShoppingItem({ scope, id: payload.id, expectedRevision: payload.revision });
       else if (kind === 'purchase') await recordPurchaseNote({ scope, ...payload });
       else if (kind === 'receipt') {
         await applyPurchaseReceipt({ scope, ...payload });
-        // Focus invalidates the old form, not an acknowledged inventory write.
+        // Focus/day changes invalidate the form, not an acknowledged inventory write.
         // Account/reset changes still unmount this session and discard its callback.
         if (mountedRef.current && operationRef.current === operation) await onInventoryApplied?.();
       }
@@ -118,7 +125,7 @@ function ShoppingNotesSession({ scope, disabled, onInventoryApplied }) {
       if (!current()) return;
       if (snapshot.scope !== scope || !Array.isArray(snapshot.manualItems) || !Array.isArray(snapshot.purchaseNotes)
         || !Array.isArray(snapshot.receipts) || !Array.isArray(snapshot.sources)) throw new Error('장보기 계정을 확인할 수 없습니다.');
-      setState((previous) => ({ status: 'ready', snapshot, busy: true, error: '', revision: previous.revision + 1,
+      setState((previous) => ({ day: renderedDay, status: 'ready', snapshot, busy: true, error: '', revision: previous.revision + 1,
         notice: kind === 'manual' ? '수동 항목을 저장했어요.' : kind === 'remove' ? '수동 항목을 제거했어요.' : kind === 'purchase' ? '구매 메모를 저장했어요.' : kind === 'receipt' ? '구매를 재고에 반영했어요.' : '' }));
     } catch {
       if (current()) setState((previous) => ({ ...previous, status: 'error', notice: '', error: kind === 'read'
@@ -146,6 +153,11 @@ function ShoppingNotesSession({ scope, disabled, onInventoryApplied }) {
       {state.error ? <p role="alert" className="mt-3 text-sm text-red-800">{state.error}</p> : null}
       {state.notice ? <p role="status" className="mt-3 text-sm text-brand-700">{state.notice}</p> : null}
       {state.snapshot ? <div key={state.revision} className="mt-5 space-y-6">
+        {state.snapshot.overdueMeals?.length ? <section aria-label="보류 중인 지난 끼니" className="space-y-2 text-sm leading-6 text-amber-900">
+          <h3 className="font-semibold">보류 중인 지난 끼니</h3>
+          <p>조리 여부 확인 필요 · 예정 배분 보류. 지난 끼니 자체를 구매 품목으로 추가하지 않아요. 식단 화면에서 조리 기록·건너뛰기 확정·날짜 이동으로 정리해 주세요.</p>
+          <ul>{state.snapshot.overdueMeals.map(meal => <li key={meal.slotId}>{meal.date} · {meal.title}</li>)}</ul>
+        </section> : null}
         <section aria-label="직접 적은 장보기" className="space-y-4">
           <h3 className="text-sm font-semibold text-slate-900">직접 적은 장보기</h3>
           <p className="text-xs leading-5 muted">식단을 바꿔도 직접 적은 항목과 체크는 남아요. 체크 변경도 저장 버튼으로 확정해 주세요.</p>
@@ -182,7 +194,7 @@ function ShoppingNotesSession({ scope, disabled, onInventoryApplied }) {
   );
 }
 
-export default function ShoppingNotesPanel({ scope, resetKey = '', disabled = false, onInventoryApplied }) {
+export default function ShoppingNotesPanel({ scope, resetKey = '', today = todayString(), disabled = false, onInventoryApplied }) {
   const [receiptNotice, setReceiptNotice] = useState(null);
   async function refreshAfterReceipt() {
     setReceiptNotice({ scope, text: '입고 기록을 저장했어요. 장보기 메모를 다시 열면 기록을 확인할 수 있어요.' });
@@ -191,6 +203,6 @@ export default function ShoppingNotesPanel({ scope, resetKey = '', disabled = fa
   }
   return <>
     {receiptNotice?.scope === scope ? <p role="status" className="text-sm leading-6 text-brand-700">{receiptNotice.text}</p> : null}
-    <ShoppingNotesSession key={JSON.stringify([scope, resetKey, disabled])} scope={scope} disabled={disabled} onInventoryApplied={refreshAfterReceipt} />
+    <ShoppingNotesSession key={JSON.stringify([scope, resetKey, disabled])} scope={scope} today={today} disabled={disabled} onInventoryApplied={refreshAfterReceipt} />
   </>;
 }

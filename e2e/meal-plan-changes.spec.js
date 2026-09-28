@@ -89,6 +89,82 @@ function expectUnchangedNonPlans(after, before) {
   for (const store of ['ingredients', 'inventoryQuantities', 'inventoryEvents', 'shoppingEntries']) expect(after[store]).toEqual(before[store]);
 }
 
+async function startOverdue(page) {
+  await startArithmetic(page, { twoWeeks: true });
+  await seedPlans(page, [arithmeticPlan(NEXT_WEEK, 200)]);
+  await page.clock.setFixedTime(new Date(`${NEXT_WEEK}T08:00:00.000Z`));
+  await gotoAndWait(page, '/meal-plan');
+  await expect(page.getByRole('region', { name: '지난 끼니 확인', exact: true })
+    .getByRole('button', { name: `${WEEK} 식단 확인`, exact: true })).toBeVisible();
+}
+
+test('AT-18 past confirmed hold survives a skip draft until explicit confirmation without consuming inventory', async ({ page }, testInfo) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startOverdue(page);
+  const before = await readState(page);
+  const overdue = page.getByRole('region', { name: '지난 끼니 확인', exact: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await overdue.screenshot({ path: testInfo.outputPath('overdue-notice-mobile.png') });
+  const shopping = page.getByRole('region', { name: '식단 장보기 미리보기', exact: true });
+  await shopping.getByRole('button', { name: '식단 장보기 확인', exact: true }).click();
+  await expect(shopping.getByRole('list', { name: '확인된 부족분', exact: true })).toContainText('100g');
+  const notes = page.getByRole('region', { name: '장보기 메모', exact: true });
+  await notes.getByRole('button', { name: '장보기 메모 열기', exact: true }).click();
+  await expect(notes.getByRole('region', { name: '보류 중인 지난 끼니', exact: true })).toContainText(WEEK);
+  await expect(notes.getByRole('option', { name: /산술 검증 닭고기 200g/ })).toHaveCount(0);
+  expect(await readState(page)).toEqual(before);
+  await overdue.getByRole('button', { name: `${WEEK} 식단 확인`, exact: true }).click();
+  await expect(meal(page).getByText('조리 여부 확인 필요 · 예정 배분 보류', { exact: true })).toBeVisible();
+  await expect(meal(page).getByRole('button', { name: '메뉴 교체', exact: true })).toBeDisabled();
+  await meal(page).getByRole('button', { name: '외식·건너뛰기', exact: true }).click();
+  const confirm = page.getByRole('button', { name: '수정 초안으로 확정본 교체', exact: true });
+  await expect(confirm).toBeEnabled();
+  await expect(overdue.getByRole('button', { name: `${WEEK} 식단 확인`, exact: true })).toBeVisible();
+  await shopping.getByRole('button', { name: '식단 장보기 확인', exact: true }).click();
+  await expect(shopping.getByRole('list', { name: '확인된 부족분', exact: true })).toContainText('100g');
+  const drafted = await readState(page);
+  expect(drafted.mealPlans.find(plan => plan.weekStart === WEEK).confirmed).toEqual(before.mealPlans.find(plan => plan.weekStart === WEEK).confirmed);
+  expectUnchangedNonPlans(drafted, before);
+  await confirm.click();
+  await expect(overdue).toContainText('조리 여부를 확인할 지난 끼니가 없어요.');
+  const after = await readState(page);
+  expect(after.mealPlans.find(plan => plan.weekStart === WEEK).confirmed.slots[0].status).toBe('skipped');
+  expectUnchangedNonPlans(after, before);
+  await page.reload();
+  await expect(overdue).toContainText('조리 여부를 확인할 지난 끼니가 없어요.');
+  expect(await readState(page)).toEqual(after);
+  expect(errors).toEqual([]);
+});
+
+test('AT-18 moves a missed meal to a future empty day and reloads without consuming or swapping stock', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await startOverdue(page);
+  const before = await readState(page);
+  const overdue = page.getByRole('region', { name: '지난 끼니 확인', exact: true });
+  await overdue.getByRole('button', { name: `${WEEK} 식단 확인`, exact: true }).click();
+  await meal(page).getByRole('button', { name: '날짜 이동', exact: true }).click();
+  await expect(panel(page).getByRole('option', { name: '두 메뉴 날짜 바꾸기', exact: true })).toHaveCount(0);
+  await expect(panel(page).getByLabel('옮길 날짜', { exact: true })).toHaveAttribute('min', NEXT_WEEK);
+  await panel(page).getByLabel('옮길 날짜', { exact: true }).fill(day(8));
+  await panel(page).getByRole('button', { name: '변경안 미리보기', exact: true }).click();
+  await expect(panel(page).getByRole('region', { name: '변경 전 전체 장보기', exact: true })).toContainText('조리 여부 확인 필요');
+  expect(await readState(page)).toEqual(before);
+  await panel(page).getByRole('button', { name: '변경안 확정', exact: true }).click();
+  await expect(panel(page).getByText('변경안을 확정했어요.', { exact: true })).toBeVisible();
+  const after = await readState(page);
+  expectUnchangedNonPlans(after, before);
+  expect(after.mealPlans.find(plan => plan.weekStart === WEEK).confirmed.slots[0].status).toBe('skipped');
+  expect(after.mealPlans.find(plan => plan.weekStart === NEXT_WEEK).confirmed.slots[1]).toMatchObject({ status: 'planned', title: '산술 검증 닭고기 200g' });
+  await page.reload();
+  await expect(meal(page, day(8)).getByRole('heading', { name: '산술 검증 닭고기 200g', exact: true })).toBeVisible();
+  await expect(overdue).toContainText('조리 여부를 확인할 지난 끼니가 없어요.');
+  expect(await readState(page)).toEqual(after);
+  expect(errors).toEqual([]);
+});
+
 test('mobile date movement previews expiry without writing and confirms only once across reload', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await startArithmetic(page);

@@ -117,3 +117,68 @@ test('failed withdrawal stops analytics in this page without claiming the saved 
   }))).toEqual({ events: 0, scripts: 0, dataLayer: [], gtagType: 'undefined' });
   expect(googleAnalyticsRequests).toBe(1);
 });
+
+for (const change of ['denied', 'removed', 'clear']) {
+  test(`another tab's ${change} consent change stops this tab without a reload`, async ({ page, context }) => {
+    await context.route('https://www.googletagmanager.com/**', route => route.abort());
+    await seedBrowserState(page, { analyticsConsent: 'granted' });
+    await gotoAndWait(page, '/');
+    await expect.poll(() => page.evaluate(() => document.querySelectorAll('script[data-fridgemate-ga]').length)).toBe(1);
+    const other = await context.newPage();
+    // Do not seed the second tab: it must share the existing same-origin storage.
+    await gotoAndWait(other, '/about');
+    if (change === 'denied') {
+      await other.getByRole('button', { name: '분석 설정' }).click();
+      await other.getByRole('button', { name: '필수 기능만' }).click();
+    } else {
+      await other.evaluate((operation) => {
+        if (operation === 'clear') window.localStorage.clear();
+        else window.localStorage.removeItem('fridgemate-analytics-consent');
+      }, change);
+    }
+    await expect.poll(() => page.evaluate(() => ({
+      events: window.__FRIDGEMATE_ANALYTICS_EVENTS__?.length || 0,
+      scripts: document.querySelectorAll('script[data-fridgemate-ga]').length,
+      session: window.sessionStorage.getItem('fridgemate-analytics-session-id'),
+      gtagType: typeof window.gtag
+    }))).toEqual({ events: 0, scripts: 0, session: null, gtagType: 'undefined' });
+    if (change !== 'denied') await expect(page.getByRole('dialog')).toBeVisible();
+    await page.getByRole('link', { name: '서비스 소개' }).click();
+    await expect(page).toHaveURL(/\/about$/u);
+    expect(await page.evaluate(() => window.__FRIDGEMATE_ANALYTICS_EVENTS__?.length || 0)).toBe(0);
+    await other.close();
+  });
+}
+
+test('a grant in another tab cannot undo this tab\'s failed withdrawal', async ({ page, context }) => {
+  await context.route('https://www.googletagmanager.com/**', route => route.abort());
+  await seedBrowserState(page, { analyticsConsent: 'granted' });
+  await gotoAndWait(page, '/');
+  await page.getByRole('button', { name: '분석 설정' }).click();
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'fridgemate-analytics-consent') throw new DOMException('Synthetic failure', 'SecurityError');
+      return setItem.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: '필수 기능만' }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  const other = await context.newPage();
+  await gotoAndWait(other, '/about');
+  // Force genuine value transitions so the browser delivers storage notifications.
+  await other.getByRole('button', { name: '분석 설정' }).click();
+  await other.getByRole('button', { name: '필수 기능만' }).click();
+  await other.getByRole('button', { name: '분석 설정' }).click();
+  await other.getByRole('button', { name: '분석 허용' }).click();
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('fridgemate-analytics-consent'))).toBe('granted');
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByRole('link', { name: '서비스 소개' }).click();
+  await expect(page).toHaveURL(/\/about$/u);
+  expect(await page.evaluate(() => ({
+    events: window.__FRIDGEMATE_ANALYTICS_EVENTS__?.length || 0,
+    scripts: document.querySelectorAll('script[data-fridgemate-ga]').length,
+    gtagType: typeof window.gtag
+  }))).toEqual({ events: 0, scripts: 0, gtagType: 'undefined' });
+  await other.close();
+});

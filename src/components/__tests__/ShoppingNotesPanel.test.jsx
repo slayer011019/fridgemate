@@ -29,6 +29,42 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('ShoppingNotesPanel', () => {
+  it('displays overdue meals as a read-only hold notice, not a purchase source', async () => {
+    vi.mocked(repository.getShoppingWorkspace).mockResolvedValue(workspace({
+      overdueMeals: [{ slotId: '2026-09-14:dinner', date: '2026-09-14', title: '보류할 닭고기 한 끼' }],
+    }));
+    render(<ShoppingNotesPanel scope="guest" />);
+    await open();
+    expect(screen.getByRole('region', { name: '보류 중인 지난 끼니' })).toHaveTextContent('2026-09-14 · 보류할 닭고기 한 끼');
+    expect(screen.queryByRole('option', { name: /보류할 닭고기 한 끼/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /식단.*밥/ })).toBeInTheDocument();
+  });
+  it('discards yesterday’s purchase sources and input before a fresh explicit read', async () => {
+    const view = render(<ShoppingNotesPanel scope="guest" today="2026-09-16" />);
+    await open();
+    const form = await purchaseValues();
+    expect(form.getByRole('button', { name: '구매 메모 저장' })).toBeEnabled();
+    vi.setSystemTime(new Date('2026-09-17T01:00:00Z'));
+    vi.mocked(repository.getShoppingWorkspace).mockResolvedValue(workspace({ sources: [] }));
+    view.rerender(<ShoppingNotesPanel scope="guest" today="2026-09-17" />);
+    expect(screen.queryByRole('form', { name: '구매 메모 작성' })).not.toBeInTheDocument();
+    expect(repository.getShoppingWorkspace).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: '장보기 메모 새로고침' }));
+    await screen.findByRole('form', { name: '구매 메모 작성' });
+    expect(screen.queryByRole('option', { name: /식단.*밥/ })).not.toBeInTheDocument();
+    expect(repository.getShoppingWorkspace).toHaveBeenLastCalledWith('guest', '2026-09-17');
+  });
+
+  it('does not accept a late workspace read from before the day changed', async () => {
+    const gate = deferred();
+    vi.mocked(repository.getShoppingWorkspace).mockReturnValueOnce(gate.promise);
+    const view = render(<ShoppingNotesPanel scope="guest" today="2026-09-16" />);
+    fireEvent.click(screen.getByRole('button', { name: '장보기 메모 열기' }));
+    view.rerender(<ShoppingNotesPanel scope="guest" today="2026-09-17" />);
+    await act(async () => gate.resolve(workspace({ manualItems: [MANUAL] })));
+    expect(screen.queryAllByRole('form')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: '장보기 메모 새로고침' })).toBeEnabled();
+  });
   it('does not offer receiving when the receipt history is absent from a loaded snapshot', async () => {
     vi.mocked(repository.getShoppingWorkspace).mockResolvedValue(workspace({ receipts: undefined }));
     render(<ShoppingNotesPanel scope="guest" />);

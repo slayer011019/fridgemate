@@ -104,6 +104,8 @@ test('mobile dinner days, ingredient disclosure and empty candidates stay usable
 });
 
 test('confirmation and a revised draft survive reload without changing stock', async ({ page }, testInfo) => {
+  // This checks editing a current confirmation, not the overdue-meal guard.
+  await page.clock.setFixedTime(new Date('2026-09-14T08:00:00.000Z'));
   await page.setViewportSize({ width: 390, height: 844 });
   await openPlanner(page, [createIngredient('chicken', { name: '닭고기', quantity: '300g', expiryDate: '2026-09-21' })]);
   const stock = await readBrowserIngredients(page, 'guest');

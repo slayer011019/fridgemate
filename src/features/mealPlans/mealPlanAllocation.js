@@ -94,18 +94,22 @@ export function allocateMealPlanInventory(input) {
   const { confirmedPlans, inventory, today } = input;
   const batches = inventory.filter((item) => !item.deletedAt && !item.consumed).map(prepareBatch)
     .sort((a, b) => (isDate(a.expiryDate) ? a.expiryDate : '').localeCompare(isDate(b.expiryDate) ? b.expiryDate : '') || a.id.localeCompare(b.id));
-  const futureSlots = confirmedPlans.flatMap((plan) => plan.slots)
-    .filter((slot) => slot.status === 'planned' && slot.date >= today)
+  const plannedSlots = confirmedPlans.flatMap((plan) => plan.slots)
+    .filter((slot) => slot.status === 'planned')
     .sort((a, b) => a.date.localeCompare(b.date));
   const masks = [];
   const shortageGroups = new Map();
   const shopping = { source: 'plan', shortages: [], needsReview: [], optional: [] };
-  const slots = futureSlots.map((slot) => {
+  const slots = plannedSlots.map((slot) => {
+    const overdue = slot.date < today;
     const quantity = getMealQuantityRequirements(slot, slot.servings);
     const sourceLines = slot.components.flatMap((component) => component.ingredients.map((line) => ({ componentId: component.id, line })));
     const getLine = (ref) => sourceLines.find((item) => item.componentId === ref.componentId && item.line.id === ref.lineId)?.line;
     const context = { slotId: slot.id, date: slot.date, title: slot.title };
     const review = (item) => shopping.needsReview.push({ ...context, ingredientKey: null, unit: null, preparationState: null, knownAmount: null, ...item });
+    // This is a conservative hold against the current snapshot, not proof of
+    // which batch was allocated or consumed on the original meal date.
+    if (overdue) review({ label: slot.title, reason: 'overdue-meal-unconfirmed' });
     // Process-only inputs are outside the measured food-row contract. They must
     // remain visible, and unknown uses may not make later stock look sufficient.
     const processInputs = slot.components.flatMap((component) => {
@@ -127,7 +131,7 @@ export function allocateMealPlanInventory(input) {
         reason: 'process-quantity-unverified' });
     }
     for (const { componentId, line } of sourceLines) {
-      if (line.optional === true && line.selected !== true) shopping.optional.push({ ...context, componentId, lineId: line.id, label: line.rawName || '이름 확인 필요' });
+      if (!overdue && line.optional === true && line.selected !== true) shopping.optional.push({ ...context, componentId, lineId: line.id, label: line.rawName || '이름 확인 필요' });
     }
     // Collect every unknown row before allocating: source order cannot decide availability.
     for (const ref of quantity.unverifiedLines) {
@@ -166,8 +170,8 @@ export function allocateMealPlanInventory(input) {
         }
       }
       const needsReview = remaining !== 0 && (required === null || reasons.size > 0);
-      const status = needsReview ? 'needs-review' : remaining > 0 ? 'shortage' : 'sufficient';
-      const shortageAmount = needsReview ? null : displayAmount(remaining);
+      const status = overdue || needsReview ? 'needs-review' : remaining > 0 ? 'shortage' : 'sufficient';
+      const shortageAmount = overdue || needsReview ? null : displayAmount(remaining);
       if (needsReview && required !== null) {
         for (const reason of reasons) review({ label, reason, ingredientKey: requirement.ingredientKey,
           unit: requirement.unit, preparationState: requirement.preparationState, uncoveredAmount: displayAmount(remaining) });
@@ -181,13 +185,14 @@ export function allocateMealPlanInventory(input) {
         group.slotIds.push(slot.id);
         shortageGroups.set(key, group);
       }
+      if (overdue) reasons.add('overdue-meal-unconfirmed');
       return { ...requirement, label, requiredAmount: requirement.amount,
         allocatedAmount: required === null ? 0 : displayAmount(required - remaining),
         shortageAmount, uncoveredAmount: remaining === null ? null : displayAmount(remaining),
         allocations, status, reasons: [...reasons] };
     });
-    return { id: slot.id, date: slot.date, title: slot.title, requirements,
-      status: combinedStatus([quantity.status === 'needs-review' || processInputs.length ? 'needs-review' : 'sufficient', ...requirements.map((req) => req.status)]) };
+    return { id: slot.id, date: slot.date, title: slot.title, overdue, requirements,
+      status: combinedStatus([overdue || quantity.status === 'needs-review' || processInputs.length ? 'needs-review' : 'sufficient', ...requirements.map((req) => req.status)]) };
   });
   shopping.shortages = [...shortageGroups.values()].map(({ integerAmount: amount, ...group }) => ({ ...group, amount: displayAmount(amount) }));
   return { today, status: slots.length ? combinedStatus(slots.map((slot) => slot.status)) : 'empty', slots, shopping };

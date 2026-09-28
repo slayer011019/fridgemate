@@ -74,6 +74,8 @@ function PreviewSession({ scope, disabled }) {
 
   const { result, checkedAt } = state;
   const shopping = result?.shopping;
+  const overdue = shopping?.needsReview.filter(item => item.reason === 'overdue-meal-unconfirmed') || [];
+  const reviewIngredients = shopping?.needsReview.filter(item => item.reason !== 'overdue-meal-unconfirmed') || [];
   const slotDates = new Map((result?.slots || []).map((slot) => [slot.id, slot.date]));
   const loading = state.status === 'loading';
 
@@ -88,7 +90,7 @@ function PreviewSession({ scope, disabled }) {
           {state.status === 'idle' ? '식단 장보기 확인' : '다시 계산'}
         </button>
       </div>
-      <p className="mt-3 max-w-2xl text-sm leading-6 muted">오늘부터 모든 주의 확정 식단을 함께 확인해요. 초안은 제외하며 냉장고 수량·직접 입력한 메모·재구매 목록을 바꾸지 않아요.</p>
+      <p className="mt-3 max-w-2xl text-sm leading-6 muted">오늘부터 모든 주의 확정 식단과 아직 확인하지 않은 지난 끼니의 보류량을 함께 확인해요. 초안은 제외하며 냉장고 수량·직접 입력한 메모·재구매 목록을 바꾸지 않아요.</p>
       <p className="mt-1 text-xs leading-5 muted">구매 완료 처리나 조리 전 안전 확인을 대신하지 않아요. 다른 화면에서 수정했다면 다시 계산해 주세요.</p>
 
       {loading ? <p role="status" className="mt-3 text-sm text-brand-700">저장된 식단과 재료를 함께 확인하고 있어요.</p> : null}
@@ -99,7 +101,7 @@ function PreviewSession({ scope, disabled }) {
         <div className="mt-4 space-y-3">
           <p className="text-xs leading-5 muted">
             이 기기에서 <time dateTime={checkedAt.toISOString()}>{checkedAt.toLocaleString('ko-KR')}</time>에 읽은 저장 상태예요.
-            {' '}브라우저 현지 날짜 {result.today}부터 모든 확정 식단을 반영했어요.
+            {' '}브라우저 현지 날짜 {result.today}부터 모든 확정 식단과 지난 미완료 끼니의 보류량을 반영했어요.
           </p>
           <p role="status" className="text-sm leading-6 text-slate-700">
             {result.status === 'empty' ? '오늘 이후 확정된 식단이 없어요.'
@@ -120,9 +122,15 @@ function PreviewSession({ scope, disabled }) {
               ))}
             </PreviewList>
           ) : null}
-          {shopping.needsReview.length > 0 ? (
-            <PreviewList title="확인이 필요한 재료" count={shopping.needsReview.length}>
-              {shopping.needsReview.map((item, index) => (
+          {overdue.length > 0 ? <PreviewList title="배분을 보류한 지난 끼니" count={overdue.length} open>
+            {overdue.map(item => <li key={item.slotId} className="py-2 text-sm leading-6">
+              <p>{item.date} · {item.title}</p>
+              <p className="text-xs text-amber-900">조리 여부 확인 필요 · 예정 배분 보류</p>
+            </li>)}
+          </PreviewList> : null}
+          {reviewIngredients.length > 0 ? (
+            <PreviewList title="확인이 필요한 재료" count={reviewIngredients.length}>
+              {reviewIngredients.map((item, index) => (
                 <li key={`${item.slotId}:${index}`} className="py-2 text-sm leading-6">
                   <p className="break-words font-medium text-slate-900">{item.label}</p>
                   <p className="text-xs leading-5 muted">{item.date} · {item.title}</p>
@@ -148,6 +156,6 @@ function PreviewSession({ scope, disabled }) {
   );
 }
 
-export default function MealPlanShoppingPreview({ scope, recordRevision, disabled = false }) {
-  return <PreviewSession key={`${scope}:${recordRevision}`} scope={scope} disabled={disabled} />;
+export default function MealPlanShoppingPreview({ scope, recordRevision, today = localDate(new Date()), disabled = false }) {
+  return <PreviewSession key={`${scope}:${recordRevision}:${today}`} scope={scope} disabled={disabled} />;
 }

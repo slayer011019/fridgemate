@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MealPlanShoppingPreview from '../components/MealPlanShoppingPreview';
 import ShoppingNotesPanel from '../components/ShoppingNotesPanel';
 import MealPlanEditor from '../components/mealPlans/MealPlanEditor';
+import MealPlanOverdueNotice from '../components/mealPlans/MealPlanOverdueNotice';
 import { shortDate } from '../components/mealPlans/mealPlanDisplay';
 import MealCookingPanel from '../components/MealCookingPanel';
 import MealPlanChangePanel from '../components/MealPlanChangePanel';
@@ -11,10 +12,36 @@ import { useMealPlan } from '../hooks/useMealPlan';
 import { usePantryStaples } from '../hooks/usePantryStaples';
 import { PANTRY_STATUS } from '../data/pantryStaples';
 import { addCalendarDays, getWeekStart } from '../features/mealPlans/mealPlanDomain';
+import { getOverdueMealPlanDraftConflicts } from '../features/mealPlans/mealPlanRepository';
+
+function localDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function useLocalToday() {
+  const [today, setToday] = useState(() => localDate(new Date()));
+  useEffect(() => {
+    let timer;
+    function schedule() {
+      clearTimeout(timer);
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      timer = setTimeout(refresh, Math.max(1, midnight.getTime() - now.getTime()));
+    }
+    function refresh() { setToday(localDate(new Date())); schedule(); }
+    schedule();
+    window.addEventListener('focus', refresh);
+    return () => { clearTimeout(timer); window.removeEventListener('focus', refresh); };
+  }, []);
+  return today;
+}
 
 function MealPlanWorkspace() {
+  const today = useLocalToday();
   const [weekStart, setWeekStart] = useState(() => getWeekStart());
-  const { plan, confirmedPlan, hasDraft, recordRevision, loading, ready, saving, error, savePlan, confirmPlan, retryLoad, storageScope } = useMealPlan(weekStart);
+  const { plan, record, confirmedPlan, hasDraft, recordRevision, loading, ready, saving, error, savePlan, confirmPlan, restoreOverdueDraft, retryLoad, storageScope } = useMealPlan(weekStart);
+  const overdueConflicts = getOverdueMealPlanDraftConflicts(record, today);
   const { ingredients, loading: inventoryLoading, error: inventoryError, loadIngredients } = useIngredients();
   const [receiptRevision, setReceiptRevision] = useState(0);
   const [cookingRevision, setCookingRevision] = useState(0);
@@ -60,6 +87,11 @@ function MealPlanWorkspace() {
         <p className="mt-3 max-w-2xl text-sm leading-6 muted">냉장고에 있는 재료와 우리 집 취향으로 한 주를 채워요. 마음에 드는 날은 고정하고, 나머지는 가볍게 바꿔보세요.</p>
       </header>
 
+      <MealPlanOverdueNotice scope={storageScope} today={today} refreshKey={`${weekStart}:${recordRevision}:${receiptRevision}:${cookingRevision}`} disabled={navigationDisabled} onReviewWeek={week => {
+        setWeekStart(week);
+        queueMicrotask(() => pageHeading.current?.focus());
+      }} />
+
       <div className="meal-plan-week-nav">
         <div className="flex items-center gap-2">
           <button className="meal-plan-action" type="button" aria-label="이전 주" disabled={navigationDisabled} onClick={() => setWeekStart(addCalendarDays(weekStart, -7))}>←</button>
@@ -78,15 +110,15 @@ function MealPlanWorkspace() {
 
       {error && <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900"><p>{error}</p><button type="button" className="mt-2 underline" disabled={saving || loading} onClick={retryLoad}>저장된 식단 다시 불러오기</button></div>}
       {loading ? <p className="py-12 text-center text-sm muted" role="status">식단을 불러오는 중이에요.</p> : ready && (
-        <MealPlanEditor key={`${storageScope}:${weekStart}`} {...{ plan, confirmedPlan, hasDraft, weekStart, storageScope, saving, savePlan, confirmPlan, ingredients, inventoryLoading, inventoryError, pantryItems }} editingDisabled={cookingOpen || changeOpen} onOpenCooking={openCooking} onOpenChange={openChange} />
+        <MealPlanEditor key={`${storageScope}:${weekStart}`} {...{ plan, confirmedPlan, hasDraft, weekStart, storageScope, saving, savePlan, confirmPlan, restoreOverdueDraft, overdueConflicts, today, ingredients, inventoryLoading, inventoryError, pantryItems }} editingDisabled={cookingOpen || changeOpen} onOpenCooking={openCooking} onOpenChange={openChange} />
       )}
 
       {cookingOpen ? <MealCookingPanel scope={storageScope} weekStart={weekStart} slotId={cookingTarget.slotId} onChanged={refreshAfterPlanningWrite} onClose={closeCooking} /> : null}
-      {changeOpen ? <MealPlanChangePanel scope={storageScope} weekStart={weekStart} {...changeTarget} pantryItems={pantryItems} onChanged={refreshAfterPlanningWrite} onClose={closeChange} /> : null}
+      {changeOpen ? <MealPlanChangePanel scope={storageScope} weekStart={weekStart} today={today} {...changeTarget} pantryItems={pantryItems} onChanged={refreshAfterPlanningWrite} onClose={closeChange} /> : null}
 
-      <MealPlanShoppingPreview key={`shopping:${storageScope}:${weekStart}`} scope={storageScope} recordRevision={`${recordRevision}:${receiptRevision}`} disabled={loading || saving || !ready || cookingOpen || changeOpen} />
+      <MealPlanShoppingPreview key={`shopping:${storageScope}:${weekStart}`} scope={storageScope} today={today} recordRevision={`${recordRevision}:${receiptRevision}`} disabled={loading || saving || !ready || cookingOpen || changeOpen} />
 
-      <ShoppingNotesPanel scope={storageScope} resetKey={`${weekStart}:${recordRevision}:${cookingRevision}`} disabled={loading || saving || !ready || cookingOpen || changeOpen} onInventoryApplied={refreshAfterReceipt} />
+      <ShoppingNotesPanel scope={storageScope} today={today} resetKey={`${weekStart}:${recordRevision}:${cookingRevision}`} disabled={loading || saving || !ready || cookingOpen || changeOpen} onInventoryApplied={refreshAfterReceipt} />
 
       <aside className="border-t border-brand-100 pt-5 text-xs leading-6 muted" aria-label="식단 이용 안내">
         <p>식품군은 메뉴에 포함된 재료 구성을 알려줘요. 하루 영양 충족이나 건강 효과를 평가하지 않으며, 열량·탄단지 계산은 아직 제공하지 않아요.</p>

@@ -8,6 +8,7 @@ const REVIEW_REASONS = {
   'inventory-expired': '옮긴 식사일에 재료 기한 확인 필요',
   'prior-demand-unverified': '다른 식단의 미확인 사용량 확인 필요',
   'process-quantity-unverified': '조리 과정에 따로 쓰는 양 확인 필요',
+  'overdue-meal-unconfirmed': '지난 끼니의 조리 여부 확인 필요 · 예정 배분 보류',
 };
 
 function SlotComparison({ label, slot, allocation }) {
@@ -41,11 +42,12 @@ function ShoppingComparison({ label, allocation }) {
   </section>;
 }
 
-function ChangeSession({ scope, weekStart, slotId, kind, pantryItems, onChanged, onClose }) {
+function ChangeSession({ scope, weekStart, slotId, kind, today, pantryItems, onChanged, onClose }) {
   const id = useId();
   const pantryKey = JSON.stringify(pantryItems);
-  const inputContext = useRef({ pantryKey });
-  if (inputContext.current.pantryKey !== pantryKey) inputContext.current = { pantryKey };
+  const inputContext = useRef({ pantryKey, today });
+  if (inputContext.current.pantryKey !== pantryKey || inputContext.current.today !== today) inputContext.current = { pantryKey, today };
+  const overdue = slotId?.slice(0, 10) < today;
   const renderedInputContext = inputContext.current;
   const [inputs, setInputs] = useState({ context: renderedInputContext, targetDate: '', mode: 'move' });
   const targetDate = inputs.context === renderedInputContext ? inputs.targetDate : '';
@@ -55,7 +57,7 @@ function ChangeSession({ scope, weekStart, slotId, kind, pantryItems, onChanged,
   const pending = useRef(null);
   const generation = useRef(0);
   const heading = useRef(null);
-  // Pantry changes discard only the comparison and input, not an in-flight
+  // Pantry/day changes discard only the comparison and input, not an in-flight
   // write's lifetime. Its acknowledgement still refreshes this same account.
   const state = storedState.context === renderedInputContext ? storedState : { ...storedState,
     preview: null, stale: true, error: '', notice: '', busy: pending.current?.kind === 'write' ? 'write' : '' };
@@ -153,9 +155,9 @@ function ChangeSession({ scope, weekStart, slotId, kind, pantryItems, onChanged,
     <p className="mt-1 text-xs leading-5 muted">저장된 초안이 없는 확정본만 변경해요. 미리보기는 저장하지 않으며, 확정하면 관련 주를 함께 이 기기·현재 계정에만 저장해요.</p>
     <form onSubmit={read} className="mt-4 space-y-3">
       {kind === 'move' ? <fieldset disabled={Boolean(state.busy)} className="grid min-w-0 gap-3 sm:grid-cols-2">
-        <label htmlFor={`${id}-date`} className="text-sm font-medium">옮길 날짜<input id={`${id}-date`} className="mt-2 min-w-0 w-full" type="date" value={targetDate} required onChange={event => changeInput('targetDate', event.target.value)} /></label>
+        <label htmlFor={`${id}-date`} className="text-sm font-medium">옮길 날짜<input id={`${id}-date`} className="mt-2 min-w-0 w-full" type="date" min={today} value={targetDate} required onChange={event => changeInput('targetDate', event.target.value)} /></label>
         <label htmlFor={`${id}-mode`} className="text-sm font-medium">이동 방식<select id={`${id}-mode`} className="mt-2 w-full" value={mode} onChange={event => changeInput('mode', event.target.value)}>
-          <option value="move">빈 날로 이동</option><option value="swap">두 메뉴 날짜 바꾸기</option>
+          <option value="move">빈 날로 이동</option>{!overdue ? <option value="swap">두 메뉴 날짜 바꾸기</option> : null}
         </select></label>
       </fieldset> : null}
       <button className="btn-secondary w-full sm:w-auto" type="submit" disabled={Boolean(state.busy) || (kind === 'move' && !targetDate)}>변경안 미리보기</button>

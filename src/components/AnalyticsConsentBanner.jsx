@@ -2,23 +2,18 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ANALYTICS_CONSENT_OPEN_EVENT,
-  ANALYTICS_CONSENT_UPDATED_EVENT,
   getAnalyticsConsent,
-  setAnalyticsConsent
+  setAnalyticsConsent,
+  subscribeToAnalyticsConsent
 } from '../utils/analyticsConsent';
 import { disableGoogleAnalytics, initializeGoogleAnalytics } from '../utils/googleAnalytics';
-
-function subscribeToConsent(callback) {
-  window.addEventListener(ANALYTICS_CONSENT_UPDATED_EVENT, callback);
-  return () => window.removeEventListener(ANALYTICS_CONSENT_UPDATED_EVENT, callback);
-}
 
 function getConsentSnapshot() {
   return getAnalyticsConsent() || 'unset';
 }
 
 function AnalyticsConsentBanner() {
-  const choice = useSyncExternalStore(subscribeToConsent, getConsentSnapshot, () => 'loading');
+  const choice = useSyncExternalStore(subscribeToAnalyticsConsent, getConsentSnapshot, () => 'loading');
   const [settingsRequested, setSettingsRequested] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const isOpen = choice === 'unset' || settingsRequested;

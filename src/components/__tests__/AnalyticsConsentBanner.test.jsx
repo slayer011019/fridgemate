@@ -106,4 +106,29 @@ describe('AnalyticsConsentBanner', () => {
     expect(window.dataLayer).toEqual([]);
     expect(window.gtag).toBeUndefined();
   });
+
+  it('does not resume GA after an external approval following a failed local withdrawal', () => {
+    setAnalyticsConsent('granted');
+    render(<MemoryRouter><AnalyticsConsentBanner /></MemoryRouter>);
+    act(() => openAnalyticsConsentSettings());
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('synthetic private detail', 'SecurityError');
+    });
+    fireEvent.click(screen.getByRole('button', { name: '필수 기능만' }));
+    write.mockRestore();
+    act(() => {
+      window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, 'granted');
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: ANALYTICS_CONSENT_STORAGE_KEY, newValue: 'granted', storageArea: window.localStorage
+      }));
+    });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(getAnalyticsConsent()).toBeNull();
+    expect(document.head.querySelector('script[data-fridgemate-ga]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '분석 허용' }));
+    expect(getAnalyticsConsent()).toBe('granted');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.head.querySelector('script[data-fridgemate-ga]')).toBeInTheDocument();
+  });
 });

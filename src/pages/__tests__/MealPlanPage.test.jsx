@@ -16,7 +16,10 @@ vi.mock('../../hooks/useIngredients', () => ({
 vi.mock('../../hooks/usePantryStaples', () => ({
   usePantryStaples: () => ({ pantryStaples: [], pantryOwnership: {} })
 }));
-vi.mock('../../features/mealPlans/mealPlanRepository', () => ({
+vi.mock('../../features/mealPlans/mealPlanRepository', async (importOriginal) => ({
+  ...await importOriginal(),
+  getMealPlanningSnapshot: async (scope) => ({ scope, confirmedPlans: [...records.values()]
+    .filter(record => record.scope === scope && record.confirmed).map(record => record.confirmed) }),
   getMealPlan: (...args) => repository.getMealPlan(...args),
   saveMealPlan: (...args) => repository.saveMealPlan(...args),
   confirmMealPlan: (...args) => repository.confirmMealPlan(...args)

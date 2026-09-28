@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('analytics consent storage failures', () => {
   let consent;
+  let subscriptions;
 
   beforeEach(async () => {
     vi.restoreAllMocks();
@@ -10,9 +11,13 @@ describe('analytics consent storage failures', () => {
     window.__FRIDGEMATE_ANALYTICS_EVENTS__ = [];
     vi.resetModules();
     consent = await import('../analyticsConsent.js');
+    subscriptions = [];
   });
 
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    subscriptions.forEach(unsubscribe => unsubscribe());
+    vi.restoreAllMocks();
+  });
 
   it.each(['property', 'getItem'])('treats a blocked localStorage %s read as no consent', (failure) => {
     window.localStorage.setItem(consent.ANALYTICS_CONSENT_STORAGE_KEY, 'granted');
@@ -110,5 +115,47 @@ describe('analytics consent storage failures', () => {
       expect(window[type].getItem(key)).toBe(key === blockedKey ? 'synthetic-value' : null);
     });
     expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__).toEqual([]);
+  });
+
+  it('shares change notifications while allowing each mounted consumer to unsubscribe', () => {
+    const first = [];
+    const second = [];
+    const unsubscribeFirst = consent.subscribeToAnalyticsConsent(() => first.push(consent.getAnalyticsConsent()));
+    const unsubscribeSecond = consent.subscribeToAnalyticsConsent(() => second.push(consent.getAnalyticsConsent()));
+    subscriptions.push(unsubscribeFirst, unsubscribeSecond);
+    consent.setAnalyticsConsent('granted');
+    unsubscribeFirst();
+    window.localStorage.setItem(consent.ANALYTICS_CONSENT_STORAGE_KEY, 'denied');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: consent.ANALYTICS_CONSENT_STORAGE_KEY, newValue: 'denied', storageArea: window.localStorage
+    }));
+    expect(first).toEqual(['granted']);
+    expect(second).toEqual(['granted', 'denied']);
+    unsubscribeSecond();
+    window.sessionStorage.setItem(consent.ANALYTICS_SESSION_ID_STORAGE_KEY, 'no-longer-observed');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: consent.ANALYTICS_CONSENT_STORAGE_KEY, newValue: 'denied', storageArea: window.localStorage
+    }));
+    expect(second).toEqual(['granted', 'denied']);
+    expect(window.sessionStorage.getItem(consent.ANALYTICS_SESSION_ID_STORAGE_KEY)).toBe('no-longer-observed');
+  });
+
+  it('does not let an external grant undo a cross-tab cleanup failure', () => {
+    consent.setAnalyticsConsent('granted');
+    subscriptions.push(consent.subscribeToAnalyticsConsent(() => {}));
+    const remove = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('synthetic private detail', 'SecurityError');
+    });
+    window.localStorage.setItem(consent.ANALYTICS_CONSENT_STORAGE_KEY, 'denied');
+    expect(() => window.dispatchEvent(new StorageEvent('storage', {
+      key: consent.ANALYTICS_CONSENT_STORAGE_KEY, newValue: 'denied', storageArea: window.localStorage
+    }))).not.toThrow();
+    remove.mockRestore();
+    window.localStorage.setItem(consent.ANALYTICS_CONSENT_STORAGE_KEY, 'granted');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: consent.ANALYTICS_CONSENT_STORAGE_KEY, newValue: 'granted', storageArea: window.localStorage
+    }));
+    expect(consent.getAnalyticsConsent()).toBeNull();
+    expect(consent.setAnalyticsConsent('granted')).toBe('granted');
   });
 });

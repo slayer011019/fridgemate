@@ -59,6 +59,55 @@ describe('future confirmed meal inventory allocation', () => {
     expect(result?.shopping.shortages).toMatchObject([{ amount: 100, slotIds: ['2026-09-21:dinner'] }]);
   });
 
+  it('keeps yesterday\'s 200g hold when the day changes instead of reusing it for today', () => {
+    const plans = frozen([plan([slot(TODAY), slot('2026-09-15')])]);
+    const inventory = frozen([stock()]);
+    const before = allocate(plans, inventory);
+    const after = allocate(plans, inventory, { today: '2026-09-15' });
+    expect(before.slots.map(item => item.requirements[0].allocatedAmount)).toEqual([200, 100]);
+    expect(after.slots).toMatchObject([
+      { date: TODAY, overdue: true, status: 'needs-review', requirements: [{ allocatedAmount: 200, shortageAmount: null, status: 'needs-review' }] },
+      { date: '2026-09-15', overdue: false, requirements: [{ allocatedAmount: 100, shortageAmount: 100 }] }
+    ]);
+    expect(after.shopping.shortages).toMatchObject([{ amount: 100, slotIds: ['2026-09-15:dinner'] }]);
+    expect(after.shopping.needsReview.filter(item => item.reason === 'overdue-meal-unconfirmed')).toEqual([
+      expect.objectContaining({ slotId: `${TODAY}:dinner`, date: TODAY, title: '산술 확인용 메뉴' })
+    ]);
+    expect(inventory[0].amount).toBe(300);
+    expect(plans[0].slots[0].status).toBe('planned');
+  });
+
+  it('keeps past shortages and optional rows out of new purchase quantities', () => {
+    const past = slot(TODAY);
+    past.components[0].ingredients.push(line({ id: 'optional', rawName: '장식', optional: true, selected: false }));
+    const result = allocate([plan([past, slot('2026-09-15')])], [], { today: '2026-09-15' });
+    expect(result.slots[0]).toMatchObject({ overdue: true, status: 'needs-review', requirements: [{ allocatedAmount: 0, shortageAmount: null, uncoveredAmount: 200 }] });
+    expect(result.shopping.shortages).toEqual([expect.objectContaining({ amount: 200, slotIds: ['2026-09-15:dinner'] })]);
+    expect(result.shopping.optional).toEqual([]);
+  });
+
+  it('keeps unknown past demand from making future matching stock look available', () => {
+    const past = slot(TODAY);
+    past.components[0].ingredients[0].amount = null;
+    const result = allocate([plan([slot('2026-09-21')], { weekStart: '2026-09-21' }), plan([past])], [stock()], { today: '2026-09-15' });
+    expect(result.slots.map(item => item.date)).toEqual([TODAY, '2026-09-21']);
+    expect(result.slots[1]).toMatchObject({ overdue: false, status: 'needs-review', requirements: [{ allocatedAmount: 0, shortageAmount: null, reasons: ['prior-demand-unverified'] }] });
+    expect(result.shopping.shortages).toEqual([]);
+  });
+
+  it.each(['skipped', 'cooked'])('releases a past hold only after its explicit %s state is supplied', (status) => {
+    const result = allocate([plan([slot(TODAY, { status }), slot('2026-09-15')])], [stock()], { today: '2026-09-15' });
+    expect(result.slots).toHaveLength(1);
+    expect(result.slots[0]).toMatchObject({ date: '2026-09-15', overdue: false, requirements: [{ allocatedAmount: 200 }] });
+    expect(result.shopping.needsReview).toEqual([]);
+  });
+
+  it('keeps a wholly overdue plan visible for confirmation instead of returning empty', () => {
+    const result = allocate([plan([slot(TODAY)])], [stock()], { today: '2026-09-21' });
+    expect(result).toMatchObject({ status: 'needs-review', slots: [{ overdue: true }], shopping: { shortages: [], optional: [] } });
+    expect(result.shopping.needsReview).toContainEqual(expect.objectContaining({ reason: 'overdue-meal-unconfirmed' }));
+  });
+
   it('never parses an unconfirmed half-block or a pantry owned flag as a quantity', () => {
     const result = allocate([plan([slot(TODAY)])], [stock({ amount: null, quantity: '반 모', quantityStatus: 'unverified', owned: true })]);
     expect(result).toMatchObject({ status: 'needs-review', shopping: { shortages: [] }, slots: [
@@ -67,15 +116,18 @@ describe('future confirmed meal inventory allocation', () => {
     expect(result?.shopping.needsReview).toMatchObject([{ label: '닭고기', reason: 'inventory-unverified' }]);
   });
 
-  it('excludes past, skipped and cooked meals and consumed or deleted stock', () => {
+  it('holds past meals for review but excludes skipped, cooked and consumed or deleted stock', () => {
     const result = allocate([plan([
       slot('2026-09-13'), slot(TODAY, { status: 'skipped' }),
       slot('2026-09-15', { status: 'cooked' }), slot('2026-09-16'),
     ])], [stock({ consumed: true }), stock({ id: 'deleted', deletedAt: '2026-09-14T00:00:00Z' })]);
-    expect(result).toMatchObject({ status: 'shortage', slots: [{ date: '2026-09-16' }], shopping: {
-      shortages: [{ amount: 200 }], needsReview: [],
+    expect(result).toMatchObject({ status: 'needs-review', slots: [
+      { date: '2026-09-13', overdue: true }, { date: '2026-09-16', overdue: false }
+    ], shopping: {
+      shortages: [{ amount: 200, slotIds: ['2026-09-16:dinner'] }],
+      needsReview: [expect.objectContaining({ slotId: '2026-09-13:dinner', reason: 'overdue-meal-unconfirmed' })],
     } });
-    expect(result?.slots).toHaveLength(1);
+    expect(result?.slots).toHaveLength(2);
   });
 
   it('keeps a current unreviewed generated plan as named review items, never zero-demand success', () => {

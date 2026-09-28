@@ -264,7 +264,7 @@ export async function applyPurchaseReceipt(input) {
   } catch (error) { throw failure || error; }
 }
 
-function planSources(snapshot, today) {
+function planShopping(snapshot, today) {
   const allocation = allocateMealPlanInventory({ ...snapshot, today });
   const versions = snapshot.confirmedPlans.map((plan) => [plan.weekStart, plan.revision]);
   const source = (kind, identity, slotIds, name, quantityText, context) => sourceSnapshot({
@@ -276,13 +276,18 @@ function planSources(snapshot, today) {
     // Only the display is abbreviated; the separate reference retains every slot.
     return `확정 식단 부족분 · ${dates}${slotIds.length > 3 ? ` 외 ${slotIds.length - 3}회` : ''}`;
   };
-  return [
+  const sources = [
     ...allocation.shopping.shortages.map((item) => source('shortage', [item.ingredientKey, item.preparationState, item.unit], item.slotIds,
       item.label, `${item.amount}${item.unit}`, shortageContext(item.slotIds))),
-    ...allocation.shopping.needsReview.map((item) => source('review',
+    ...allocation.shopping.needsReview.filter(item => item.date >= today).map((item) => source('review',
       [item.slotId, item.componentId, item.lineId, item.ingredientKey, item.unit, item.preparationState, item.reason],
-      [item.slotId], item.label, '양 확인 필요', `${item.date} · ${item.title} · 단위 ${item.unit ?? '미확인'} · ${PREPARATION_LABELS[item.preparationState] ?? '조리 상태 미확인'}`)),
+      [item.slotId], item.label, '양 확인 필요',
+      `${item.date} · ${item.title} · 단위 ${item.unit ?? '미확인'} · ${PREPARATION_LABELS[item.preparationState] ?? '조리 상태 미확인'}`)),
   ];
+  // An unresolved past meal is not an item to buy or receive into inventory.
+  const overdueMeals = allocation.slots.filter(slot => slot.overdue)
+    .map(slot => ({ slotId: slot.id, date: slot.date, title: slot.title }));
+  return { sources, overdueMeals };
 }
 
 export async function getShoppingWorkspace(scope = 'guest', today) {
@@ -306,8 +311,9 @@ export async function getShoppingWorkspace(scope = 'guest', today) {
   const manualItems = entries.filter((entry) => entry.kind === 'manual' && entry.status === 'active');
   const purchaseNotes = entries.filter((entry) => entry.kind === 'purchase-note')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
+  const plan = planShopping(snapshot, today);
   const sources = [
-    ...planSources(snapshot, today),
+    ...plan.sources,
     ...manualItems.map((entry) => sourceSnapshot({ source: 'manual', sourceId: `${entry.id}@${entry.revision}`,
       name: entry.name, quantityText: entry.quantityText, context: `직접 입력 · 버전 ${entry.revision}` })),
     ...snapshot.ingredients.filter((item) => item.consumed && !item.deletedAt).map((item) => sourceSnapshot({
@@ -315,5 +321,5 @@ export async function getShoppingWorkspace(scope = 'guest', today) {
       name: item.name, quantityText: item.quantity || '', context: '소비 완료 재료 · 재구매 후보',
     })),
   ];
-  return { scope, manualItems, purchaseNotes, receipts, sources, checkedAt: new Date().toISOString() };
+  return { scope, manualItems, purchaseNotes, receipts, sources, overdueMeals: plan.overdueMeals, checkedAt: new Date().toISOString() };
 }

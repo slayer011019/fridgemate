@@ -101,6 +101,27 @@ describe('explicit meal date move proposals', () => {
     expect(result.plans.every(item => item.revision === 2)).toBe(true);
   });
 
+  it.each(['2026-09-22', NEXT])('resolves an overdue source by moving it to an explicitly free %s dinner', targetDate => {
+    const source = chickenPlan();
+    const target = targetDate === NEXT ? plan({ weekStart: NEXT, preferences: { ...preferences, dinnerDays: [] } }) : source;
+    const result = move(frozen(source), frozen(target), { today: '2026-09-22', now: '2026-09-22T03:00:00.000Z', targetSlotId: `${targetDate}:dinner`, mode: 'move' });
+    expect(result.plans[0].slots[0]).toMatchObject({ status: 'skipped', components: source.slots[0].components });
+    const moved = result.plans.flatMap(value => value.slots).find(value => value.date === targetDate);
+    expect(moved).toMatchObject({ status: 'planned', components: source.slots[0].components, servings: source.slots[0].servings });
+    const allocation = allocateMealPlanInventory({ scope: 'guest', confirmedPlans: result.plans, inventory: [], today: '2026-09-22' });
+    expect(allocation.slots).toEqual([expect.objectContaining({ date: targetDate, overdue: false })]);
+    expect(allocation.shopping.needsReview.some(item => item.reason === 'overdue-meal-unconfirmed')).toBe(false);
+  });
+
+  it.each(['locked', 'cooked'])('does not release an overdue %s source through a move', protection => {
+    const source = chickenPlan();
+    if (protection === 'locked') source.slots[0].locked = true;
+    else source.slots[0] = cooked(source.slots[0]);
+    const before = structuredClone(source);
+    expect(() => move(source, source, { today: '2026-09-22', mode: 'move' })).toThrow();
+    expect(source).toStrictEqual(before);
+  });
+
   it('swaps across weeks without losing either menu or changing the other selected dinner days', () => {
     const source = plan();
     const target = plan({ weekStart: NEXT });

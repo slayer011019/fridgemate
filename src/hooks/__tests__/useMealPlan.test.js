@@ -4,12 +4,13 @@ import { useMealPlan } from '../useMealPlan';
 import { generateMealPlan } from '../../features/mealPlans/mealPlanDomain';
 
 const authState = { storageScope: 'guest', loading: false };
-const repository = { getMealPlan: vi.fn(), saveMealPlan: vi.fn(), confirmMealPlan: vi.fn() };
+const repository = { getMealPlan: vi.fn(), saveMealPlan: vi.fn(), confirmMealPlan: vi.fn(), restoreOverdueMealPlanDraft: vi.fn() };
 vi.mock('../useAuth', () => ({ useAuth: () => authState }));
 vi.mock('../../features/mealPlans/mealPlanRepository', () => ({
   getMealPlan: (...args) => repository.getMealPlan(...args),
   saveMealPlan: (...args) => repository.saveMealPlan(...args),
-  confirmMealPlan: (...args) => repository.confirmMealPlan(...args)
+  confirmMealPlan: (...args) => repository.confirmMealPlan(...args),
+  restoreOverdueMealPlanDraft: (...args) => repository.restoreOverdueMealPlanDraft(...args)
 }));
 
 function deferred() {
@@ -41,6 +42,55 @@ describe('useMealPlan', () => {
     repository.saveMealPlan.mockImplementation(async (next) => record(next));
   });
   afterEach(cleanup);
+
+  it('restores through the guarded write path, preserving state on failure and blocking duplicate requests', async () => {
+    const draft = plan('guest', 3);
+    const confirmed = plan();
+    repository.getMealPlan.mockResolvedValue(record(draft, confirmed, 3));
+    repository.restoreOverdueMealPlanDraft.mockRejectedValueOnce(new Error('복구 저장 실패'));
+    const { result } = renderHook(() => useMealPlan('2026-09-14'));
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    await act(async () => { expect(await result.current.restoreOverdueDraft()).toBeNull(); });
+    expect(result.current.plan).toEqual(draft);
+    expect(result.current.confirmedPlan).toEqual(confirmed);
+    const pending = deferred();
+    repository.restoreOverdueMealPlanDraft.mockReturnValue(pending.promise);
+    let request;
+    await act(async () => {
+      request = result.current.restoreOverdueDraft();
+      expect(await result.current.restoreOverdueDraft()).toBeNull();
+      expect(await result.current.confirmPlan()).toBeNull();
+    });
+    expect(repository.restoreOverdueMealPlanDraft).toHaveBeenCalledTimes(2);
+    expect(repository.restoreOverdueMealPlanDraft).toHaveBeenLastCalledWith('2026-09-14', 'guest', 3);
+    expect(result.current.plan).toEqual(draft);
+    const restored = { ...draft, slots: confirmed.slots };
+    await act(async () => { pending.resolve(record(restored, confirmed, 4)); expect(await request).toEqual(restored); });
+    expect(result.current.recordRevision).toBe(4);
+    expect(result.current.confirmedPlan).toEqual(confirmed);
+    expect(result.current.error).toBe('');
+  });
+
+  it('does not expose a late restored draft after the account changes', async () => {
+    repository.getMealPlan.mockImplementation(async (_week, scope) => record(plan(scope)));
+    const pending = deferred();
+    repository.restoreOverdueMealPlanDraft.mockReturnValue(pending.promise);
+    const { result, rerender } = renderHook(() => useMealPlan('2026-09-14'));
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    const oldRestore = result.current.restoreOverdueDraft;
+    let request;
+    act(() => { request = oldRestore(); });
+    authState.storageScope = 'user:alice';
+    rerender();
+    await waitFor(() => expect(result.current.plan?.scope).toBe('user:alice'));
+    await act(async () => {
+      pending.resolve(record(plan('guest', 2)));
+      expect(await request).toBeNull();
+      expect(await oldRestore()).toBeNull();
+    });
+    expect(result.current.plan.scope).toBe('user:alice');
+    expect(repository.restoreOverdueMealPlanDraft).toHaveBeenCalledTimes(1);
+  });
 
   it('loads the requested scoped week and commits only after a successful save', async () => {
     const save = deferred();

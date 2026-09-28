@@ -5,7 +5,7 @@ const NOW = '2026-09-21T09:00:00.000Z';
 const WEEK = '2026-09-21';
 const NEXT = '2026-09-28';
 const SLOT = `${WEEK}:dinner`;
-const STORES = ['ingredients', 'inventoryQuantities', 'mealPlans', 'inventoryEvents', 'shoppingEntries'];
+const STORES = ['ingredients', 'inventoryQuantities', 'mealPlans', 'inventoryEvents', 'shoppingEntries', 'menuDecisions', 'mealPlanPilot'];
 let connections = [];
 
 async function open(scope = 'guest') {
@@ -97,6 +97,112 @@ describe('explicit atomic meal plan changes', () => {
     expect(preview.beforeAllocation.shopping.shortages).toMatchObject([{ amount: 300 }]);
     expect(preview.afterAllocation.shopping.shortages).toMatchObject([{ amount: 300 }]);
     expect(await state()).toEqual(before);
+  });
+
+  it('explicitly moves a past uncompleted dinner across weeks without automatically consuming stock', async () => {
+    const s = await setup();
+    vi.setSystemTime(new Date('2026-09-22T09:00:00.000Z'));
+    const before = await state();
+    const preview = await s.preview();
+    expect(preview.beforeAllocation.slots).toMatchObject([
+      { date: WEEK, overdue: true, requirements: [{ allocatedAmount: 200 }] },
+      { date: '2026-09-22', overdue: false, requirements: [{ allocatedAmount: 100, shortageAmount: 100 }] }
+    ]);
+    expect(preview.afterAllocation.slots).toMatchObject([
+      { date: '2026-09-22', overdue: false, requirements: [{ allocatedAmount: 200 }] },
+      { date: NEXT, overdue: false, requirements: [{ allocatedAmount: 100, shortageAmount: 100 }] }
+    ]);
+    expect(await state()).toEqual(before);
+    await s.changes.confirmMealPlanChange(preview);
+    const after = await state();
+    expect(after.mealPlans[0].confirmed.slots[0]).toMatchObject({ status: 'skipped', components: before.mealPlans[0].confirmed.slots[0].components });
+    expect(after.mealPlans[0].archives).toEqual([before.mealPlans[0].confirmed]);
+    expect(after.mealPlans[1].confirmed.slots[0].status).toBe('planned');
+    for (const store of STORES.filter(name => name !== 'mealPlans')) expect(after[store]).toEqual(before[store]);
+  });
+
+  it('retains a past hold while skipping is only a draft and releases it after explicit confirmation', async () => {
+    const s = await setup();
+    const { allocateMealPlanInventory } = await import('../mealPlanAllocation');
+    const { setMealPlanSlotSkipped } = await import('../mealPlanDomain');
+    vi.setSystemTime(new Date('2026-09-22T09:00:00.000Z'));
+    const before = await state();
+    const current = await s.plans.getMealPlan(WEEK);
+    const skipped = setMealPlanSlotSkipped(current.confirmed, SLOT, true, { now: '2026-09-22T09:00:00.000Z' });
+    const draft = await s.plans.saveMealPlan(skipped, 'guest', current.revision);
+    const allocate = async () => allocateMealPlanInventory({ ...await s.plans.getMealPlanningSnapshot(), today: '2026-09-22' });
+    expect((await allocate()).slots).toMatchObject([{ overdue: true }, { requirements: [{ allocatedAmount: 100 }] }]);
+    await s.plans.confirmMealPlan(WEEK, 'guest', draft.revision);
+    const after = await allocate();
+    expect(after.slots).toEqual([expect.objectContaining({ date: '2026-09-22', overdue: false, requirements: [expect.objectContaining({ allocatedAmount: 200 })] })]);
+    expect(after.shopping.needsReview).toEqual([]);
+    const persisted = await state();
+    for (const store of STORES.filter(name => name !== 'mealPlans')) expect(persisted[store]).toEqual(before[store]);
+  });
+
+  it('releases a past hold after explicit measured cooking and allocates only the actual remainder', async () => {
+    const s = await setup();
+    const { allocateMealPlanInventory } = await import('../mealPlanAllocation');
+    vi.setSystemTime(new Date('2026-09-22T09:00:00.000Z'));
+    const stock = (await s.quantities.getInventoryQuantitySnapshot()).inventory[0];
+    await s.cooking.recordMealCooking({ scope: 'guest', weekStart: WEEK, slotId: SLOT, operationId: 'past-cooked',
+      expectedPlanRevision: 2, usageMode: 'measured', completeUsageConfirmed: true,
+      usages: [{ ingredientId: stock.id, expectedRevision: stock.quantityRevision, expectedSourceToken: stock.sourceToken, amount: 150, unit: 'g' }] });
+    const snapshot = await s.plans.getMealPlanningSnapshot();
+    const result = allocateMealPlanInventory({ ...snapshot, today: '2026-09-22' });
+    expect(snapshot.inventory[0].amount).toBe(150);
+    expect(result.slots).toEqual([expect.objectContaining({ date: '2026-09-22', overdue: false, requirements: [expect.objectContaining({ allocatedAmount: 150, shortageAmount: 50 })] })]);
+    expect(result.shopping.needsReview).toEqual([]);
+    expect((await state()).inventoryEvents.map(event => event.kind).sort()).toEqual(['consumption', 'cooking']);
+  });
+
+  it('ends a past meal hold after unknown cooking without pretending its stock quantity remains verified', async () => {
+    const s = await setup();
+    const { allocateMealPlanInventory } = await import('../mealPlanAllocation');
+    vi.setSystemTime(new Date('2026-09-22T09:00:00.000Z'));
+    const before = await state();
+    await s.cooking.recordMealCooking({ scope: 'guest', weekStart: WEEK, slotId: SLOT, operationId: 'past-unknown',
+      expectedPlanRevision: 2, usageMode: 'unknown', completeUsageConfirmed: false, usages: [] });
+    const snapshot = await s.plans.getMealPlanningSnapshot();
+    const result = allocateMealPlanInventory({ ...snapshot, today: '2026-09-22' });
+    expect(result.slots).toEqual([expect.objectContaining({ date: '2026-09-22', overdue: false, status: 'needs-review',
+      requirements: [expect.objectContaining({ allocatedAmount: 0, shortageAmount: null })] })]);
+    expect(result.shopping.needsReview.some(item => item.reason === 'overdue-meal-unconfirmed')).toBe(false);
+    expect(result.shopping.needsReview).toContainEqual(expect.objectContaining({ reason: 'inventory-unverified' }));
+    const after = await state();
+    expect(after.ingredients).toEqual(before.ingredients);
+    expect(after.inventoryEvents.map(event => event.kind)).toEqual(['cooking']);
+    expect(after.inventoryQuantities[0].status).toBe('unverified');
+    for (const store of ['shoppingEntries', 'menuDecisions', 'mealPlanPilot']) expect(after[store]).toEqual(before[store]);
+  });
+
+  it('reserves newly received stock conservatively for unresolved past demand but never counts purchase notes as inventory', async () => {
+    const s = await setup();
+    const shopping = await import('../../shopping/shoppingRepository');
+    const { allocateMealPlanInventory } = await import('../mealPlanAllocation');
+    await s.review(0);
+    vi.setSystemTime(new Date('2026-09-22T09:00:00.000Z'));
+    const before = await state();
+    const note = await shopping.recordPurchaseNote({ scope: 'guest', operationId: 'buy-after-overdue',
+      source: { source: 'manual', sourceId: 'manual:chicken@1', name: '닭고기', quantityText: '200g', context: '직접 입력' },
+      actualQuantityText: '500g', memo: '입고 전' });
+    const allocate = async () => allocateMealPlanInventory({ ...await s.plans.getMealPlanningSnapshot(), today: '2026-09-22' });
+    expect((await allocate()).slots.map(slot => slot.requirements[0].allocatedAmount)).toEqual([0, 0]);
+    await shopping.applyPurchaseReceipt({ scope: 'guest', operationId: 'receive-after-overdue', purchaseNoteId: note.id,
+      values: { name: '닭고기', quantityText: '500g', quantityStatus: 'verified', amount: 500, unit: 'g', preparationState: 'raw',
+        category: '육류', storageType: '냉장', purchaseDate: '2026-09-22', expiryDate: '2026-10-01', memo: '새 입고' } });
+    const received = await state();
+    const result = await allocate();
+    expect(result.slots).toMatchObject([
+      { date: WEEK, overdue: true, requirements: [{ allocatedAmount: 200 }] },
+      { date: '2026-09-22', overdue: false, requirements: [{ allocatedAmount: 200, shortageAmount: 0 }] }
+    ]);
+    expect(result.shopping.shortages).toEqual([]);
+    expect(result.shopping.needsReview).toContainEqual(expect.objectContaining({ reason: 'overdue-meal-unconfirmed' }));
+    expect(received.mealPlans).toEqual(before.mealPlans);
+    expect(received.inventoryEvents.map(event => event.kind)).toEqual(['receipt']);
+    expect((await s.plans.getMealPlanningSnapshot()).inventory.map(item => item.amount).sort((a, b) => a - b)).toEqual([0, 500]);
+    expect(await state()).toEqual(received);
   });
 
   it('does not allocate stock after a moved meal crosses its expiry date', async () => {

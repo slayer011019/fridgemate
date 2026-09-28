@@ -48,7 +48,7 @@ function delayReceiptAcknowledgement() {
   return { committed, acknowledgement };
 }
 
-function InventoryParent() {
+function InventoryParent({ today }) {
   const [state, setState] = useState({ amount: 0, refreshes: 0 });
   async function refresh() {
     const snapshot = await getInventoryQuantitySnapshot('guest');
@@ -56,11 +56,27 @@ function InventoryParent() {
   }
   return <>
     <output aria-label="부모 냉장고 상태">{state.amount}g · 갱신 {state.refreshes}회</output>
-    <ShoppingNotesPanel scope="guest" onInventoryApplied={refresh} />
+    <ShoppingNotesPanel scope="guest" today={today} onInventoryApplied={refresh} />
   </>;
 }
 
 describe('explicit receiving through shopping notes', () => {
+  it('preserves a committed receipt acknowledgement across midnight without reviving its old form', async () => {
+    const gate = delayReceiptAcknowledgement();
+    const view = render(<StrictMode><InventoryParent today="2026-09-16" /></StrictMode>);
+    const form = await open(); fill(form);
+    fireEvent.click(form.getByRole('button', { name: '확인한 구매량을 재고에 반영' }));
+    await act(async () => { await gate.committed.promise; });
+    view.rerender(<StrictMode><InventoryParent today="2026-09-17" /></StrictMode>);
+    expect(screen.queryByRole('form', { name: '구매 반영 · 닭고기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '장보기 메모 새로고침' })).toBeDisabled();
+    await act(async () => { gate.acknowledgement.resolve(); });
+    await waitFor(() => expect(screen.getByLabelText('부모 냉장고 상태')).toHaveTextContent('500g · 갱신 1회'));
+    expect(screen.queryByRole('form', { name: '구매 반영 · 닭고기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '장보기 메모 새로고침' })).toBeEnabled();
+    expect((await shopping.getShoppingWorkspace('guest', '2026-09-17')).receipts).toHaveLength(1);
+    expect((await getInventoryQuantitySnapshot('guest')).inventory[0].amount).toBe(500);
+  });
   it('requires actual quantities and applies the package once while preserving the original purchase note', async () => {
     const view = render(<ShoppingNotesPanel scope="guest" />);
     const form = await open();

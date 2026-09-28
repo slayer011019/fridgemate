@@ -31,8 +31,16 @@ async function seedPlan(weekStart = WEEK, title = '이동 검증용 닭고기 �
 function page() {
   return <StrictMode><MemoryRouter><IngredientsProvider><PantryStaplesProvider><MealPlanPage /></PantryStaplesProvider></IngredientsProvider></MemoryRouter></StrictMode>;
 }
+async function noticeReady() {
+  // The selected-week board can settle before the separate all-weeks read.
+  await waitFor(() => {
+    expect(screen.queryByText('식단을 불러오는 중이에요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '지난 끼니 확인' })).toHaveAttribute('aria-busy', 'false');
+  });
+}
 async function openMove(targetDate) {
   const monday = within(await screen.findByRole('article', { name: `${WEEK} 저녁 식단` }));
+  await noticeReady();
   fireEvent.click(monday.getByRole('button', { name: '날짜 이동' }));
   const panel = within(await screen.findByRole('region', { name: '식단 변경 미리보기' }));
   fireEvent.change(panel.getByLabelText('옮길 날짜'), { target: { value: targetDate } });
@@ -67,6 +75,7 @@ describe('meal-plan changes through real storage and page controls', () => {
     expect(await getMealPlan(WEEK)).toEqual(before);
     confirm.focus(); fireEvent.click(confirm); fireEvent.click(confirm);
     await panel.findByText('변경안을 확정했어요.');
+    await noticeReady();
     const after = await getMealPlan(WEEK);
     expect(after).toMatchObject({ revision: 3, draft: null, archives: [before.confirmed] });
     expect(after.confirmed.slots[0].status).toBe('skipped');
@@ -77,6 +86,7 @@ describe('meal-plan changes through real storage and page controls', () => {
     expect(within(await screen.findByRole('article', { name: '2026-09-22 저녁 식단' })).getByRole('heading', { name: before.confirmed.slots[0].title })).toBeInTheDocument();
     view.unmount(); render(page());
     expect(within(await screen.findByRole('article', { name: `${WEEK} 저녁 식단` })).getByRole('heading', { name: '외식하거나 쉬는 날' })).toBeInTheDocument();
+    await noticeReady();
   });
 
   it('requires an explicit swap and confirms both weeks together while keeping the old confirmations', async () => {
@@ -89,6 +99,7 @@ describe('meal-plan changes through real storage and page controls', () => {
     await waitFor(() => expect(confirm).toBeEnabled());
     expect(await getMealPlan(WEEK)).toEqual(first); expect(await getMealPlan(NEXT)).toEqual(next);
     fireEvent.click(confirm); await panel.findByText('변경안을 확정했어요.');
+    await noticeReady();
     expect((await getMealPlan(WEEK)).confirmed.slots[0].title).toBe(next.confirmed.slots[0].title);
     expect((await getMealPlan(NEXT)).confirmed.slots[0].title).toBe(first.confirmed.slots[0].title);
     expect((await getMealPlan(WEEK)).archives).toEqual([first.confirmed]);
@@ -111,6 +122,8 @@ describe('meal-plan changes through real storage and page controls', () => {
 
   it('offers manual remaining-week readjustment without regenerating when inventory changes', async () => {
     render(page());
+    await screen.findByRole('article', { name: `${WEEK} 저녁 식단` });
+    await noticeReady();
     const before = await getMealPlan(WEEK);
     await saveIngredient({ id: 'rice', name: '밥', quantity: '한 공기', consumed: false, expiryDate: '2026-09-30', createdAt: NOW, updatedAt: NOW });
     expect(await getMealPlan(WEEK)).toEqual(before);
@@ -121,6 +134,7 @@ describe('meal-plan changes through real storage and page controls', () => {
     await waitFor(() => expect(confirm).toBeEnabled());
     expect(await getMealPlan(WEEK)).toEqual(before);
     fireEvent.click(confirm); await panel.findByText('변경안을 확정했어요.');
+    await noticeReady();
     const after = await getMealPlan(WEEK);
     expect(after.confirmed.slots[0].templateKey).not.toBe(before.confirmed.slots[0].templateKey);
     expect(after.confirmed.slots.slice(1)).toEqual(before.confirmed.slots.slice(1));
@@ -130,11 +144,13 @@ describe('meal-plan changes through real storage and page controls', () => {
   it('keeps a conflicting locked draft unconfirmed until the user resolves its exclusion', async () => {
     render(page());
     const monday = within(await screen.findByRole('article', { name: `${WEEK} 저녁 식단` }));
+    await noticeReady();
     fireEvent.click(monday.getByRole('button', { name: '메뉴 고정' }));
     const confirmDraft = () => screen.getByRole('button', { name: '수정 초안으로 확정본 교체' });
     await waitFor(() => expect(confirmDraft()).toBeEnabled());
     fireEvent.click(confirmDraft());
     await screen.findByRole('heading', { name: '확정됨' });
+    await noticeReady();
     const original = await getMealPlan(WEEK);
     const stock = await getAllIngredients();
     fireEvent.click(screen.getByText('식단 조건', { exact: false, selector: 'summary' }));
@@ -143,6 +159,7 @@ describe('meal-plan changes through real storage and page controls', () => {
     expect(monday.getByRole('button', { name: '날짜 이동' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: '고정하지 않은 메뉴 다시 추천' }));
     await waitFor(() => expect(confirmDraft()).toBeEnabled());
+    await noticeReady();
     const conflict = await getMealPlan(WEEK);
     expect(conflict.draft.slots[0]).toMatchObject({ locked: true, title: original.confirmed.slots[0].title });
     fireEvent.click(confirmDraft());
@@ -157,6 +174,7 @@ describe('meal-plan changes through real storage and page controls', () => {
     await waitFor(() => expect(confirmDraft()).toBeEnabled());
     fireEvent.click(confirmDraft());
     await screen.findByRole('heading', { name: '확정됨' });
+    await noticeReady();
     const resolved = await getMealPlan(WEEK);
     expect(resolved.draft).toBeNull();
     expect(resolved.confirmed.preferences.excludedIngredients).toEqual([]);

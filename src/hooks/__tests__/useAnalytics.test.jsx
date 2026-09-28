@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AnalyticsProvider, useAnalytics } from '../useAnalytics';
 import AnalyticsConsentBanner from '../../components/AnalyticsConsentBanner';
@@ -46,6 +46,7 @@ describe('AnalyticsProvider storage isolation', () => {
     delete window.dataLayer;
     delete window.gtag;
     vi.stubEnv('VITE_GA_MEASUREMENT_ID', 'G-TEST123');
+    vi.stubEnv('DEV', false);
     saveProductEvent.mockReset().mockResolvedValue(null);
     readIngredients.mockReset().mockResolvedValue([]);
   });
@@ -104,6 +105,63 @@ describe('AnalyticsProvider storage isolation', () => {
     expect(screen.getByRole('heading', { name: '식단 화면' })).toBeInTheDocument();
     await Promise.resolve();
     expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__).toEqual([]);
+    expect(saveProductEvent).not.toHaveBeenCalled();
+  });
+
+  it('starts analytics after another tab explicitly grants consent', async () => {
+    setAnalyticsConsent('denied');
+    mount();
+    await act(async () => {
+      window.localStorage.setItem('fridgemate-analytics-consent', 'granted');
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'fridgemate-analytics-consent', newValue: 'granted', storageArea: window.localStorage
+      }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '정상 기능 사용' }));
+    expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__.map(event => event.event_name)).toContain('ingredient_created');
+    expect(document.head.querySelector('script[data-fridgemate-ga]')).toBeInTheDocument();
+  });
+
+  it.each(['denied', 'removed', 'clear'])('stops analytics and clears local session data after cross-tab %s', async (change) => {
+    setAnalyticsConsent('granted');
+    mount();
+    await act(async () => {});
+    expect(document.head.querySelector('script[data-fridgemate-ga]')).toBeInTheDocument();
+    saveProductEvent.mockClear();
+    act(() => {
+      if (change === 'clear') window.localStorage.clear();
+      else if (change === 'removed') window.localStorage.removeItem('fridgemate-analytics-consent');
+      else window.localStorage.setItem('fridgemate-analytics-consent', 'denied');
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: change === 'clear' ? null : 'fridgemate-analytics-consent',
+        newValue: change === 'denied' ? 'denied' : null,
+        storageArea: window.localStorage
+      }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '정상 기능 사용' }));
+    expect(document.head.querySelector('script[data-fridgemate-ga]')).toBeNull();
+    expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__).toEqual([]);
+    expect(window.sessionStorage.getItem('fridgemate-analytics-session-id')).toBeNull();
+    expect(window.sessionStorage.getItem('fridgemate-analytics-session-started')).toBeNull();
+    expect(saveProductEvent).not.toHaveBeenCalled();
+    if (change !== 'denied') expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it.each(['success', 'failure'])('drops a previous consent generation\'s delayed session lookup on %s', async (outcome) => {
+    let finishLookup;
+    readIngredients.mockImplementationOnce(() => new Promise((resolve, reject) => {
+      finishLookup = () => outcome === 'success' ? resolve([]) : reject(new Error('Synthetic cache failure'));
+    }));
+    setAnalyticsConsent('granted');
+    mount();
+    saveProductEvent.mockClear();
+    // React may batch this into the same final "granted" state, without effect cleanup.
+    act(() => {
+      setAnalyticsConsent('denied');
+      setAnalyticsConsent('granted');
+    });
+    await act(async () => finishLookup());
+    expect(window.__FRIDGEMATE_ANALYTICS_EVENTS__.map(event => event.event_name)).not.toContain('session_started');
     expect(saveProductEvent).not.toHaveBeenCalled();
   });
 });

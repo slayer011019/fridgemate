@@ -1,5 +1,5 @@
 import FDBFactory from 'fake-indexeddb/lib/FDBFactory';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   generateMealPlan, getSlotSummary, replaceMealPlanSlot, setMealPlanSlotSkipped, toggleMealPlanSlotLock,
 } from '../mealPlanDomain.js';
@@ -94,10 +94,13 @@ describe('completed meals stay outside ordinary menu editing', () => {
   it('preserves the complete cooked snapshot when servings, exclusions and dinner days change', () => {
     const previous = cookedPlan();
     const original = structuredClone(previous);
-    const next = generateMealPlan({ weekStart: WEEK, previousPlan: previous, now: NOW,
+    const next = generateMealPlan({ weekStart: WEEK, previousPlan: previous, confirmedPlan: previous, now: NOW,
       preferences: { servings: 2, dinnerDays: [], excludedIngredients: ['밥'] } });
     expect(next.slots[0]).toEqual(original.slots[0]);
-    expect(next.slots.slice(1).every(slot => slot.status === 'skipped' && slot.servings === 2)).toBe(true);
+    // AT-18 also preserves the intervening overdue planned meals; changing
+    // dinner-day preferences only skips unresolved dates from today onward.
+    expect(next.slots.slice(1, 5)).toEqual(original.slots.slice(1, 5));
+    expect(next.slots.slice(5).every(slot => slot.status === 'skipped' && slot.servings === 2)).toBe(true);
     expect(previous).toEqual(original);
   });
 
@@ -133,7 +136,13 @@ describe('completed meals stay outside ordinary menu editing', () => {
 describe('cooking metadata and persistence boundaries', () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 19, 12));
     Object.defineProperty(window, 'indexedDB', { configurable: true, value: new FDBFactory() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it.each(['applied', 'needs-review', 'reversed'])('restores valid %s cooking and archived snapshots', async status => {
@@ -184,7 +193,7 @@ describe('cooking metadata and persistence boundaries', () => {
     await seed(value);
     const repository = await import('../mealPlanRepository.js');
     const draft = structuredClone(value.confirmed);
-    draft.slots[1].title = '수정한 화요일';
+    draft.slots[5].title = '수정한 토요일';
     // Key insertion order is not a different cooking record.
     draft.slots[0].cooking = { reversalId: null, consumptionId: 'consumption:first', inventoryStatus: 'applied', recordedAt: NOW, id: 'cooking:first' };
     const saved = await repository.saveMealPlan(draft, 'guest', 3);
@@ -192,7 +201,7 @@ describe('cooking metadata and persistence boundaries', () => {
     expect(saved.confirmed).toEqual(value.confirmed);
     const confirmed = await repository.confirmMealPlan(WEEK, 'guest', 4);
     expect(confirmed.confirmed.slots[0]).toEqual(value.confirmed.slots[0]);
-    expect(confirmed.confirmed.slots[1].title).toBe('수정한 화요일');
+    expect(confirmed.confirmed.slots[5].title).toBe('수정한 토요일');
     expect(confirmed.archives).toEqual([value.confirmed]);
   });
 
@@ -263,11 +272,11 @@ describe('cooking metadata and persistence boundaries', () => {
     await seedEvents(history);
     const repository = await import('../mealPlanRepository.js');
     const draft = structuredClone(value.confirmed);
-    draft.slots[1].title = '다른 날 수정';
+    draft.slots[5].title = '다른 날 수정';
     await repository.saveMealPlan(draft, 'guest', 3);
     const result = await repository.confirmMealPlan(WEEK, 'guest', 4);
     expect(result.confirmed.slots[0]).toEqual(value.confirmed.slots[0]);
-    expect(result.confirmed.slots[1].title).toBe('다른 날 수정');
+    expect(result.confirmed.slots[5].title).toBe('다른 날 수정');
     expect(await readEvents(db)).toEqual(history);
   });
 
@@ -325,11 +334,11 @@ describe('cooking metadata and persistence boundaries', () => {
     const before = await readEvents(db);
     const repository = await import('../mealPlanRepository.js');
     const draft = structuredClone(value.confirmed);
-    draft.slots[1].title = '다른 날 수정';
+    draft.slots[5].title = '다른 날 수정';
     await repository.saveMealPlan(draft, 'guest', 3);
     const result = await repository.confirmMealPlan(WEEK, 'guest', 4);
     expect(result.confirmed.slots[0]).toEqual(value.confirmed.slots[0]);
-    expect(result.confirmed.slots[1].title).toBe('다른 날 수정');
+    expect(result.confirmed.slots[5].title).toBe('다른 날 수정');
     expect(await readEvents(db)).toEqual(before);
   });
 

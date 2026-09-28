@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { confirmMealPlan, getMealPlan, saveMealPlan } from '../features/mealPlans/mealPlanRepository';
+import { confirmMealPlan, getMealPlan, restoreOverdueMealPlanDraft, saveMealPlan } from '../features/mealPlans/mealPlanRepository';
 import { useAuth } from './useAuth';
 
 function emptyState(key) {
@@ -67,7 +67,7 @@ export function useMealPlan(weekStart) {
       || stateRef.current !== state
       || refreshRef.current === context
       || saveRef.current?.context === context) return null;
-    if (action === 'confirm' && !state.record?.draft) return null;
+    if (action !== 'draft' && !state.record?.draft) return null;
     if (action === 'draft' && (nextPlan?.scope !== storageScope || nextPlan?.weekStart !== weekStart)) {
       setState((previous) => ({ ...previous, error: '현재 계정과 선택한 주의 식단인지 확인해주세요.' }));
       return null;
@@ -82,7 +82,9 @@ export function useMealPlan(weekStart) {
       const expectedRevision = state.record?.revision ?? 0;
       const record = action === 'confirm'
         ? await confirmMealPlan(weekStart, storageScope, expectedRevision)
-        : await saveMealPlan(nextPlan, storageScope, expectedRevision);
+        : action === 'restore-overdue'
+          ? await restoreOverdueMealPlanDraft(weekStart, storageScope, expectedRevision)
+          : await saveMealPlan(nextPlan, storageScope, expectedRevision);
       if (mountedRef.current && contextRef.current === context && saveRef.current === operation) {
         setState({ key, record, loading: false, saving: false, ready: true, error: '' });
         return action === 'confirm' ? record.confirmed : record.draft;
@@ -104,6 +106,7 @@ export function useMealPlan(weekStart) {
 
   const savePlan = useCallback((nextPlan) => persist('draft', nextPlan), [persist]);
   const confirmPlan = useCallback(() => persist('confirm'), [persist]);
+  const restoreOverdueDraft = useCallback(() => persist('restore-overdue'), [persist]);
 
   const retryLoad = useCallback(() => {
     const context = contextRef.current;
@@ -122,6 +125,6 @@ export function useMealPlan(weekStart) {
   return {
     ...visibleState, plan: record?.draft ?? record?.confirmed ?? null,
     confirmedPlan: record?.confirmed ?? null, hasDraft: Boolean(record?.draft),
-    recordRevision: record?.revision ?? 0, savePlan, confirmPlan, retryLoad, storageScope,
+    recordRevision: record?.revision ?? 0, savePlan, confirmPlan, restoreOverdueDraft, retryLoad, storageScope,
   };
 }

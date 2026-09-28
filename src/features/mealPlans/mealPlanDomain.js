@@ -188,23 +188,41 @@ function plannedSlot(date, servings, candidate, ingredients, pantryItems) {
   return slot;
 }
 
-export function generateMealPlan({ weekStart, preferences, ingredients = [], pantryItems = [], scope = 'guest', previousPlan = null, now } = {}) {
+function confirmedOverdueSlots(confirmedPlan, scope, weekStart, today) {
+  if (!confirmedPlan) return new Map();
+  assertChangePlan(confirmedPlan);
+  if (confirmedPlan.scope !== scope || confirmedPlan.weekStart !== weekStart) {
+    throw new Error('같은 계정과 주의 확정 식단을 전달해주세요.');
+  }
+  return new Map(confirmedPlan.slots.filter(slot => slot.status === 'planned' && slot.date < today).map(slot => [slot.id, slot]));
+}
+
+export function generateMealPlan({ weekStart, preferences, ingredients = [], pantryItems = [], scope = 'guest', previousPlan = null, confirmedPlan = null, now } = {}) {
   const start = getWeekStart(weekStart || new Date());
   const previous = previousPlan?.weekStart === start && previousPlan.scope === scope ? previousPlan : null;
   const normalized = normalizePreferences(preferences || previous?.preferences);
   const revision = (previous?.revision || 0) + 1;
   const updatedAt = timestamp(now);
+  const today = formatCalendarDate(new Date(updatedAt));
+  const overdue = confirmedOverdueSlots(confirmedPlan, scope, start, today);
   const candidates = eligibleTemplates(normalized);
   const preservedSlots = (previous?.slots || []).filter((slot, day) => {
     const explicitlyRestored = normalized.dinnerDays.includes(day) && !previous.preferences.dinnerDays.includes(day);
     return slot.status === 'cooked' || slot.locked || (slot.status === 'skipped' && !explicitlyRestored);
   });
+  for (const confirmed of overdue.values()) {
+    const draft = previous?.slots.find(slot => slot.id === confirmed.id);
+    const preserved = draft?.status === 'skipped' ? draft : confirmed;
+    const index = preservedSlots.findIndex(slot => slot.id === confirmed.id);
+    if (index < 0) preservedSlots.push(preserved);
+    else preservedSlots[index] = preserved;
+  }
   const usedKeys = preservedSlots.filter((slot) => ['planned', 'cooked'].includes(slot.status)).map((slot) => slot.templateKey);
   const slots = ALL_DINNER_DAYS.map((day) => {
     const date = addCalendarDays(start, day);
     const preserved = preservedSlots.find((slot) => slot.date === date);
     if (preserved) {
-      if (preserved.status === 'cooked') return structuredClone(preserved);
+      if (preserved.status === 'cooked' || overdue.has(preserved.id)) return structuredClone(preserved);
       const slot = { ...clone(preserved), servings: normalized.servings, notice: null };
       const excludedNames = getExcludedNames(slot.components, normalized.excludedIngredients);
       if (slot.locked && excludedNames.length) {
@@ -224,21 +242,33 @@ export function generateMealPlan({ weekStart, preferences, ingredients = [], pan
     if (candidate) usedKeys.push(candidate.key);
     return slot;
   });
+  const replayPrevious = previous ? clone({
+    weekStart: previous.weekStart, scope: previous.scope, revision: previous.revision,
+    preferences: previous.preferences, slots: previous.slots, createdAt: previous.createdAt,
+  }) : null;
+  if (replayPrevious && overdue.size) {
+    // Explicit skips retain the complete protected meal, including optional source fields.
+    replayPrevious.slots = replayPrevious.slots.map((slot, index) => overdue.has(slot.id) && slot.status === 'skipped'
+      ? structuredClone(previous.slots[index]) : slot);
+  }
   return {
     id: `week:${start}`, schemaVersion: 1, catalogVersion: ACTIVE_MEAL_PLAN_CATALOG_VERSION,
     engineVersion: 'weekly-dinner-rules-v3',
-    generationInput: clone({
-      weekStart: start, scope, preferences: normalized, now: updatedAt,
-      ingredients: ingredients.map((item) => item ? {
-        name: item.name, normalizedName: item.normalizedName, expiryDate: item.expiryDate,
-        consumed: item.consumed, deletedAt: item.deletedAt,
-      } : null),
-      pantryItems: pantryItems.map((item) => typeof item === 'string' ? item : { name: item?.name }),
-      previousPlan: previous ? {
-        weekStart: previous.weekStart, scope: previous.scope, revision: previous.revision,
-        preferences: previous.preferences, slots: previous.slots, createdAt: previous.createdAt,
-      } : null,
-    }),
+    generationInput: {
+      ...clone({
+        weekStart: start, scope, preferences: normalized, now: updatedAt,
+        ingredients: ingredients.map((item) => item ? {
+          name: item.name, normalizedName: item.normalizedName, expiryDate: item.expiryDate,
+          consumed: item.consumed, deletedAt: item.deletedAt,
+        } : null),
+        pantryItems: pantryItems.map((item) => typeof item === 'string' ? item : { name: item?.name }),
+      }),
+      previousPlan: replayPrevious,
+      ...(confirmedPlan ? { confirmedPlan: structuredClone({
+        weekStart: confirmedPlan.weekStart, scope: confirmedPlan.scope, revision: confirmedPlan.revision,
+        preferences: confirmedPlan.preferences, slots: confirmedPlan.slots, createdAt: confirmedPlan.createdAt,
+      }) } : {}),
+    },
     scope, weekStart: start, preferences: normalized, slots, revision,
     createdAt: previous?.createdAt || updatedAt, updatedAt,
   };
@@ -252,9 +282,11 @@ function updateSlot(plan, slotId, transform, now, preferences = plan.preferences
   };
 }
 
-export function replaceMealPlanSlot(plan, slotId, { ingredients = [], pantryItems = [], now } = {}) {
+export function replaceMealPlanSlot(plan, slotId, { ingredients = [], pantryItems = [], confirmedPlan = null, now } = {}) {
+  const overdue = confirmedOverdueSlots(confirmedPlan, plan.scope, plan.weekStart, formatCalendarDate(new Date(timestamp(now))));
   const slot = plan.slots.find((item) => item.id === slotId);
   if (!slot || slot.status === 'cooked') return plan;
+  if (overdue.has(slot.id)) return plan;
   if (slot.locked || slot.status === 'skipped') {
     return updateSlot(plan, slotId, (item) => ({ ...item, notice: item.locked ? '고정을 풀면 다른 메뉴로 바꿀 수 있어요.' : '건너뛰기를 해제하면 메뉴를 고를 수 있어요.' }), now);
   }
@@ -313,9 +345,9 @@ function assertChangePlan(plan) {
   }
 }
 
-function assertMovableSlot(slot, today) {
+function assertMovableSlot(slot, today, allowOverdueSource = false) {
   if (!slot) throw new Error('이동할 식사 날짜를 찾을 수 없어요.');
-  if (slot.date < today) throw new Error('지난 날짜의 식단은 이동으로 바꾸지 않아요.');
+  if (slot.date < today && !allowOverdueSource) throw new Error('지난 날짜는 도착일로 지정하거나 메뉴를 교환할 수 없어요.');
   if (slot.status === 'cooked') throw new Error('조리 기록이 있는 메뉴는 이동할 수 없어요.');
   if (slot.locked) throw new Error('고정을 먼저 풀어야 메뉴를 이동할 수 있어요.');
 }
@@ -352,7 +384,7 @@ export function moveMealPlanSlot({ sourcePlan, targetPlan = sourcePlan, sourceSl
   if (!['move', 'swap'].includes(mode)) throw new Error('메뉴 이동 또는 날짜 교환을 명시적으로 선택해 주세요.');
   const source = sourcePlan.slots.find(slot => slot.id === sourceSlotId);
   const target = targetPlan.slots.find(slot => slot.id === targetSlotId);
-  assertMovableSlot(source, today);
+  assertMovableSlot(source, today, mode === 'move');
   assertMovableSlot(target, today);
   if (source.status !== 'planned') throw new Error('계획된 메뉴만 다른 날짜로 이동할 수 있어요.');
   if (source.id === target.id) return { plans: [sourcePlan], changes: [], notices: ['같은 날짜여서 식단을 유지했어요.'] };
