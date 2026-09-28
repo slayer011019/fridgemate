@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
+import InventoryReadError from '../components/InventoryReadError';
 import PublicRecipeExplorer from '../components/PublicRecipeExplorer';
 import { getPublicRecipeLinkItems } from '../features/recipes/recipeContentHubs';
 import PantryStaplesPanel from '../components/PantryStaplesPanel';
@@ -29,6 +30,8 @@ function RecipesPage() {
     retryPantrySave,
     ownedPantryItems,
     loading,
+    readError,
+    loadIngredients,
     ingredients,
     summary,
     missingBasicIngredients,
@@ -41,8 +44,8 @@ function RecipesPage() {
     fridgeInsight,
     sectionStats
   } = useRecipesPageModel();
-  const hasInventory = !loading && activeIngredientCount > 0;
-  const recommendationEmptyMessage = !loading && activeIngredientCount === 0 ? '재료를 등록하면 추천을 시작할 수 있어요' : '';
+  const hasInventory = !loading && !readError && activeIngredientCount > 0;
+  const recommendationEmptyMessage = !loading && !readError && activeIngredientCount === 0 ? '재료를 등록하면 추천을 시작할 수 있어요' : '';
   const dbRecommendationsState = useDBRecommendations({
     ingredients,
     pantryItems: ownedPantryItems
@@ -55,7 +58,7 @@ function RecipesPage() {
   };
 
   useEffect(() => {
-    if (loading) {
+    if (loading || readError) {
       return;
     }
 
@@ -78,6 +81,7 @@ function RecipesPage() {
     activeIngredientCount,
     buyOneRecommendations.length,
     loading,
+    readError,
     readyRecommendations.length,
     summary.expiringSoon,
     trackEvent,
@@ -100,6 +104,8 @@ function RecipesPage() {
         title={hasInventory ? '보유 재료로 만들 메뉴를 확인하세요' : '남은 재료를 골라 조리법까지 살펴보세요'}
         description={hasInventory ? '핵심 재료와 양념을 함께 비교합니다. 분량과 보관 상태는 조리 전에 확인하세요.' : '입력한 재료는 이번 탐색에만 사용해요. 마음에 드는 메뉴에서 준비 재료와 만드는 순서를 확인하세요.'}
       />
+
+      {readError ? <InventoryReadError loading={loading} onRetry={loadIngredients} /> : null}
 
       {hasInventory ? <>
       <section className="stats-grid">

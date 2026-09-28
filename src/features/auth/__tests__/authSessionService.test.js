@@ -44,6 +44,7 @@ vi.mock('../../ingredients/ingredientsScopeState.js', () => ({
 
 describe('authSessionService', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     window.localStorage.clear();
     indexedDbMocks.clearAccountLocalData.mockResolvedValue(undefined);
@@ -52,6 +53,40 @@ describe('authSessionService', () => {
     indexedDbMocks.clearMealPlans.mockResolvedValue(undefined);
     indexedDbMocks.deleteDatabase.mockResolvedValue(undefined);
     scopeStateMocks.clearScopeState.mockReturnValue(true);
+  });
+
+  it.each(['server response', 'local cleanup'])('does not clear the new account when deletion waits for %s', async (phase) => {
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const service = await import('../authSessionService.js');
+    let current;
+    const options = { backendEnabled: true, user: { id: 'A' }, setSession: vi.fn((value) => { current = value; }),
+      setError: vi.fn(), setGuestImportPrompt: vi.fn(), defaultGuestImportPrompt: {} };
+    service.persistSession({ user: { id: 'A' } }, options.setSession);
+    authApiMocks.deleteAccount.mockReturnValue(phase === 'server response' ? gate : Promise.resolve());
+    if (phase === 'local cleanup') indexedDbMocks.clearAccountLocalData.mockReturnValue(gate);
+    const deleting = service.deleteAccountWithSession('password', options).catch((error) => error);
+    if (phase === 'local cleanup') await vi.waitFor(() => expect(indexedDbMocks.clearAccountLocalData).toHaveBeenCalled());
+    authApiMocks.login.mockResolvedValue({ user: { id: 'B' } });
+    await service.loginWithSession({}, options);
+    release();
+    expect(await deleting).toMatchObject({ code: 'AUTH_CONTEXT_CHANGED' });
+    expect(current).toEqual({ user: { id: 'B' } });
+  });
+
+  it('does not apply a local-only logout completion after the identity has changed during cleanup', async () => {
+    let release;
+    indexedDbMocks.clearAccountLocalData.mockReturnValue(new Promise((resolve) => { release = resolve; }));
+    const service = await import('../authSessionService.js');
+    const options = { backendEnabled: false, user: { id: 'A' }, clearLocalData: true,
+      setSession: vi.fn(), setError: vi.fn(), setGuestImportPrompt: vi.fn(), defaultGuestImportPrompt: {} };
+    service.persistSession({ user: { id: 'A' } }, options.setSession);
+    const pending = service.logoutSession(options);
+    service.persistSession({ user: { id: 'B' } }, options.setSession);
+    release();
+    expect(await pending).toMatchObject({ ok: false });
+    expect(options.setGuestImportPrompt).not.toHaveBeenCalled();
+    expect(options.setError).not.toHaveBeenCalled();
   });
 
   it('restores a server-verified session without persisting identity in localStorage', async () => {

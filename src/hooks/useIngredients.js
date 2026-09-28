@@ -23,9 +23,12 @@ export function IngredientsProvider({ children }) {
   const backendSyncAvailable = isBackendEnabled() && isAuthenticated;
   const useApi = false;
   const initialScopeState = getScopeState(storageScope);
-  const [ingredients, setIngredients] = useState(() => (initialScopeState.loaded ? initialScopeState.items : []));
-  const [loading, setLoading] = useState(() => !initialScopeState.loaded);
+  const scopeSnapshotReady = initialScopeState.loaded && !initialScopeState.writeRecords?.size;
+  const [displayScope, setDisplayScope] = useState(storageScope);
+  const [ingredients, setIngredients] = useState(() => (scopeSnapshotReady ? initialScopeState.items : []));
+  const [loading, setLoading] = useState(() => !scopeSnapshotReady);
   const [error, setError] = useState('');
+  const [readError, setReadError] = useState('');
   const [dataSource, setDataSource] = useState('indexeddb');
   const [syncSummary, setSyncSummary] = useState(() => initialScopeState.syncSummary || createEmptySyncSummary());
   const [syncStatus, setSyncStatus] = useState('idle');
@@ -53,13 +56,16 @@ export function IngredientsProvider({ children }) {
     setError('');
   }, []);
 
-  const commitIngredients = useCallback((nextValue, targetScope = scopeRef.current) => {
+  const commitIngredients = useCallback((nextValue, targetScope = scopeRef.current, { fullSnapshot = false } = {}) => {
     const scopeState = getScopeState(targetScope);
     const currentItems = targetScope === scopeRef.current ? ingredientsRef.current : scopeState.items;
     const nextIngredients = typeof nextValue === 'function' ? nextValue(currentItems) : nextValue;
 
     scopeState.items = nextIngredients;
-    scopeState.loaded = true;
+    if (fullSnapshot) {
+      scopeState.loaded = true;
+      scopeState.writeVersion = (scopeState.writeVersion || 0) + 1;
+    }
 
     if (targetScope === scopeRef.current) {
       ingredientsRef.current = nextIngredients;
@@ -78,12 +84,15 @@ export function IngredientsProvider({ children }) {
 
   useEffect(() => {
     const nextScopeState = getScopeState(storageScope);
+    const ready = nextScopeState.loaded && !nextScopeState.writeRecords?.size;
+    setDisplayScope(storageScope);
     scopeRef.current = storageScope;
     ingredientsRef.current = nextScopeState.items;
-    setIngredients(nextScopeState.loaded ? nextScopeState.items : []);
-    setLoading(!nextScopeState.loaded);
+    setIngredients(ready ? nextScopeState.items : []);
+    setLoading(!ready);
     setError('');
     setDataSource('indexeddb');
+    setReadError('');
     setSyncSummary(nextScopeState.syncSummary || createEmptySyncSummary());
     setSyncStatus('idle');
     setSyncError(null);
@@ -126,7 +135,7 @@ export function IngredientsProvider({ children }) {
     const result = await commitIngredientImport(command, { isCurrent });
     if (isCurrent()) {
       const pendingUploads = backendSyncAvailable ? getPendingIngredients(result.syncSnapshot) : [];
-      commitIngredients(result.ingredients, storageScope);
+      commitIngredients(result.ingredients, storageScope, { fullSnapshot: true });
       commitSyncSummary({ ...createEmptySyncSummary(), pendingUploads,
         nextSnapshot: backendSyncAvailable ? result.syncSnapshot : [] }, storageScope);
       setDataSource('indexeddb');
@@ -153,6 +162,7 @@ export function IngredientsProvider({ children }) {
         commitSyncSummary,
         runRepositoryCommand,
         setLoading,
+        setReadError,
         setHasUnsyncedChanges,
         setSyncStatus
       }),
@@ -162,7 +172,7 @@ export function IngredientsProvider({ children }) {
   useEffect(() => {
     const scopeState = getScopeState(storageScope);
 
-    if (scopeState.loaded) {
+    if (scopeState.loaded && !scopeState.writeRecords?.size) {
       setLoading(false);
       return;
     }
@@ -176,13 +186,14 @@ export function IngredientsProvider({ children }) {
       createCrudActions({
         storageScope,
         syncEnabled: backendSyncAvailable,
-        ingredientsRef,
         commitIngredients,
         commitSyncSummary,
         runRepositoryCommand,
-        markDirty
+        markDirty,
+        isCurrentSession: isCurrentLoadSession,
+        setError
       }),
-    [backendSyncAvailable, commitIngredients, commitSyncSummary, markDirty, runRepositoryCommand, storageScope]
+    [backendSyncAvailable, commitIngredients, commitSyncSummary, isCurrentLoadSession, markDirty, runRepositoryCommand, storageScope]
   );
 
   const pushIngredientsToServer = useMemo(
@@ -190,6 +201,7 @@ export function IngredientsProvider({ children }) {
       createPushAction({
         isAuthenticated: backendSyncAvailable,
         storageScope,
+        isCurrentSession: isCurrentLoadSession,
         commitIngredients,
         commitSyncSummary,
         setSyncStatus,
@@ -198,7 +210,7 @@ export function IngredientsProvider({ children }) {
         setSyncError,
         setError
       }),
-    [backendSyncAvailable, commitIngredients, commitSyncSummary, storageScope]
+    [backendSyncAvailable, commitIngredients, commitSyncSummary, isCurrentLoadSession, storageScope]
   );
 
   const pullIngredientsFromServer = useMemo(
@@ -206,6 +218,7 @@ export function IngredientsProvider({ children }) {
       createPullAction({
         isAuthenticated: backendSyncAvailable,
         storageScope,
+        isCurrentSession: isCurrentLoadSession,
         commitIngredients,
         commitSyncSummary,
         setSyncStatus,
@@ -213,21 +226,22 @@ export function IngredientsProvider({ children }) {
         setSyncError,
         setError
       }),
-    [backendSyncAvailable, commitIngredients, commitSyncSummary, storageScope]
+    [backendSyncAvailable, commitIngredients, commitSyncSummary, isCurrentLoadSession, storageScope]
   );
 
   const value = useMemo(
     () => ({
-      ingredients,
-      loading,
-      isSyncing,
-      error,
-      dataSource,
-      syncSummary,
-      syncStatus,
-      lastSyncedAt,
-      syncError,
-      hasUnsyncedChanges,
+      ingredients: displayScope === storageScope ? ingredients : scopeSnapshotReady ? initialScopeState.items : [],
+      loading: displayScope === storageScope ? loading : !scopeSnapshotReady,
+      isSyncing: displayScope === storageScope && isSyncing,
+      error: displayScope === storageScope ? error : '',
+      readError: displayScope === storageScope ? readError : '',
+      dataSource: displayScope === storageScope ? dataSource : 'indexeddb',
+      syncSummary: displayScope === storageScope ? syncSummary : initialScopeState.syncSummary,
+      syncStatus: displayScope === storageScope ? syncStatus : 'idle',
+      lastSyncedAt: displayScope === storageScope ? lastSyncedAt : null,
+      syncError: displayScope === storageScope ? syncError : null,
+      hasUnsyncedChanges: displayScope === storageScope && hasUnsyncedChanges,
       clearError,
       markIngredientsDirty: markDirty,
       loadIngredients,
@@ -246,10 +260,13 @@ export function IngredientsProvider({ children }) {
       addIngredients,
       clearError,
       dataSource,
+      displayScope,
       error,
+      readError,
       findIngredient,
       hasUnsyncedChanges,
       ingredients,
+      initialScopeState,
       importIngredients,
       isSyncing,
       lastSyncedAt,
@@ -259,6 +276,8 @@ export function IngredientsProvider({ children }) {
       pullIngredientsFromServer,
       pushIngredientsToServer,
       removeIngredient,
+      storageScope,
+      scopeSnapshotReady,
       syncError,
       syncSummary,
       syncStatus,

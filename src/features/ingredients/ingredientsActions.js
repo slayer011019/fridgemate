@@ -23,6 +23,10 @@ import {
 const FALLBACK_WARNING_MESSAGE =
   'The API connection is unstable, so FridgeMate is temporarily using the authenticated local cache.';
 const STALE_READ_MESSAGE = '재고 조회를 시작한 계정이나 요청이 바뀌었습니다. 다시 확인해주세요.';
+const STALE_SYNC_MESSAGE = '동기화를 시작한 계정이 바뀌었습니다. 현재 계정에서 다시 시도해주세요.';
+const READ_ERROR_MESSAGE = '재고를 불러오지 못했어요. 다시 불러와 주세요.';
+const WRITE_ERROR_MESSAGE = '재료를 저장하지 못했어요. 기존 재고는 유지돼요. 다시 시도해주세요.';
+const DELETE_ERROR_MESSAGE = '재료를 삭제하지 못했어요. 기존 재고는 유지돼요. 다시 시도해주세요.';
 
 export function ensureIngredientId(ingredient) {
   const id = ingredient.id || crypto.randomUUID();
@@ -84,7 +88,7 @@ export function createRepositoryCommandRunner({ useApi, setDataSource, setError 
       return { result, source, usedFallback };
     } catch (nextError) {
       if (!isCurrent()) throw new Error(STALE_READ_MESSAGE);
-      setError(nextError.message || 'Failed to process ingredient data.');
+      setError(!useApi ? READ_ERROR_MESSAGE : nextError.message || 'Failed to process ingredient data.');
       throw nextError;
     }
   };
@@ -108,6 +112,7 @@ export function createLoadIngredientsAction({
   commitSyncSummary,
   runRepositoryCommand,
   setLoading,
+  setReadError,
   setHasUnsyncedChanges,
   setSyncStatus
 }) {
@@ -117,11 +122,12 @@ export function createLoadIngredientsAction({
       && getScopeState(storageScope) === scopeState;
     if (!isSameSession()) throw new Error(STALE_READ_MESSAGE);
 
-    if (!force && scopeState.loaded) {
+    if (!force && scopeState.loaded && !scopeState.writeRecords?.size) {
       const hasPendingChanges = scopeState.syncSummary.pendingUploads.length > 0;
       setHasUnsyncedChanges(hasPendingChanges);
       if (hasPendingChanges) setSyncStatus('dirty');
       setLoading(false);
+      setReadError('');
       return scopeState.items;
     }
 
@@ -133,11 +139,12 @@ export function createLoadIngredientsAction({
         const { items, sync } = await scopeState.promise;
         if (!isCurrent()) throw new Error(STALE_READ_MESSAGE);
         // Another mounted provider may share the read but owns its own UI state.
-        commitIngredients(items, storageScope);
+        commitIngredients(items, storageScope, { fullSnapshot: true });
         commitSyncSummary(sync, storageScope);
         const hasPendingChanges = sync.pendingUploads.length > 0;
         setHasUnsyncedChanges(hasPendingChanges);
         if (hasPendingChanges) setSyncStatus('dirty');
+        setReadError('');
         return items;
       } catch (nextError) {
         if (isSameSession() && scopeState.loadRequest === request && !request.isCurrent()) {
@@ -145,6 +152,7 @@ export function createLoadIngredientsAction({
           // never reuse the snapshot captured for the abandoned owner.
           return loadIngredients({ force: true });
         }
+        if (isCurrent()) setReadError(READ_ERROR_MESSAGE);
         throw nextError;
       } finally {
         if (isCurrent()) setLoading(false);
@@ -157,59 +165,62 @@ export function createLoadIngredientsAction({
     scopeState.loaded = false;
     setLoading(true);
 
-    const task = runRepositoryCommand('loadIngredients', () =>
-      loadIngredientsFromRepository({
-        scope: storageScope,
-        useApi
-      }),
-      { isCurrent: request.isCurrent }
-    ).then(async ({ result, source }) => {
-      if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
-      let items = result || [];
-      let nextSyncSummary = createEmptySyncSummary();
+    const readSnapshot = async () => {
+      const writeVersion = scopeState.writeVersion || 0;
+      const changedWhileReading = () => (scopeState.writeVersion || 0) !== writeVersion;
+      try {
+        const response = await loadIngredientsFromRepository({ scope: storageScope, useApi });
+        if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
+        if (changedWhileReading()) return readSnapshot();
+        let items = response.result || [];
+        let nextSyncSummary = createEmptySyncSummary();
 
-      if (source === 'api') {
-        const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+        if (response.source === 'api') {
+          const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+          if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
+          nextSyncSummary = await syncIngredientSnapshot({ localIngredients, remoteIngredients: items });
+          if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
+          if (changedWhileReading()) return readSnapshot();
+          items = getVisibleIngredients(nextSyncSummary.nextSnapshot);
+          await syncIndexedDbCache('loadIngredients', () =>
+            ingredientCache.replaceAll(nextSyncSummary.nextSnapshot, buildScopeOptions(storageScope))
+          );
+        } else if (syncEnabled) {
+          const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+          if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
+          nextSyncSummary = { ...createEmptySyncSummary(),
+            pendingUploads: getPendingIngredients(localIngredients), nextSnapshot: localIngredients };
+          items = getVisibleIngredients(localIngredients);
+        }
         if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
-        nextSyncSummary = await syncIngredientSnapshot({
-          localIngredients,
-          remoteIngredients: items
-        });
-        if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
-        items = getVisibleIngredients(nextSyncSummary.nextSnapshot);
-        await syncIndexedDbCache('loadIngredients', () =>
-          ingredientCache.replaceAll(nextSyncSummary.nextSnapshot, buildScopeOptions(storageScope))
-        );
-      } else if (syncEnabled) {
-        const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
-        if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
-        const pendingUploads = getPendingIngredients(localIngredients);
-        nextSyncSummary = {
-          ...createEmptySyncSummary(),
-          pendingUploads,
-          nextSnapshot: localIngredients
-        };
-        items = getVisibleIngredients(localIngredients);
+        // Keep one shared request owner, but never publish a snapshot or error
+        // taken before a successful local mutation in that same session.
+        if (changedWhileReading()) return readSnapshot();
+        return { ...response, result: { items, sync: nextSyncSummary } };
+      } catch (nextError) {
+        if (request.isCurrent() && changedWhileReading()) return readSnapshot();
+        throw nextError;
       }
-
-      return {
-        items,
-        sync: nextSyncSummary
-      };
-    });
+    };
+    const task = runRepositoryCommand('loadIngredients', readSnapshot,
+      { isCurrent: request.isCurrent }).then(({ result }) => result);
 
     scopeState.promise = task;
 
     try {
       const { items, sync } = await task;
       if (!request.isCurrent()) throw new Error(STALE_READ_MESSAGE);
-      commitIngredients(items, storageScope);
+      commitIngredients(items, storageScope, { fullSnapshot: true });
       commitSyncSummary(sync, storageScope);
       const hasPendingChanges = sync.pendingUploads.length > 0;
       setHasUnsyncedChanges(hasPendingChanges);
       if (hasPendingChanges) setSyncStatus('dirty');
+      setReadError('');
 
       return items;
+    } catch (nextError) {
+      if (request.isCurrent()) setReadError(READ_ERROR_MESSAGE);
+      throw nextError;
     } finally {
       if (scopeState.promise === task) scopeState.promise = null;
 
@@ -223,12 +234,69 @@ export function createLoadIngredientsAction({
 export function createCrudActions({
   storageScope,
   syncEnabled,
-  ingredientsRef,
   commitIngredients,
   commitSyncSummary,
   runRepositoryCommand,
-  markDirty
+  markDirty,
+  isCurrentSession,
+  setError
 }) {
+  const scopeState = getScopeState(storageScope);
+  const isCurrent = () => isCurrentSession() && getScopeState(storageScope) === scopeState;
+  const assertCurrent = () => {
+    if (!isCurrent()) throw new Error(STALE_READ_MESSAGE);
+  };
+  const commitCurrent = next => {
+    if (isCurrent()) commitIngredients(next, storageScope);
+  };
+  const beginWrite = (nextItems, removedIds = []) => {
+    assertCurrent();
+    setError('');
+    const token = {};
+    const records = scopeState.writeRecords ||= new Map();
+    const changes = new Map(nextItems.map(item => [item.id, item]));
+    removedIds.forEach(id => changes.set(id, null));
+    const operations = [...changes].map(([id, next]) => {
+      if (!records.has(id)) {
+        const index = scopeState.items.findIndex(item => item.id === id);
+        records.set(id, { confirmed: scopeState.items[index] || null, index,
+          sequence: 0, confirmedSequence: 0, pending: new Map() });
+      }
+      const record = records.get(id);
+      const sequence = ++record.sequence;
+      record.pending.set(token, sequence);
+      return { id, next, record, sequence };
+    });
+    return {
+      settle(success) {
+        let reportFailure = false;
+        for (const { id, next, record, sequence } of operations) {
+          if (success && sequence > record.confirmedSequence) {
+            record.confirmed = next;
+            record.confirmedSequence = sequence;
+          }
+          record.pending.delete(token);
+          const hasNewerPending = [...record.pending.values()].some(pending => pending > sequence);
+          if (!hasNewerPending) {
+            // A failed optimistic edit is never the rollback baseline for the
+            // next edit. Restore only the last confirmed value in this chain.
+            commitCurrent(current => record.confirmed
+              ? restoreIngredient(current, record.confirmed, record.index)
+              : current.filter(item => item.id !== id));
+            if (!success && record.confirmedSequence <= sequence) reportFailure = true;
+          }
+          if (!record.pending.size) records.delete(id);
+        }
+        return reportFailure;
+      }
+    };
+  };
+  const reportWriteFailure = (error, message, mutation) => {
+    const visibleFailure = mutation.settle(false);
+    if (isCurrent() && visibleFailure) setError(message);
+    else if (!isCurrent()) scopeState.loaded = false;
+    throw error;
+  };
   const prepareLocalIngredient = (ingredient, pendingState) => {
     if (!syncEnabled) return ingredient;
 
@@ -245,6 +313,7 @@ export function createCrudActions({
   };
 
   const refreshLocalSyncSummary = async () => {
+    assertCurrent();
     if (!syncEnabled) {
       commitSyncSummary(createEmptySyncSummary(), storageScope);
       return;
@@ -252,6 +321,7 @@ export function createCrudActions({
 
     try {
       const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+      assertCurrent();
       commitSyncSummary(
         {
           ...createEmptySyncSummary(),
@@ -267,89 +337,97 @@ export function createCrudActions({
 
   const saveLocalIngredient = async (ingredient) => {
     await ingredientCache.save(ingredient, buildScopeOptions(storageScope));
+    assertCurrent();
+    scopeState.writeVersion = (scopeState.writeVersion || 0) + 1;
     await refreshLocalSyncSummary();
+    assertCurrent();
     markDirty();
   };
 
   const saveLocalIngredients = async (ingredients) => {
     await ingredientCache.saveMany(ingredients, buildScopeOptions(storageScope));
+    assertCurrent();
+    scopeState.writeVersion = (scopeState.writeVersion || 0) + 1;
     await refreshLocalSyncSummary();
+    assertCurrent();
     markDirty();
   };
 
   const removeLocalIngredient = async (id) => {
     await ingredientCache.remove(id, buildScopeOptions(storageScope));
+    assertCurrent();
+    scopeState.writeVersion = (scopeState.writeVersion || 0) + 1;
     commitSyncSummary(createEmptySyncSummary(), storageScope);
     markDirty();
   };
 
   return {
     async addIngredient(ingredient) {
+      assertCurrent();
       const optimisticIngredient = prepareLocalIngredient(
         ensureIngredientId({ ...ingredient }),
         SYNC_STATE.PENDING_CREATE
       );
-      commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
+      const mutation = beginWrite([optimisticIngredient]);
+      commitCurrent((current) => upsertIngredient(current, optimisticIngredient));
 
       try {
         await saveLocalIngredient(optimisticIngredient);
+        mutation.settle(true);
         return optimisticIngredient;
       } catch (nextError) {
-        commitIngredients((current) => current.filter((item) => item.id !== optimisticIngredient.id));
-        throw nextError;
+        reportWriteFailure(nextError, WRITE_ERROR_MESSAGE, mutation);
       }
     },
 
     async updateIngredient(ingredient) {
-      const existingIngredient = ingredientsRef.current.find((item) => item.id === ingredient.id);
+      assertCurrent();
+      const existingIngredient = scopeState.items.find((item) => item.id === ingredient.id);
       const pendingState =
         existingIngredient?.syncState === SYNC_STATE.PENDING_CREATE
           ? SYNC_STATE.PENDING_CREATE
           : SYNC_STATE.PENDING_UPDATE;
       const optimisticIngredient = prepareLocalIngredient(ensureIngredientId({ ...ingredient }), pendingState);
-      const previousIndex = ingredientsRef.current.findIndex((item) => item.id === optimisticIngredient.id);
-      const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
+      const mutation = beginWrite([optimisticIngredient]);
 
-      commitIngredients((current) => upsertIngredient(current, optimisticIngredient));
+      commitCurrent((current) => upsertIngredient(current, optimisticIngredient));
 
       try {
         await saveLocalIngredient(optimisticIngredient);
+        mutation.settle(true);
         return optimisticIngredient;
       } catch (nextError) {
-        if (previousIngredient) {
-          commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
-        } else {
-          commitIngredients((current) => current.filter((item) => item.id !== optimisticIngredient.id));
-        }
-
-        throw nextError;
+        reportWriteFailure(nextError, WRITE_ERROR_MESSAGE, mutation);
       }
     },
 
     async addIngredients(items) {
+      assertCurrent();
       const optimisticIngredients = items.map((ingredient) =>
         prepareLocalIngredient(ensureIngredientId({ ...ingredient }), SYNC_STATE.PENDING_CREATE)
       );
-      const optimisticIds = new Set(optimisticIngredients.map((ingredient) => ingredient.id));
+      const mutation = beginWrite(optimisticIngredients);
 
-      commitIngredients((current) =>
+      commitCurrent((current) =>
         optimisticIngredients.reduce((nextItems, ingredient) => upsertIngredient(nextItems, ingredient), current)
       );
 
       try {
         await saveLocalIngredients(optimisticIngredients);
+        mutation.settle(true);
         return optimisticIngredients;
       } catch (nextError) {
-        commitIngredients((current) => current.filter((ingredient) => !optimisticIds.has(ingredient.id)));
-        throw nextError;
+        reportWriteFailure(nextError, WRITE_ERROR_MESSAGE, mutation);
       }
     },
 
     async removeIngredient(id) {
-      const previousIndex = ingredientsRef.current.findIndex((ingredient) => ingredient.id === id);
-      const previousIngredient = previousIndex >= 0 ? ingredientsRef.current[previousIndex] : null;
+      assertCurrent();
+      const previousIndex = scopeState.items.findIndex((ingredient) => ingredient.id === id);
+      const previousIngredient = previousIndex >= 0 ? scopeState.items[previousIndex] : null;
+      const mutation = beginWrite([], [id]);
 
-      commitIngredients((current) => current.filter((ingredient) => ingredient.id !== id));
+      commitCurrent((current) => current.filter((ingredient) => ingredient.id !== id));
 
       try {
         if (syncEnabled && previousIngredient) {
@@ -372,17 +450,17 @@ export function createCrudActions({
         } else {
           await removeLocalIngredient(id);
         }
+        mutation.settle(true);
       } catch (nextError) {
-        if (previousIngredient) {
-          commitIngredients((current) => restoreIngredient(current, previousIngredient, previousIndex));
-        }
-
-        throw nextError;
+        reportWriteFailure(nextError, DELETE_ERROR_MESSAGE, mutation);
       }
     },
 
     async findIngredient(id) {
-      const existingIngredient = ingredientsRef.current.find((ingredient) => ingredient.id === id);
+      assertCurrent();
+      // Pending writes and failed/unfinished reads are not a confirmed cache.
+      const existingIngredient = scopeState.loaded && !scopeState.writeRecords?.has(id)
+        ? scopeState.items.find((ingredient) => ingredient.id === id) : null;
 
       if (existingIngredient) {
         return existingIngredient;
@@ -393,8 +471,9 @@ export function createCrudActions({
           id,
           scope: storageScope,
           useApi: false
-        })
+        }), { isCurrent }
       );
+      assertCurrent();
 
       const committedIngredient =
         source === 'api' && foundIngredient ? markIngredientAsSynced(foundIngredient) : foundIngredient;
@@ -406,7 +485,8 @@ export function createCrudActions({
       }
 
       if (committedIngredient) {
-        commitIngredients((current) => upsertIngredient(current, committedIngredient));
+        assertCurrent();
+        commitCurrent((current) => upsertIngredient(current, committedIngredient));
       }
 
       return committedIngredient;
@@ -417,6 +497,7 @@ export function createCrudActions({
 export function createPushAction({
   isAuthenticated,
   storageScope,
+  isCurrentSession = () => true,
   commitIngredients,
   commitSyncSummary,
   setSyncStatus,
@@ -425,7 +506,14 @@ export function createPushAction({
   setSyncError,
   setError
 }) {
+  const scopeState = getScopeState(storageScope);
+  const isCurrent = () => isCurrentSession() && getScopeState(storageScope) === scopeState;
+  const assertCurrent = () => {
+    if (!isCurrent()) throw new Error(STALE_SYNC_MESSAGE);
+  };
+
   return async function pushIngredientsToServer() {
+    if (!isCurrent()) return { ok: false, message: STALE_SYNC_MESSAGE };
     if (!isAuthenticated) {
       const message = '로그인이 필요합니다.';
       setSyncStatus('error');
@@ -441,6 +529,7 @@ export function createPushAction({
 
     try {
       const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+      assertCurrent();
       const pendingIngredients = getPendingIngredients(localIngredients);
       const response = await pushIngredientsToServerInRepository(
         pendingIngredients.map(({ lastSyncedAt, syncState, ...ingredient }) => ({
@@ -448,15 +537,18 @@ export function createPushAction({
           clientId: ingredient.clientId || ingredient.id
         }))
       );
+      assertCurrent();
       const remoteIngredients = Array.isArray(response) ? response : response.items || [];
       const syncSummary = await syncIngredientSnapshot({ localIngredients, remoteIngredients });
+      assertCurrent();
       const now = new Date().toISOString();
       const nextSnapshot = syncSummary.nextSnapshot;
       const nextIngredients = getVisibleIngredients(nextSnapshot);
       const hasPendingChanges = syncSummary.pendingUploads.length > 0;
 
       await ingredientCache.replaceAll(nextSnapshot, buildScopeOptions(storageScope));
-      commitIngredients(nextIngredients, storageScope);
+      assertCurrent();
+      commitIngredients(nextIngredients, storageScope, { fullSnapshot: true });
       commitSyncSummary(syncSummary, storageScope);
       setStoredLastSyncedAt(storageScope, now);
       setLastSyncedAt(now);
@@ -470,6 +562,7 @@ export function createPushAction({
         lastSyncedAt: now
       };
     } catch (nextError) {
+      if (!isCurrent()) return { ok: false, message: STALE_SYNC_MESSAGE };
       const message = nextError.message || 'API request could not reach the server.';
       setSyncStatus('error');
       setHasUnsyncedChanges(true);
@@ -483,6 +576,7 @@ export function createPushAction({
 export function createPullAction({
   isAuthenticated,
   storageScope,
+  isCurrentSession = () => true,
   commitIngredients,
   commitSyncSummary,
   setSyncStatus,
@@ -490,7 +584,14 @@ export function createPullAction({
   setSyncError,
   setError
 }) {
+  const scopeState = getScopeState(storageScope);
+  const isCurrent = () => isCurrentSession() && getScopeState(storageScope) === scopeState;
+  const assertCurrent = () => {
+    if (!isCurrent()) throw new Error(STALE_SYNC_MESSAGE);
+  };
+
   return async function pullIngredientsFromServer() {
+    if (!isCurrent()) return { ok: false, message: STALE_SYNC_MESSAGE };
     if (!isAuthenticated) {
       const message = '로그인이 필요합니다.';
       setSyncStatus('error');
@@ -505,15 +606,19 @@ export function createPullAction({
 
     try {
       const response = await pullIngredientsFromServerInRepository();
+      assertCurrent();
       const remoteIngredients = Array.isArray(response) ? response : response.items || [];
       const localIngredients = await ingredientCache.getAllForSync(buildScopeOptions(storageScope));
+      assertCurrent();
       const syncSummary = await syncIngredientSnapshot({ localIngredients, remoteIngredients });
+      assertCurrent();
       const nextSnapshot = syncSummary.nextSnapshot;
       const nextIngredients = getVisibleIngredients(nextSnapshot);
       const hasPendingChanges = syncSummary.pendingUploads.length > 0;
 
       await ingredientCache.replaceAll(nextSnapshot, buildScopeOptions(storageScope));
-      commitIngredients(nextIngredients, storageScope);
+      assertCurrent();
+      commitIngredients(nextIngredients, storageScope, { fullSnapshot: true });
       commitSyncSummary(syncSummary, storageScope);
       setSyncStatus(hasPendingChanges ? 'dirty' : 'synced');
       setHasUnsyncedChanges(hasPendingChanges);
@@ -524,6 +629,7 @@ export function createPullAction({
         syncedCount: nextIngredients.length
       };
     } catch (nextError) {
+      if (!isCurrent()) return { ok: false, message: STALE_SYNC_MESSAGE };
       const message = nextError.message || 'API request could not reach the server.';
       setSyncStatus('error');
       setSyncError(message);

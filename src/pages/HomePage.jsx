@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
+import InventoryReadError from '../components/InventoryReadError';
 import PublicRecipeExplorer from '../components/PublicRecipeExplorer';
 import PageHeader from '../components/PageHeader';
 import AdSenseSlot from '../components/ads/AdSenseSlot';
@@ -70,7 +71,7 @@ function HomePage() {
   const ocrEnabled = isOcrEnabled();
   const { trackEvent } = useAnalytics();
   const lastViewSignatureRef = useRef('');
-  const { loading, summary, topRecommendations, upcomingItems, urgentCount } = useHomePageModel();
+  const { loading, readError, loadIngredients, summary, topRecommendations, upcomingItems, urgentCount } = useHomePageModel();
   const {
     cancelMenu,
     completeMenu,
@@ -80,8 +81,8 @@ function HomePage() {
     retrySync,
     syncing: menuDecisionSyncing
   } = useMenuDecision();
-  const showDashboard = !loading && summary.total > 0;
-  const isEmptyDashboard = !loading && summary.total === 0 && urgentCount === 0 && topRecommendations.length === 0;
+  const showDashboard = !loading && !readError && summary.total > 0;
+  const isEmptyDashboard = !loading && !readError && summary.total === 0 && urgentCount === 0 && topRecommendations.length === 0;
   const summaryItems = [
     {
       label: '\uC804\uCCB4 \uC7AC\uB8CC',
@@ -101,7 +102,7 @@ function HomePage() {
   ];
 
   useEffect(() => {
-    if (loading) {
+    if (loading || readError) {
       return;
     }
 
@@ -120,7 +121,7 @@ function HomePage() {
       buy_one_more_count: 0,
       use_soon_count: 0
     });
-  }, [loading, summary.total, topRecommendations.length, trackEvent, urgentCount]);
+  }, [loading, readError, summary.total, topRecommendations.length, trackEvent, urgentCount]);
 
   return (
     <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
@@ -144,6 +145,8 @@ function HomePage() {
           </>
         }
       />
+
+      {readError ? <InventoryReadError loading={loading} onRetry={loadIngredients} /> : null}
 
       {decision && decision.status !== 'cancelled' ? (
         <section className="border-y border-emerald-200 bg-emerald-50/70 px-4 py-5 sm:px-6" aria-labelledby="today-menu-title">

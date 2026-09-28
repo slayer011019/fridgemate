@@ -13,6 +13,56 @@ const ONE_PIXEL_PNG = Buffer.from(
   'base64'
 );
 
+for (const nextUser of [{ id: 'user-2', email: 'second@example.com' }, DEFAULT_USER]) {
+  test(`an old preference 401 is not replayed after logout and login as ${nextUser.id}`, async ({ page }) => {
+    await seedBrowserState(page, { session: { user: DEFAULT_USER } });
+    await mockApiSession(page, { user: DEFAULT_USER, restoreSession: true });
+    let currentUser = DEFAULT_USER;
+    const defaults = { preferredIngredients: [], dislikedIngredients: [], spiceLevel: 'medium', cookingTimePreference: 'flexible' };
+    const writes = [];
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    let received;
+    const requestReceived = new Promise(resolve => { received = resolve; });
+    await page.route('**/api/auth/refresh', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: currentUser }) }));
+    await page.route('**/api/auth/login', route => {
+      currentUser = nextUser;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: nextUser }) });
+    });
+    await page.route('**/api/user-preferences', async route => {
+      if (route.request().method() === 'PUT') {
+        writes.push({ userId: currentUser.id, body: route.request().postDataJSON() });
+        if (writes.length === 1) {
+          received();
+          await pending;
+          await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Fixture expired first request' }) });
+          return;
+        }
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(defaults) });
+    });
+    await gotoAndWait(page, '/account');
+    await page.getByLabel('선호 재료', { exact: true }).fill('두부');
+    await page.getByRole('button', { name: '취향 저장', exact: true }).click();
+    await requestReceived;
+    const logoutFinished = page.waitForResponse(item => new URL(item.url()).pathname === '/api/auth/logout');
+    await page.getByRole('main').getByRole('button', { name: '로그아웃', exact: true }).click();
+    await logoutFinished;
+    await expect(page).toHaveURL(/\/login$/);
+    await page.getByLabel('이메일').fill(nextUser.email);
+    await page.getByLabel('비밀번호').fill('password123');
+    await page.getByRole('button', { name: '로그인', exact: true }).click();
+    await expect(page.getByRole('heading', { name: nextUser.email, exact: true })).toBeVisible();
+    const oldResponse = page.waitForResponse(item => item.request().method() === 'PUT' && new URL(item.url()).pathname === '/api/user-preferences');
+    release();
+    await oldResponse;
+    await page.waitForLoadState('networkidle');
+    expect(writes).toEqual([{ userId: DEFAULT_USER.id, body: { ...defaults, preferredIngredients: ['두부'] } }]);
+    await expect(page.getByRole('heading', { name: nextUser.email, exact: true })).toBeVisible();
+    await expect(page.getByLabel('선호 재료', { exact: true })).toHaveValue('');
+  });
+}
+
 test('preference quota failure clears success feedback and retries without losing saved choices', async ({ page }, testInfo) => {
   await seedBrowserState(page, { session: { token: 'test-token', user: DEFAULT_USER } });
   await mockApiSession(page, { user: DEFAULT_USER, restoreSession: true });

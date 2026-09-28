@@ -63,7 +63,7 @@ export function useRecipesPageModel() {
         .map((staple) => staple.name),
     [pantryOwnership, pantryStaples]
   );
-  const { recommendations, loading, ingredients } = useLocalRecommendations(ownedPantryItems);
+  const { recommendations, loading, ingredients, readError, loadIngredients } = useLocalRecommendations(ownedPantryItems);
   const summary = useMemo(() => getDashboardSummary(ingredients), [ingredients]);
   const missingBasicIngredients = useMemo(() => getMissingBasicIngredients(ingredients), [ingredients]);
   const activeIngredientCount = useMemo(() => ingredients.filter((ingredient) => !ingredient.consumed).length, [ingredients]);
@@ -112,6 +112,8 @@ export function useRecipesPageModel() {
     retryPantrySave,
     ownedPantryItems,
     loading,
+    readError,
+    loadIngredients,
     ingredients,
     summary,
     missingBasicIngredients,

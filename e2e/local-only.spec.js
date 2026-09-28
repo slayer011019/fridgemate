@@ -1,6 +1,106 @@
 import { expect, test } from '@playwright/test';
 import { createIngredient, gotoAndWait, readBrowserIngredients, seedBrowserState } from './support/testApp';
 
+for (const route of ['/', '/recipes', '/ingredients']) {
+  test(`inventory read failure offers recovery without pretending the fridge is empty on ${route}`, async ({ page }, testInfo) => {
+    const ingredient = createIngredient('read-failure-egg', { name: '계란', expiryDate: '' });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await seedBrowserState(page, { ingredients: [ingredient] });
+    await gotoAndWait(page, '/ingredients');
+    await expect(page.getByRole('heading', { name: '계란', exact: true })).toBeVisible();
+    await page.addInitScript(() => {
+      const original = IDBObjectStore.prototype.getAll;
+      IDBObjectStore.prototype.getAll = function (...args) {
+        if (this.name === 'ingredients' && this.transaction.db.name === 'fridgemate-db__guest') {
+          throw new DOMException('Fixture denied ingredient read', 'SecurityError');
+        }
+        return original.apply(this, args);
+      };
+      window.restoreInventoryRead = () => { IDBObjectStore.prototype.getAll = original; };
+    });
+    await gotoAndWait(page, route);
+    const alert = page.getByRole('alert').filter({ hasText: /재고를 불러오지 못/ });
+    await expect(alert).toContainText(/비어 있는지.*확인/);
+    await expect(page.getByText('재료를 등록하면 추천을 시작할 수 있어요', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Fixture denied ingredient read', { exact: false })).toHaveCount(0);
+    if (route === '/') {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await alert.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath('inventory-read-failure-mobile.png') });
+    }
+    await page.evaluate(() => window.restoreInventoryRead());
+    await page.getByRole('button', { name: '재고 다시 불러오기', exact: true }).click();
+    await expect(alert).toHaveCount(0);
+    expect(await readBrowserIngredients(page, 'guest')).toEqual([ingredient]);
+    if (route === '/ingredients') {
+      await expect(page.getByRole('heading', { name: '계란', exact: true })).toBeVisible();
+    } else {
+      await expect(page.getByRole('heading', { name: route === '/' ? '먼저 쓸 재료와 오늘 메뉴를 확인하세요' : '보유 재료로 만들 메뉴를 확인하세요', exact: true })).toBeVisible();
+    }
+    expect(errors).toEqual([]);
+  });
+}
+
+test('inventory delete failure restores the row, explains failure and allows retry', async ({ page }) => {
+  const ingredient = createIngredient('delete-failure-milk', { name: '우유', expiryDate: '' });
+  await seedBrowserState(page, { ingredients: [ingredient] });
+  await gotoAndWait(page, '/ingredients');
+  await expect(page.getByRole('heading', { name: '우유', exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    const original = IDBObjectStore.prototype.delete;
+    IDBObjectStore.prototype.delete = function (key) {
+      if (this.name === 'ingredients' && key === 'delete-failure-milk') {
+        throw new DOMException('Fixture denied delete', 'SecurityError');
+      }
+      return original.call(this, key);
+    };
+    window.restoreInventoryDelete = () => { IDBObjectStore.prototype.delete = original; };
+  });
+  await page.getByRole('button', { name: '삭제', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: /삭제하지 못/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '우유', exact: true })).toBeVisible();
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([ingredient]);
+  await page.evaluate(() => window.restoreInventoryDelete());
+  await page.getByRole('button', { name: '삭제', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '우유', exact: true })).toHaveCount(0);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([]);
+});
+
+test('inventory edit read failure locks the form until an explicit successful retry', async ({ page }) => {
+  const ingredient = createIngredient('edit-failure-milk', { name: '우유', quantity: '1통', expiryDate: '' });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await seedBrowserState(page, { ingredients: [ingredient] });
+  await gotoAndWait(page, '/ingredients');
+  await expect(page.getByRole('heading', { name: '우유', exact: true })).toBeVisible();
+  await page.addInitScript(() => {
+    const originals = { get: IDBObjectStore.prototype.get, getAll: IDBObjectStore.prototype.getAll };
+    for (const method of ['get', 'getAll']) {
+      IDBObjectStore.prototype[method] = function (...args) {
+        if (this.name === 'ingredients' && this.transaction.db.name === 'fridgemate-db__guest') {
+          throw new DOMException('Fixture denied edit read', 'SecurityError');
+        }
+        return originals[method].apply(this, args);
+      };
+    }
+    window.restoreEditRead = () => Object.assign(IDBObjectStore.prototype, originals);
+  });
+  await gotoAndWait(page, '/ingredients/edit-failure-milk/edit');
+  await expect(page.getByRole('alert').filter({ hasText: /재료 정보를 불러오지 못/ })).toBeVisible();
+  await expect(page.getByLabel('이름')).toBeDisabled();
+  await expect(page.getByRole('button', { name: '수정 저장', exact: true })).toBeDisabled();
+  await page.evaluate(() => window.restoreEditRead());
+  await page.getByRole('button', { name: '재료 다시 불러오기', exact: true }).click();
+  await expect(page.getByLabel('이름')).toHaveValue('우유');
+  await expect(page.getByLabel('이름')).toBeEnabled();
+  await page.getByLabel('수량').fill('2통');
+  await page.getByRole('button', { name: '수정 저장', exact: true }).click();
+  await expect(page).toHaveURL(/\/ingredients$/);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([expect.objectContaining({ id: ingredient.id, name: '우유', quantity: '2통' })]);
+  expect(errors).toEqual([]);
+});
+
 test('local-only mode keeps CRUD data in IndexedDB across reloads', async ({ page }) => {
   await seedBrowserState(page);
   await gotoAndWait(page, '/ingredients/new');
