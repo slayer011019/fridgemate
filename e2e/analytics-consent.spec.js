@@ -49,3 +49,71 @@ test('analytics stays blocked until consent and stops after withdrawal', async (
   await expect.poll(() => page.evaluate(() => window.dataLayer.length)).toBe(0);
   expect(googleAnalyticsRequests).toBe(1);
 });
+
+test('a blocked consent read does not break the app or enable analytics', async ({ page }) => {
+  let googleAnalyticsRequests = 0;
+  await page.route('https://www.googletagmanager.com/**', async (route) => {
+    googleAnalyticsRequests += 1;
+    await route.abort();
+  });
+  await seedBrowserState(page, { analyticsConsent: null });
+  await page.addInitScript(() => {
+    const getItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'fridgemate-analytics-consent') {
+        throw new DOMException('synthetic blocked storage', 'SecurityError');
+      }
+      return getItem.call(this, key);
+    };
+  });
+
+  await gotoAndWait(page, '/');
+
+  await expect(page.getByRole('heading', { name: '남은 재료로 오늘 메뉴를 골라보세요' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /서비스 개선을 위한 이용 분석/u })).toBeVisible();
+  await page.getByRole('button', { name: '분석 허용' }).click();
+  await expect(page.getByRole('alert')).toContainText('현재 탭에서는 분석을 중지');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('link', { name: '서비스 소개' }).click();
+  await expect(page).toHaveURL(/\/about$/u);
+  expect(await page.evaluate(() => ({
+    events: window.__FRIDGEMATE_ANALYTICS_EVENTS__?.length || 0,
+    scripts: document.querySelectorAll('script[data-fridgemate-ga]').length
+  }))).toEqual({ events: 0, scripts: 0 });
+  expect(googleAnalyticsRequests).toBe(0);
+});
+
+test('failed withdrawal stops analytics in this page without claiming the saved approval was removed', async ({ page }) => {
+  let googleAnalyticsRequests = 0;
+  await page.route('https://www.googletagmanager.com/**', async (route) => {
+    googleAnalyticsRequests += 1;
+    await route.abort();
+  });
+  await seedBrowserState(page, { analyticsConsent: 'granted' });
+  await gotoAndWait(page, '/');
+  await expect.poll(() => googleAnalyticsRequests).toBe(1);
+  await page.getByRole('button', { name: '분석 설정' }).click();
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'fridgemate-analytics-consent') {
+        throw new DOMException('synthetic blocked storage', 'SecurityError');
+      }
+      return setItem.call(this, key, value);
+    };
+  });
+
+  await page.getByRole('button', { name: '필수 기능만' }).click();
+  await expect(page.getByRole('alert')).toContainText('다른 탭이나 다시 연 페이지');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(await page.evaluate(() => window.localStorage.getItem('fridgemate-analytics-consent'))).toBe('granted');
+  await page.getByRole('link', { name: '서비스 소개' }).click();
+  await expect(page).toHaveURL(/\/about$/u);
+  expect(await page.evaluate(() => ({
+    events: window.__FRIDGEMATE_ANALYTICS_EVENTS__?.length || 0,
+    scripts: document.querySelectorAll('script[data-fridgemate-ga]').length,
+    dataLayer: window.dataLayer,
+    gtagType: typeof window.gtag
+  }))).toEqual({ events: 0, scripts: 0, dataLayer: [], gtagType: 'undefined' });
+  expect(googleAnalyticsRequests).toBe(1);
+});

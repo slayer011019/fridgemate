@@ -48,6 +48,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Fixed
 
+- Propagated shopping-save failures to preserve drafts and show truthful status; isolated corrupt/unavailable OCR correction storage from inventory saves without overwriting damaged source data; and blocked new analytics in the current document when consent persistence or cleanup fails. Added test-first utility, real-storage UI and browser regressions while preserving normal flows. See `docs/PRD_V3_STABILITY_2026-09-28.md` for evidence and limits; this does not enable pilot collection or change meal allocation, schema, dependencies or deployment.
 - Refreshed inventory after an acknowledged purchase receipt even when a focus event invalidates the receipt form, while preserving account/reset/unmount stale-response guards. Added real-storage regression coverage for the committed-stock/stale-parent discrepancy.
 - Separated shopping row IDs from complete plan-version/slot references so long future schedules no longer exceed the identifier cap. Verified 104 weeks/728 arithmetic-fixture dinners, immutable pre-edit purchase evidence, nested input capture, malformed-reference rejection and unchanged legacy purchase retries without a database migration or new dependency.
 - Stabilized menu-decision service tests with a controlled clock and sync-window boundary coverage; production date validation is unchanged.

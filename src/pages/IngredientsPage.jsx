@@ -86,13 +86,8 @@ function IngredientsPage() {
   );
 
   const handleSaveShoppingListDetails = useCallback(
-    async (ingredient) => {
-      try {
-        await updateIngredient(ingredient);
-      } catch {
-        // Error state is surfaced from the hook.
-      }
-    },
+    // The panel needs the rejection to retain its draft and show the failed save.
+    (ingredient) => updateIngredient(ingredient),
     [updateIngredient]
   );
 

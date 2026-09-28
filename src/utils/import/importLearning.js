@@ -20,34 +20,54 @@ function getBrowserStorage() {
 }
 
 function readCorrectionMap(scope = 'guest') {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return {};
-  }
-
   try {
-    const rawValue =
-      storage.getItem(storageKey(scope)) ||
-      (scope === 'guest' ? storage.getItem(LEGACY_IMPORT_CORRECTIONS_STORAGE_KEY) : null);
-    return rawValue ? JSON.parse(rawValue) : {};
+    const storage = getBrowserStorage();
+    if (!storage) return { correctionMap: {}, canWrite: false };
+
+    const currentValue = storage.getItem(storageKey(scope));
+    const rawValue = currentValue === null && scope === 'guest'
+      ? storage.getItem(LEGACY_IMPORT_CORRECTIONS_STORAGE_KEY)
+      : currentValue;
+    const parsed = rawValue === null ? {} : JSON.parse(rawValue);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { correctionMap: {}, canWrite: false };
+    }
+
+    const entries = Object.entries(parsed);
+    const validEntries = entries.filter(([, row]) =>
+      row && typeof row === 'object' && !Array.isArray(row) &&
+      ['name', 'category', 'storageType', 'updatedAt'].every((field) =>
+        !Object.hasOwn(row, field) || typeof row[field] === 'string'
+      )
+    );
+    // Read safe rows, but never replace a damaged source with a partial recovery.
+    return {
+      correctionMap: Object.fromEntries(validEntries),
+      canWrite: validEntries.length === entries.length
+    };
   } catch {
-    return {};
+    return { correctionMap: {}, canWrite: false };
   }
 }
 
 function writeCorrectionMap(correctionMap, scope = 'guest') {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
+  try {
+    const storage = getBrowserStorage();
+    if (!storage) return false;
+    storage.setItem(storageKey(scope), JSON.stringify(correctionMap));
+    return true;
+  } catch {
+    return false;
   }
-
-  storage.setItem(storageKey(scope), JSON.stringify(correctionMap));
 }
 
 export function clearImportCorrections(scope = 'guest') {
-  const storage = getBrowserStorage();
+  let storage;
+  try {
+    storage = getBrowserStorage();
+  } catch {
+    return false;
+  }
 
   if (!storage) {
     return true;
@@ -82,11 +102,11 @@ export function getImportCorrectionKey(item) {
 }
 
 export function applyImportCorrections(items, scope = 'guest') {
-  const correctionMap = readCorrectionMap(scope);
+  const { correctionMap } = readCorrectionMap(scope);
 
   return items.map((item) => {
     const correctionKey = getImportCorrectionKey(item);
-    const correction = correctionMap[correctionKey];
+    const correction = Object.hasOwn(correctionMap, correctionKey) ? correctionMap[correctionKey] : null;
 
     if (!correction) {
       return item;
@@ -105,8 +125,9 @@ export function applyImportCorrections(items, scope = 'guest') {
 }
 
 export function saveImportCorrections(items, scope = 'guest') {
-  const correctionMap = readCorrectionMap(scope);
-  const nextMap = { ...correctionMap };
+  const { correctionMap, canWrite } = readCorrectionMap(scope);
+  if (!canWrite) return false;
+  const nextMap = new Map(Object.entries(correctionMap));
 
   items.forEach((item) => {
     const correctionKey = getImportCorrectionKey(item);
@@ -115,17 +136,17 @@ export function saveImportCorrections(items, scope = 'guest') {
       return;
     }
 
-    nextMap[correctionKey] = {
+    nextMap.set(correctionKey, {
       name: item.name,
       category: item.category,
       storageType: item.storageType,
       updatedAt: new Date().toISOString()
-    };
+    });
   });
 
-  const trimmedEntries = Object.entries(nextMap)
+  const trimmedEntries = [...nextMap.entries()]
     .sort((left, right) => String(right[1].updatedAt).localeCompare(String(left[1].updatedAt)))
     .slice(0, MAX_CORRECTION_COUNT);
 
-  writeCorrectionMap(Object.fromEntries(trimmedEntries), scope);
+  return writeCorrectionMap(Object.fromEntries(trimmedEntries), scope);
 }

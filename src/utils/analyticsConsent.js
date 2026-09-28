@@ -6,11 +6,19 @@ export const ANALYTICS_SESSION_ID_STORAGE_KEY = 'fridgemate-analytics-session-id
 export const ANALYTICS_SESSION_STARTED_STORAGE_KEY = 'fridgemate-analytics-session-started';
 export const ANALYTICS_EVENT_STORE_KEY = '__FRIDGEMATE_ANALYTICS_EVENTS__';
 
-export function getAnalyticsConsent() {
-  if (typeof window === 'undefined') return null;
+// A failed choice must not revive an older persisted approval in this document.
+// Only a later explicit, successfully saved choice clears this temporary block.
+let blockedForDocument = false;
 
-  const value = window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY);
-  return value === 'granted' || value === 'denied' ? value : null;
+export function getAnalyticsConsent() {
+  if (typeof window === 'undefined' || blockedForDocument) return null;
+
+  try {
+    const value = window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY);
+    return value === 'granted' || value === 'denied' ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 export function setAnalyticsConsent(value) {
@@ -19,17 +27,36 @@ export function setAnalyticsConsent(value) {
     throw new Error('Analytics consent must be granted or denied.');
   }
 
-  window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, value);
+  blockedForDocument = true;
+  let saved = false;
+  try {
+    window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, value);
+    saved = window.localStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY) === value;
+  } catch {
+    // Keep analytics disabled without exposing browser/storage error details.
+  }
 
   if (value === 'denied') {
-    window.localStorage.removeItem(ANALYTICS_ID_STORAGE_KEY);
-    window.sessionStorage.removeItem(ANALYTICS_SESSION_ID_STORAGE_KEY);
-    window.sessionStorage.removeItem(ANALYTICS_SESSION_STARTED_STORAGE_KEY);
+    for (const [storageType, key] of [
+      ['localStorage', ANALYTICS_ID_STORAGE_KEY],
+      ['sessionStorage', ANALYTICS_SESSION_ID_STORAGE_KEY],
+      ['sessionStorage', ANALYTICS_SESSION_STARTED_STORAGE_KEY]
+    ]) {
+      try {
+        window[storageType].removeItem(key);
+      } catch {
+        saved = false;
+      }
+    }
+  }
+  if (value === 'denied' || !saved) {
     window[ANALYTICS_EVENT_STORE_KEY] = [];
   }
 
-  window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_UPDATED_EVENT, { detail: { value } }));
-  return value;
+  blockedForDocument = !saved;
+  const choice = saved ? value : null;
+  window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_UPDATED_EVENT, { detail: { value: choice } }));
+  return choice;
 }
 
 export function openAnalyticsConsentSettings() {

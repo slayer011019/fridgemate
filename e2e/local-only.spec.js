@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { gotoAndWait, seedBrowserState } from './support/testApp';
+import { createIngredient, gotoAndWait, readBrowserIngredients, seedBrowserState } from './support/testApp';
 
 test('local-only mode keeps CRUD data in IndexedDB across reloads', async ({ page }) => {
   await seedBrowserState(page);
@@ -20,6 +20,55 @@ test('local-only mode keeps CRUD data in IndexedDB across reloads', async ({ pag
 
   await page.getByRole('button', { name: '삭제' }).click();
   await expect(page.getByText('우유')).toHaveCount(0);
+});
+
+test('shopping edits survive a local write failure and persist after automatic retry', async ({ page }) => {
+  const ingredient = createIngredient('shopping-milk', {
+    clientId: 'shopping-milk', name: '우유', category: '유제품', quantity: '1통', memo: '기존 메모', consumed: true
+  });
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await seedBrowserState(page, { ingredients: [ingredient] });
+  await gotoAndWait(page, '/ingredients');
+  const quantity = page.getByRole('textbox', { name: '다음 구매 수량' });
+  const memo = page.getByRole('textbox', { name: '장보기 메모', exact: true });
+  await expect(quantity).toHaveValue('1통');
+
+  // Abort only this fixture's ingredient write; reads, seed data and other stores stay real.
+  await page.evaluate(() => {
+    const original = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (value, ...args) {
+      if (this.name === 'ingredients' && this.transaction.db.name === 'fridgemate-db__guest'
+        && value.id === 'shopping-milk') {
+        throw new DOMException('Fixture storage is full', 'QuotaExceededError');
+      }
+      return original.call(this, value, ...args);
+    };
+    window.__FRIDGEMATE_TEST__.restoreShoppingWrite = () => {
+      IDBObjectStore.prototype.put = original;
+      delete window.__FRIDGEMATE_TEST__.restoreShoppingWrite;
+    };
+  });
+
+  await quantity.fill('2통');
+  await memo.fill('작은 팩으로 구매');
+  await expect(page.getByText('저장 실패', { exact: true })).toBeVisible();
+  await expect(page.getByText('저장됨', { exact: true })).toHaveCount(0);
+  await expect(quantity).toHaveValue('2통');
+  await expect(memo).toHaveValue('작은 팩으로 구매');
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([ingredient]);
+
+  await page.evaluate(() => window.__FRIDGEMATE_TEST__.restoreShoppingWrite());
+  await expect(page.getByText('저장됨', { exact: true })).toBeVisible();
+  await expect(page.getByText('저장 실패', { exact: true })).toHaveCount(0);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([
+    { ...ingredient, quantity: '2통', memo: '작은 팩으로 구매' }
+  ]);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(quantity).toHaveValue('2통');
+  await expect(memo).toHaveValue('작은 팩으로 구매');
+  expect(pageErrors).toEqual([]);
 });
 
 test('guest menu selection survives a reload without a server account', async ({ page }) => {

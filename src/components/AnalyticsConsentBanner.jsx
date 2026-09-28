@@ -20,11 +20,14 @@ function getConsentSnapshot() {
 function AnalyticsConsentBanner() {
   const choice = useSyncExternalStore(subscribeToConsent, getConsentSnapshot, () => 'loading');
   const [settingsRequested, setSettingsRequested] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const isOpen = choice === 'unset' || settingsRequested;
 
   useEffect(() => {
     if (choice === 'granted') {
       initializeGoogleAnalytics();
+    } else {
+      disableGoogleAnalytics();
     }
   }, [choice]);
 
@@ -35,7 +38,15 @@ function AnalyticsConsentBanner() {
   }, []);
 
   const saveChoice = (value) => {
-    setAnalyticsConsent(value);
+    const savedChoice = setAnalyticsConsent(value);
+    if (savedChoice !== value) {
+      setSaveError(true);
+      setSettingsRequested(true);
+      disableGoogleAnalytics();
+      return;
+    }
+
+    setSaveError(false);
     setSettingsRequested(false);
 
     if (value === 'granted') {
@@ -71,6 +82,13 @@ function AnalyticsConsentBanner() {
           {choice === 'granted' || choice === 'denied' ? (
             <p className="mt-2 text-xs font-medium text-slate-500">
               현재 설정: {choice === 'granted' ? '이용 분석 허용' : '필수 기능만 사용'}
+            </p>
+          ) : null}
+          {saveError ? (
+            <p className="mt-2 text-sm text-red-700" role="alert">
+              선택을 저장하거나 이전 분석 정보를 정리하지 못했습니다. 현재 탭에서는 분석을 중지했습니다.
+              다른 탭이나 다시 연 페이지에는 이전 설정이 남아 있을 수 있으니 브라우저 저장소 설정을
+              확인한 뒤 다시 선택해 주세요.
             </p>
           ) : null}
         </div>

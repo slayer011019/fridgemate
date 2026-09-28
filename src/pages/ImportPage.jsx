@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { saveImportCorrectionsRemote } from '../api/importCorrectionsApi';
 import PageHeader from '../components/PageHeader';
@@ -50,20 +50,20 @@ function ImportPage() {
   const [status, setStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
-  const [items, setItems] = useState([]);
+  const [reviewItems, setItems] = useState([]);
   const [importMessage, setImportMessage] = useState('');
+  const [importSaved, setImportSaved] = useState(false);
+  const [reviewSource, setReviewSource] = useState(null);
 
   const rawText = ocrResult?.text || '';
   const parseResult = useMemo(() => parseImportText(ocrResult), [ocrResult]);
 
-  useEffect(() => {
-    setItems(
-      annotateDuplicateImportItems(
-        applyImportCorrections(parseResult.candidates, storageScope),
-        ingredients
-      )
-    );
-  }, [ingredients, parseResult, storageScope]);
+  if (reviewSource?.parseResult !== parseResult || reviewSource?.storageScope !== storageScope) {
+    setReviewSource({ parseResult, storageScope });
+    setItems(annotateDuplicateImportItems(applyImportCorrections(parseResult.candidates, storageScope), ingredients));
+  }
+  // Inventory updates (including a failed save rollback) must not reset manual review edits.
+  const items = useMemo(() => annotateDuplicateImportItems(reviewItems, ingredients), [reviewItems, ingredients]);
 
   const handleFileChange = async (event) => {
     const fileInput = event.currentTarget;
@@ -75,6 +75,7 @@ function ImportPage() {
     setError('');
     setStatus('idle');
     setImportMessage('');
+    setImportSaved(false);
 
     if (!nextFile) return;
 
@@ -110,6 +111,7 @@ function ImportPage() {
       });
 
       setOcrResult(result);
+      setImportSaved(false);
       setStatus('success');
       trackEvent('ocr_parse_completed', {
         raw_text_length: result?.text?.length || 0,
@@ -148,6 +150,7 @@ function ImportPage() {
   };
 
   const handleImport = async () => {
+    if (importSaved) return;
     const selectedRawItems = items.filter((item) => item.selected && item.name.trim());
     const selectedItems = toImportableItems(items);
 
@@ -163,7 +166,7 @@ function ImportPage() {
         edited_item_count: selectedRawItems.filter((item) => item.name !== item.originalName || item.quantity !== item.originalQuantity).length,
         deleted_item_count: items.length - selectedItems.length
       });
-      saveImportCorrections(selectedRawItems, storageScope);
+      const learningSaved = saveImportCorrections(selectedRawItems, storageScope);
       if (isBackendEnabled() && isAuthenticated) {
         saveImportCorrectionsRemote(selectedRawItems).catch((correctionError) => {
           console.warn('[ImportPage] Failed to save remote import corrections.', correctionError);
@@ -201,8 +204,12 @@ function ImportPage() {
       trackEvent('activation_completed', {
         activation_path: 'ocr_first_import'
       });
-      setImportMessage(`${selectedItems.length}\uAC1C \uD56D\uBAA9\uC744 \uAC00\uC838\uC654\uC5B4\uC694.`);
-      navigate('/ingredients');
+      setImportSaved(true);
+      if (learningSaved) {
+        navigate('/ingredients');
+      } else {
+        setImportMessage(`${selectedItems.length}개 재료를 냉장고에 저장했어요. 다음번 보정 학습은 저장하지 못했어요. 냉장고에서 저장한 재료를 확인할 수 있어요.`);
+      }
     } catch (importError) {
       setImportMessage(importError.message || IMPORT_PAGE_COPY.importFailed);
     }
@@ -270,7 +277,7 @@ function ImportPage() {
           <span className="badge bg-slate-100 text-slate-700">{`\uD15C\uD50C\uB9BF ${parseResult.template?.id || 'unknown'}`}</span>
           <span className="badge bg-white text-slate-500">{`source ${parseResult.sourceType || 'unknown'} ${Math.round((parseResult.sourceConfidence || 0) * 100)}%`}</span>
           {importMessage ? (
-            <span className="rounded-2xl border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm font-medium text-brand-700 xl:justify-self-end">
+            <span role="status" className="rounded-2xl border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm font-medium text-brand-700 xl:justify-self-end">
               {importMessage}
             </span>
           ) : null}
@@ -289,7 +296,7 @@ function ImportPage() {
         </section>
       ) : null}
 
-      {parseResult.candidates.length ? (
+      {parseResult.candidates.length && !importSaved ? (
         <ParsedItemEditor
           items={items}
           onItemChange={handleItemChange}
