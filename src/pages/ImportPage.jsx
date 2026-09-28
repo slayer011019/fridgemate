@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { saveImportCorrectionsRemote } from '../api/importCorrectionsApi';
 import PageHeader from '../components/PageHeader';
+import ImportCorrectionRecoveryPanel from '../components/import/ImportCorrectionRecoveryPanel';
 import OcrResultPanel from '../components/import/OcrResultPanel';
 import ParsedItemEditor from '../components/import/ParsedItemEditor';
 import UploadBox from '../components/import/UploadBox';
@@ -353,6 +354,12 @@ function ImportSession({ isAuthenticated, storageScope }) {
         fileDisabled={busy}
         onChange={handleFileChange}
         onRunOcr={runOcr}
+      />
+      <ImportCorrectionRecoveryPanel
+        key={importSaved ? 'saved' : 'review'}
+        scope={storageScope}
+        disabled={editingDisabled}
+        canReset={() => mounted.current && !saving.current && recognizing.current === null}
       />
 
       {isSaving ? <p aria-live="polite" className="text-sm text-brand-700">재료를 저장하고 있어요. 완료될 때까지 기다려 주세요.</p> : null}

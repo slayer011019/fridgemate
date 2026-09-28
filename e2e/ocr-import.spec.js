@@ -46,6 +46,137 @@ async function writeOtherTabStock(page, ingredient) {
   }), ingredient);
 }
 
+test('OCR correction recovery requires confirmation and preserves reviewed input, stock and the weekly plan', async ({ page }, testInfo) => {
+  await page.clock.setFixedTime(new Date('2026-09-28T03:00:00.000Z'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const old = createIngredient('keep-onion', { name: '양파', memo: '초기화와 무관한 재고' });
+  await seedBrowserState(page, { ingredients: [old], ocrResult: { text: '두부 2팩' } });
+  await gotoAndWait(page, '/meal-plan');
+  await page.getByRole('button', { name: '한 주 식단 만들기', exact: true }).click();
+  await page.getByRole('button', { name: '이 식단 확정', exact: true }).click();
+  await expect(page.getByText('식단을 확정했어요.', { exact: true })).toBeVisible();
+  const before = await readPlanningStores(page);
+  expect(before.plans.length).toBeGreaterThan(0);
+  expect(before.plans[0].confirmed).not.toBeNull();
+  const currentRaw = '{"다른재료":{"name":"보존될 안전 행"},"손상":null}';
+  const legacyRaw = '{"예전재료":{"name":"옛 보정"}}';
+  await page.evaluate(({ currentRaw, legacyRaw }) => {
+    localStorage.setItem('fridgemate-import-corrections:v2:guest', currentRaw);
+    localStorage.setItem('fridgemate-import-corrections', legacyRaw);
+    localStorage.setItem('fridgemate-import-corrections:v2:user:other', '{"다른계정":{"name":"보존"}}');
+  }, { currentRaw, legacyRaw });
+  await gotoAndWait(page, '/import');
+  await reviewReceipt(page);
+  await page.getByRole('textbox', { name: '이름', exact: true }).fill('부침 두부');
+  await page.getByRole('textbox', { name: '수량', exact: true }).fill('2팩');
+  const panel = page.getByRole('region', { name: '이 기기의 보정 기록', exact: true });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: '보정 기록 초기화', exact: true }).click();
+  await expect(panel.getByRole('button', { name: '초기화 확인', exact: true })).toBeVisible();
+  await panel.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(panel.getByRole('button', { name: '보정 기록 초기화', exact: true })).toBeFocused();
+  expect(await page.evaluate(() => [localStorage.getItem('fridgemate-import-corrections:v2:guest'), localStorage.getItem('fridgemate-import-corrections')])).toEqual([currentRaw, legacyRaw]);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([old]);
+  expect(await readPlanningStores(page)).toEqual(before);
+  await panel.getByRole('button', { name: '보정 기록 초기화', exact: true }).click();
+  const bounds = await panel.evaluate(node => ({ left: node.getBoundingClientRect().left, right: node.getBoundingClientRect().right, width: node.clientWidth, contentWidth: node.scrollWidth }));
+  expect(bounds.left).toBeGreaterThanOrEqual(0);
+  expect(bounds.right).toBeLessThanOrEqual(390);
+  expect(bounds.contentWidth).toBeLessThanOrEqual(bounds.width + 1);
+  await page.screenshot({ path: testInfo.outputPath('correction-confirm-mobile.png'), fullPage: true });
+  await panel.getByRole('button', { name: '초기화 확인', exact: true }).click();
+  await expect(panel.getByText('이 기기의 보정 기록을 초기화했어요.', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => [localStorage.getItem('fridgemate-import-corrections:v2:guest'), localStorage.getItem('fridgemate-import-corrections')])).toEqual([null, null]);
+  expect(await page.evaluate(() => localStorage.getItem('fridgemate-import-corrections:v2:user:other'))).toBe('{"다른계정":{"name":"보존"}}');
+  await expect(page.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('부침 두부');
+  await expect(page.getByRole('textbox', { name: '수량', exact: true })).toHaveValue('2팩');
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([old]);
+  expect(await readPlanningStores(page)).toEqual(before);
+  await page.getByRole('button', { name: '선택 항목 저장', exact: true }).click();
+  await expect(page).toHaveURL(/\/ingredients$/);
+  const saved = await readBrowserIngredients(page, 'guest');
+  expect(saved).toHaveLength(2);
+  expect(saved.find(row => row.id === old.id)).toEqual(old);
+  expect(saved.find(row => row.name === '부침 두부')).toEqual(expect.objectContaining({ quantity: '2팩' }));
+  expect((await readPlanningStores(page)).plans).toEqual(before.plans);
+  await gotoAndWait(page, '/import');
+  await page.getByLabel('사진 고르기').setInputFiles({ name: 'next-receipt.png', mimeType: 'image/png', buffer: ONE_PIXEL_PNG });
+  await page.getByRole('button', { name: '사진에서 재료 찾기', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('부침 두부');
+  expect(await readBrowserIngredients(page, 'guest')).toEqual(saved);
+  expect(errors).toEqual([]);
+});
+
+test('OCR correction recovery discards confirmation when another tab changes the records', async ({ page, context }) => {
+  await seedBrowserState(page, { ocrResult: { text: '두부 2팩' } });
+  await gotoAndWait(page, '/import');
+  await page.evaluate(() => {
+    localStorage.setItem('fridgemate-import-corrections:v2:guest', 'null');
+    localStorage.setItem('fridgemate-import-corrections', '{"옛기록":{"name":"보존"}}');
+  });
+  await page.reload();
+  await reviewReceipt(page);
+  await page.getByRole('textbox', { name: '수량', exact: true }).fill('2팩');
+  const panel = page.getByRole('region', { name: '이 기기의 보정 기록', exact: true });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: '보정 기록 초기화', exact: true }).click();
+  await expect(panel.getByRole('button', { name: '초기화 확인', exact: true })).toBeVisible();
+  const other = await context.newPage();
+  await other.goto('http://127.0.0.1:4173/import');
+  const newRaw = '{"두부":{"name":"다른 탭의 새 보정"}}';
+  await other.evaluate(value => localStorage.setItem('fridgemate-import-corrections:v2:guest', value), newRaw);
+  await expect(page.getByRole('button', { name: '초기화 확인', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '보정 기록 초기화', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('fridgemate-import-corrections:v2:guest'))).toBe(newRaw);
+  expect(await page.evaluate(() => localStorage.getItem('fridgemate-import-corrections'))).toBe('{"옛기록":{"name":"보존"}}');
+  await expect(page.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('두부');
+  await expect(page.getByRole('textbox', { name: '수량', exact: true })).toHaveValue('2팩');
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([]);
+  await other.close();
+});
+
+test('OCR correction recovery keeps the current map when legacy deletion fails and retries only after confirmation', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const old = createIngredient('unchanged-stock');
+  await seedBrowserState(page, { ingredients: [old] });
+  await gotoAndWait(page, '/import');
+  await page.evaluate(() => {
+    localStorage.setItem('fridgemate-import-corrections:v2:guest', 'null');
+    localStorage.setItem('fridgemate-import-corrections', '{"두부":{"name":"되살아나면 안 되는 기록"}}');
+  });
+  await page.reload();
+  const before = await readPlanningStores(page);
+  await page.evaluate(() => {
+    const original = Storage.prototype.removeItem;
+    window.__restoreCorrectionRemove = () => { Storage.prototype.removeItem = original; };
+    Storage.prototype.removeItem = function (key) {
+      if (key === 'fridgemate-import-corrections') throw new DOMException('private deletion fixture', 'SecurityError');
+      return original.call(this, key);
+    };
+  });
+  const panel = page.getByRole('region', { name: '이 기기의 보정 기록', exact: true });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: '보정 기록 초기화', exact: true }).click();
+  await panel.getByRole('button', { name: '초기화 확인', exact: true }).click();
+  await expect(panel).toContainText(/초기화하지 못|완료하지 못/);
+  await expect(panel.getByText('이 기기의 보정 기록을 초기화했어요.', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('fridgemate-import-corrections:v2:guest'))).toBe('null');
+  expect(await page.evaluate(() => localStorage.getItem('fridgemate-import-corrections'))).toBe('{"두부":{"name":"되살아나면 안 되는 기록"}}');
+  await expect(page.getByText('private deletion fixture')).toHaveCount(0);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([old]);
+  expect(await readPlanningStores(page)).toEqual(before);
+  await page.screenshot({ path: testInfo.outputPath('correction-delete-failure-mobile.png'), fullPage: true });
+  await page.evaluate(() => window.__restoreCorrectionRemove());
+  await panel.getByRole('button', { name: '보정 상태 다시 확인', exact: true }).click();
+  await panel.getByRole('button', { name: '보정 기록 초기화', exact: true }).click();
+  await panel.getByRole('button', { name: '초기화 확인', exact: true }).click();
+  await expect(panel.getByText('이 기기의 보정 기록을 초기화했어요.', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => [localStorage.getItem('fridgemate-import-corrections:v2:guest'), localStorage.getItem('fridgemate-import-corrections')])).toEqual([null, null]);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([old]);
+  expect(await readPlanningStores(page)).toEqual(before);
+});
+
 test('OCR replacement rolls back both stores on abort and retries without losing the reviewed input', async ({ page }, testInfo) => {
   await page.clock.setFixedTime(new Date('2026-09-28T03:00:00.000Z'));
   await page.setViewportSize({ width: 390, height: 844 });
