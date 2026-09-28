@@ -63,7 +63,7 @@ function AccountPage() {
       />
 
       <section className="card space-y-4">
-        {error ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</div> : null}
+        {error ? <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</div> : null}
 
         <div className="soft-panel">
           <p className="kicker">{'\uB85C\uADF8\uC778 \uC815\uBCF4'}</p>
@@ -129,14 +129,13 @@ function AccountPage() {
           </div>
         </div>
 
-        {syncStatus === 'synced' ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-            로컬 변경사항을 서버와 병합했습니다.
-          </div>
-        ) : null}
+        <div role="status" aria-label="재료 동기화 상태" aria-live="polite" aria-atomic="true"
+          className={syncStatus === 'synced' || syncStatus === 'syncing' ? 'rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900' : 'sr-only'}>
+          {syncStatus === 'synced' ? '로컬 변경사항을 서버와 병합했습니다.' : syncStatus === 'syncing' ? '재료 동기화 중이에요.' : ''}
+        </div>
 
         {syncError ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{syncError}</div>
+          <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{syncError}</div>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">

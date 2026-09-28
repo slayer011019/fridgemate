@@ -90,19 +90,19 @@ describe('OCR review and atomic import boundaries', () => {
     await database.saveIngredients([stock('original', '두부')], SCOPE);
     render(<App />);
     await review();
-    fireEvent.click(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ }));
     fireEvent.change(screen.getByRole('textbox', { name: '수량' }), { target: { value: '3모' } });
     const [existing] = await database.getAllIngredients(SCOPE);
     await database.saveIngredient({ ...existing, memo: '다른 화면에서 변경한 메모' }, SCOPE);
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(/바뀌었습니다/);
+    expect(await screen.findByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/바뀌었습니다/);
     expect(screen.getByRole('textbox', { name: '수량' })).toHaveValue('3모');
     fireEvent.click(screen.getByRole('button', { name: '재고 다시 확인' }));
-    await waitFor(() => expect(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' })).not.toBeChecked());
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ })).not.toBeChecked());
     expect(screen.getByRole('textbox', { name: '수량' })).toHaveValue('3모');
-    expect(screen.getByRole('checkbox', { name: '이 항목 가져오기' })).toBeChecked();
-    expect(screen.getByRole('status')).toHaveTextContent(/교체.*다시/);
-    fireEvent.click(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' }));
+    expect(screen.getByRole('checkbox', { name: /^이 항목 가져오기:/ })).toBeChecked();
+    expect(screen.getByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/교체.*다시/);
+    fireEvent.click(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ }));
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
     await screen.findByRole('heading', { name: '저장된 냉장고' });
     expect(await database.getAllIngredients(SCOPE)).toEqual([expect.objectContaining({ name: '두부', quantity: '3모' })]);
@@ -124,16 +124,16 @@ describe('OCR review and atomic import boundaries', () => {
     await database.saveIngredients([stock('original', '두부')], SCOPE);
     render(<App />);
     await review();
-    fireEvent.click(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ }));
     fireEvent.change(screen.getByRole('textbox', { name: '수량' }), { target: { value: '3모' } });
     vi.spyOn(database, 'getAllIngredients').mockRejectedValueOnce(new Error('재고 다시 읽기 실패'));
     fireEvent.click(screen.getByRole('button', { name: '재고 다시 확인' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/다시 확인하지 못/));
+    await waitFor(() => expect(screen.getByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/다시 확인하지 못/));
     expect(screen.getByRole('textbox', { name: '수량' })).toHaveValue('3모');
-    expect(screen.getByRole('checkbox', { name: '이 항목 가져오기' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /^이 항목 가져오기:/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: '재고 다시 확인' }));
-    await waitFor(() => expect(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' })).not.toBeChecked());
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ })).not.toBeChecked());
     expect(screen.getByRole('textbox', { name: '수량' })).toHaveValue('3모');
   });
 
@@ -152,7 +152,7 @@ describe('OCR review and atomic import boundaries', () => {
     });
     render(<App />);
     await review();
-    if (replacement) fireEvent.click(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' }));
+    if (replacement) fireEvent.click(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ }));
     const button = screen.getByRole('button', { name: '선택 항목 저장' });
     act(() => { button.click(); button.click(); });
     expect(call).toHaveBeenCalledTimes(1);
@@ -167,7 +167,7 @@ describe('OCR review and atomic import boundaries', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '재고 다시 확인' })).toBeEnabled());
     expect(screen.getByRole('textbox', { name: '이름' })).toHaveValue('두부');
     expect(screen.getByRole('textbox', { name: '이름' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: '이 항목 가져오기' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /^이 항목 가져오기:/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: '사진에서 재료 찾기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '선택 항목 저장' })).toBeDisabled();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
@@ -232,7 +232,7 @@ describe('OCR review and atomic import boundaries', () => {
     fireEvent.change(screen.getAllByRole('textbox', { name: '이름' })[0], { target: { value: '변경 금지' } });
     expect(screen.queryByDisplayValue('변경 금지')).not.toBeInTheDocument();
     fireEvent.click(confirm);
-    expect(await screen.findByRole('status')).toHaveTextContent(/바뀌었습니다/);
+    expect(await screen.findByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/바뀌었습니다/);
     expect(call.mock.calls[1][0]).toBe(command);
     expect(await database.getAllIngredients(SCOPE)).toStrictEqual(before);
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
@@ -431,10 +431,10 @@ describe('OCR review and atomic import boundaries', () => {
     await database.saveIngredients([stock('tofu', '두부'), stock('milk', '우유')], SCOPE);
     render(<App />);
     await review();
-    fireEvent.click(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ }));
     fireEvent.change(screen.getByRole('textbox', { name: '이름' }), { target: { value: '우유' } });
-    expect(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' })).not.toBeChecked();
-    expect(screen.getByRole('status')).toHaveTextContent(/이름.*교체.*다시 확인/);
+    expect(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ })).not.toBeChecked();
+    expect(screen.getByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/이름.*교체.*다시 확인/);
     expect(await database.getAllIngredients(SCOPE)).toHaveLength(2);
   });
 
@@ -442,7 +442,7 @@ describe('OCR review and atomic import boundaries', () => {
     await database.saveIngredients([stock('original', '두부')], SCOPE);
     render(<App />);
     await review();
-    fireEvent.click(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ }));
     await database.saveIngredients([stock('new-batch', '두부')], SCOPE);
     fireEvent.click(screen.getByRole('button', { name: '테스트 재고 다시 읽기' }));
     await waitFor(() => expect(screen.getByLabelText('등록 재료 수')).toHaveTextContent('2'));
@@ -459,7 +459,7 @@ describe('OCR review and atomic import boundaries', () => {
     const before = await database.getAllIngredients(SCOPE);
     render(<App />);
     await review();
-    fireEvent.click(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ }));
     for (const method of ['put', 'add']) {
       const write = IDBObjectStore.prototype[method];
       vi.spyOn(IDBObjectStore.prototype, method).mockImplementation(function (value, ...args) {
@@ -470,7 +470,7 @@ describe('OCR review and atomic import boundaries', () => {
       });
     }
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(/저장하지 못|저장 실패/);
+    expect(await screen.findByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/저장하지 못|저장 실패/);
     expect.soft(await database.getAllIngredients(SCOPE)).toStrictEqual(before);
     expect.soft(localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(screen.getByRole('textbox', { name: '이름' })).toHaveValue('두부');

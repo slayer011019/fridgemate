@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ANALYTICS_CONSENT_OPEN_EVENT,
@@ -16,6 +16,9 @@ function AnalyticsConsentBanner() {
   const choice = useSyncExternalStore(subscribeToAnalyticsConsent, getConsentSnapshot, () => 'loading');
   const [settingsRequested, setSettingsRequested] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const panelRef = useRef(null);
+  const triggerRef = useRef(null);
+  const focusOnOpen = useRef(false);
   const isOpen = choice === 'unset' || settingsRequested;
 
   useEffect(() => {
@@ -27,12 +30,25 @@ function AnalyticsConsentBanner() {
   }, [choice]);
 
   useEffect(() => {
-    const handleOpen = () => setSettingsRequested(true);
+    const handleOpen = () => {
+      if (!panelRef.current?.contains(document.activeElement)) triggerRef.current = document.activeElement;
+      focusOnOpen.current = !panelRef.current;
+      setSettingsRequested(true);
+      panelRef.current?.focus();
+    };
     window.addEventListener(ANALYTICS_CONSENT_OPEN_EVENT, handleOpen);
     return () => window.removeEventListener(ANALYTICS_CONSENT_OPEN_EVENT, handleOpen);
   }, []);
 
+  useEffect(() => {
+    if (settingsRequested && focusOnOpen.current) {
+      focusOnOpen.current = false;
+      panelRef.current?.focus();
+    }
+  }, [settingsRequested]);
+
   const saveChoice = (value) => {
+    const restoreFocus = panelRef.current?.contains(document.activeElement);
     const savedChoice = setAnalyticsConsent(value);
     if (savedChoice !== value) {
       setSaveError(true);
@@ -43,6 +59,12 @@ function AnalyticsConsentBanner() {
 
     setSaveError(false);
     setSettingsRequested(false);
+    if (restoreFocus) {
+      const trigger = triggerRef.current;
+      const target = trigger?.isConnected && trigger !== document.body ? trigger : document.getElementById('main-content');
+      target?.focus();
+    }
+    triggerRef.current = null;
 
     if (value === 'granted') {
       initializeGoogleAnalytics();
@@ -55,9 +77,11 @@ function AnalyticsConsentBanner() {
 
   return (
     <section
+      ref={panelRef}
+      tabIndex={-1}
       aria-labelledby="analytics-consent-title"
       aria-describedby="analytics-consent-description"
-      className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-2xl rounded-lg border border-slate-300 bg-white p-4 shadow-2xl sm:bottom-5 sm:p-5"
+      className="mx-auto my-5 w-[calc(100%-1.5rem)] max-w-2xl scroll-mt-72 rounded-lg border border-slate-300 bg-white p-4 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-green-700 sm:p-5"
       role="dialog"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

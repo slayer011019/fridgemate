@@ -29,6 +29,33 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('ShoppingNotesPanel', () => {
+  it.each(['manual', 'purchase', 'remove'])('restores keyboard focus after %s replaces the saved forms', async kind => {
+    vi.spyOn(repository, 'saveManualShoppingItem').mockResolvedValue(MANUAL);
+    vi.spyOn(repository, 'recordPurchaseNote').mockResolvedValue({});
+    vi.spyOn(repository, 'removeManualShoppingItem').mockResolvedValue(undefined);
+    if (kind === 'remove') vi.mocked(repository.getShoppingWorkspace).mockResolvedValue(workspace({ manualItems: [MANUAL] }));
+    render(<ShoppingNotesPanel scope="guest" />);
+    const add = await open();
+    let button;
+    if (kind === 'manual') { addValues(add); button = add.getByRole('button', { name: '수동 항목 추가' }); }
+    else if (kind === 'purchase') button = (await purchaseValues()).getByRole('button', { name: '구매 메모 저장' });
+    else button = screen.getByRole('button', { name: '수동 항목 제거' });
+    button.focus(); fireEvent.click(button);
+    await screen.findByText(kind === 'manual' ? '수동 항목을 저장했어요.' : kind === 'purchase' ? '구매 메모를 저장했어요.' : '수동 항목을 제거했어요.');
+    expect(screen.getByRole('heading', { name: '장보기 메모', exact: true })).toHaveFocus();
+    expect(within(screen.getByRole('form', { name: '수동 장보기 추가' })).getByLabelText('품목 이름')).toHaveValue('');
+  });
+
+  it('does not take focus back from another task after a pending shopping save', async () => {
+    const gate = deferred(); vi.spyOn(repository, 'saveManualShoppingItem').mockReturnValueOnce(gate.promise);
+    render(<><button>다른 작업</button><ShoppingNotesPanel scope="guest" /></>);
+    const form = await open(); addValues(form);
+    const button = form.getByRole('button', { name: '수동 항목 추가' }); button.focus(); fireEvent.click(button);
+    const outside = screen.getByRole('button', { name: '다른 작업' }); outside.focus();
+    await act(async () => gate.resolve(MANUAL));
+    await screen.findByText('수동 항목을 저장했어요.'); expect(outside).toHaveFocus();
+  });
+
   it('displays overdue meals as a read-only hold notice, not a purchase source', async () => {
     vi.mocked(repository.getShoppingWorkspace).mockResolvedValue(workspace({
       overdueMeals: [{ slotId: '2026-09-14:dinner', date: '2026-09-14', title: '보류할 닭고기 한 끼' }],

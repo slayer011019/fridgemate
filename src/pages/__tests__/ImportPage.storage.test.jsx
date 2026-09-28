@@ -76,7 +76,7 @@ describe('OCR auxiliary learning storage failures', () => {
     renderPage();
     await extractImage();
 
-    const choices = screen.getAllByRole('checkbox', { name: '이 항목 가져오기' });
+    const choices = screen.getAllByRole('checkbox', { name: /^이 항목 가져오기:/ });
     expect(choices).toHaveLength(2);
     expect(choices[0]).toBeChecked();
     expect(choices[1]).not.toBeChecked();
@@ -87,7 +87,7 @@ describe('OCR auxiliary learning storage failures', () => {
     expect(choices[1]).not.toBeChecked();
     expect(screen.getByText('전체 2개 중 0개 선택됨')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(/최소 1개 이상 선택/);
+    expect(await screen.findByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/최소 1개 이상 선택/);
     expect(await database.getAllIngredients(SCOPE)).toEqual([]);
   });
 
@@ -99,8 +99,8 @@ describe('OCR auxiliary learning storage failures', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '수량' }), { target: { value: '1모' } });
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/1개.*저장/);
-    expect(screen.getByRole('status')).toHaveTextContent(/보정.*저장하지 못/);
+    expect(await screen.findByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/1개.*저장/);
+    expect(screen.getByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/보정.*저장하지 못/);
     expect(screen.queryByRole('button', { name: '선택 항목 저장' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '냉장고 보기' })).toHaveAttribute('href', '/ingredients');
     expect(await database.getAllIngredients(SCOPE)).toEqual([expect.objectContaining({ name: '손두부', quantity: '1모' })]);
@@ -111,7 +111,7 @@ describe('OCR auxiliary learning storage failures', () => {
     fireEvent.click(screen.getByRole('button', { name: '사진에서 재료 찾기' }));
     await waitFor(() => expect(screen.getByRole('textbox', { name: '이름' })).toHaveValue('양파'));
     expect(screen.getByRole('button', { name: '선택 항목 저장' })).toBeEnabled();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: '가져오기 결과' })).not.toBeInTheDocument();
 
     window.__FRIDGEMATE_TEST__.extractTextFromImage = async () => ({ text: '우유 1L', lineItems: [] });
     await extractImage('next-receipt.png');
@@ -159,7 +159,7 @@ describe('OCR auxiliary learning storage failures', () => {
     expect(screen.getByRole('button', { name: '선택 항목 저장' })).toBeEnabled();
     expect(await database.getAllIngredients(SCOPE)).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/1개.*저장/));
+    await waitFor(() => expect(screen.getByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/1개.*저장/));
     expect(await database.getAllIngredients(SCOPE)).toEqual([expect.objectContaining({ name: '손두부', quantity: '3모' })]);
   });
 });

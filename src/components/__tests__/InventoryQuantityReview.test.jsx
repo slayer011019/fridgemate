@@ -52,6 +52,32 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('InventoryQuantityReview', () => {
+  it.each(['save', 'revoke'])('restores keyboard focus after a successful %s remounts its quantity form', async action => {
+    if (action === 'revoke') await confirmRaw();
+    render(<InventoryQuantityReview scope="guest" />);
+    const form = await openForm();
+    if (action === 'save') enterQuantity(form);
+    const button = form.getByRole('button', { name: action === 'save' ? '확인한 수량 저장' : '수량 확인 취소' });
+    button.focus(); fireEvent.click(button);
+    await screen.findByText(action === 'save' ? '확인한 수량을 저장했어요.' : '수량 확인을 취소했어요.');
+    expect(screen.getByRole('heading', { name: '남은 수량 확인' })).toHaveFocus();
+  });
+
+  it('does not reclaim focus moved outside the quantity form during a pending save', async () => {
+    const gate = deferred(); const save = repository.saveInventoryQuantity;
+    vi.spyOn(repository, 'saveInventoryQuantity').mockImplementationOnce(async input => {
+      const result = await save(input); await gate.promise; return result;
+    });
+    render(<><button>다른 작업</button><InventoryQuantityReview scope="guest" /></>);
+    const form = await openForm(); enterQuantity(form);
+    const button = form.getByRole('button', { name: '확인한 수량 저장' });
+    button.focus(); fireEvent.click(button);
+    const outside = screen.getByRole('button', { name: '다른 작업' }); outside.focus();
+    await act(async () => gate.resolve());
+    await screen.findByText('확인한 수량을 저장했어요.');
+    expect(outside).toHaveFocus();
+  });
+
   it('requires an explicit request before showing quantity confirmation inputs', () => {
     const read = vi.spyOn(repository, 'getInventoryQuantitySnapshot');
     render(<InventoryQuantityReview scope="guest" />);

@@ -101,7 +101,8 @@ function ChangeSession({ scope, weekStart, slotId, kind, today, pantryItems, onC
       const preview = await previewMealPlanChange(input);
       if (!current()) return;
       if (preview?.scope !== scope) throw new Error('변경안의 계정을 확인할 수 없어요. 다시 미리보기 해 주세요.');
-      setState({ context: renderedInputContext, preview, busy: 'read', stale: false, error: '', notice: '' });
+      setState({ context: renderedInputContext, preview, busy: 'read', stale: false, error: '',
+        notice: preview.canApply ? '변경안이 준비됐어요. 변경 내용을 확인한 뒤 확정해 주세요.' : '적용할 변경안이 없어요. 아래 변경 안내를 확인해 주세요.' });
     } catch (error) {
       if (current()) setState(previous => ({ ...previous, error: error?.message || '변경안을 읽지 못했어요. 다시 미리보기 해 주세요.' }));
     } finally {
@@ -163,10 +164,12 @@ function ChangeSession({ scope, weekStart, slotId, kind, today, pantryItems, onC
       </fieldset> : null}
       <button className="btn-secondary w-full sm:w-auto" type="submit" disabled={Boolean(state.busy) || (kind === 'move' && !targetDate)}>변경안 미리보기</button>
     </form>
-    {state.busy ? <p role="status" className="mt-3 text-sm text-brand-700">{state.busy === 'write' ? '관련 식단을 함께 저장하고 있어요.' : '현재 식단과 재고로 변경안을 비교하고 있어요.'}</p> : null}
-    {state.stale ? <p role="status" className="mt-3 text-sm text-amber-900">다른 화면의 변경을 확인하려면 다시 미리보기 해 주세요.</p> : null}
+    <p role="status" aria-live="polite" aria-atomic="true" className={state.busy || state.stale || state.notice
+      ? `mt-3 text-sm font-medium ${state.stale ? 'text-amber-900' : 'text-brand-700'}` : 'sr-only'}>
+      {state.busy ? (state.busy === 'write' ? '관련 식단을 함께 저장하고 있어요.' : '현재 식단과 재고로 변경안을 비교하고 있어요.')
+        : state.stale ? '다른 화면의 변경을 확인하려면 다시 미리보기 해 주세요.' : state.notice}
+    </p>
     {state.error ? <p role="alert" className="mt-3 text-sm leading-6 text-red-800">{state.error}</p> : null}
-    {state.notice ? <p role="status" className="mt-3 text-sm font-medium text-brand-700">{state.notice}</p> : null}
     {preview ? <div className="mt-5 space-y-5">
       {preview.notices.length ? <ul className="space-y-1 text-sm leading-6 text-amber-900" aria-label="변경 안내">{preview.notices.map((notice, index) => <li key={index}>{notice}</li>)}</ul> : null}
       <div className="divide-y divide-brand-100">{preview.changes.map(change => <article key={change.date} aria-label={`${change.date} 변경 비교`} className="space-y-3 py-4">

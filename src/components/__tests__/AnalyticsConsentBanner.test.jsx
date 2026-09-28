@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
 import AnalyticsConsentBanner from '../AnalyticsConsentBanner';
 import {
   ANALYTICS_CONSENT_STORAGE_KEY,
@@ -130,5 +131,67 @@ describe('AnalyticsConsentBanner', () => {
     expect(getAnalyticsConsent()).toBe('granted');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(document.head.querySelector('script[data-fridgemate-ga]')).toBeInTheDocument();
+  });
+
+  function renderFocusExample() {
+    return render(<MemoryRouter>
+      <main id="main-content" tabIndex={-1}><button>다른 작업</button></main>
+      <button onClick={openAnalyticsConsentSettings}>분석 설정 열기</button>
+      <AnalyticsConsentBanner />
+    </MemoryRouter>);
+  }
+
+  it('focuses explicitly opened settings and restores the connected trigger after saving', async () => {
+    setAnalyticsConsent('denied');
+    const user = userEvent.setup();
+    renderFocusExample();
+    const trigger = screen.getByRole('button', { name: '분석 설정 열기' });
+    await user.click(trigger);
+    expect(screen.getByRole('dialog')).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: '필수 기능만' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('does not autofocus an automatic banner and returns a removed choice button to main', async () => {
+    const user = userEvent.setup();
+    renderFocusExample();
+    expect(document.body).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: '필수 기능만' }));
+    expect(screen.getByRole('main')).toHaveFocus();
+  });
+
+  it('retains focus on a failed choice so the user can retry', async () => {
+    setAnalyticsConsent('denied');
+    const user = userEvent.setup();
+    renderFocusExample();
+    await user.click(screen.getByRole('button', { name: '분석 설정 열기' }));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError'); });
+    const choice = screen.getByRole('button', { name: '필수 기능만' });
+    await user.click(choice);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(choice).toHaveFocus();
+  });
+
+  it('keeps the automatic banner choice focused when the first save fails', async () => {
+    const user = userEvent.setup();
+    renderFocusExample();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError'); });
+    const choice = screen.getByRole('button', { name: '필수 기능만' });
+    await user.click(choice);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(choice).toHaveFocus();
+  });
+
+  it('does not steal focus that has moved outside settings when a choice is saved', async () => {
+    setAnalyticsConsent('denied');
+    const user = userEvent.setup();
+    renderFocusExample();
+    await user.click(screen.getByRole('button', { name: '분석 설정 열기' }));
+    const other = screen.getByRole('button', { name: '다른 작업' });
+    await user.click(other);
+    fireEvent.click(screen.getByRole('button', { name: '필수 기능만' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(other).toHaveFocus();
   });
 });

@@ -65,15 +65,17 @@ export function createMealCookingFormModel(slot, inventory) {
 }
 
 export function createMealCookingPayload(model, amounts, completeUsageConfirmed) {
-  if (completeUsageConfirmed !== true) throw new Error('실제로 쓴 재고를 모두 확인한 뒤 체크해 주세요.');
+  if (completeUsageConfirmed !== true) throw Object.assign(new Error('실제로 쓴 재고를 모두 확인한 뒤 체크해 주세요.'), { field: 'confirmation' });
   const usages = [];
   for (const row of model.rows) {
     const value = amounts[row.ingredientId];
     if (value === undefined || value.trim() === '') continue;
     const amount = Number(value);
-    validateInventoryQuantityValues({ name: row.name, amount, unit: row.unit, preparationState: row.preparationState });
+    try {
+      validateInventoryQuantityValues({ name: row.name, amount, unit: row.unit, preparationState: row.preparationState });
+      if (amount > row.availableAmount) throw new Error(`${row.name}: 실제 사용량이 확인된 남은 양보다 많아요. 냉장고에서 남은 양을 다시 확인해 주세요.`);
+    } catch (error) { throw Object.assign(error, { ingredientId: row.ingredientId }); }
     if (amount === 0) continue;
-    if (amount > row.availableAmount) throw new Error(`${row.name}: 실제 사용량이 확인된 남은 양보다 많아요. 냉장고에서 남은 양을 다시 확인해 주세요.`);
     usages.push({ ingredientId: row.ingredientId, amount, unit: row.unit,
       expectedRevision: row.expectedRevision, expectedSourceToken: row.expectedSourceToken });
   }

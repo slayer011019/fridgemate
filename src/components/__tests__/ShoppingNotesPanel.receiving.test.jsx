@@ -61,6 +61,50 @@ function InventoryParent({ today }) {
 }
 
 describe('explicit receiving through shopping notes', () => {
+  it('discards receipt focus intent if an awaited parent refresh crosses an account roundtrip', async () => {
+    const gate = deferred(); const refresh = vi.fn(() => gate.promise);
+    const view = render(<ShoppingNotesPanel scope="guest" onInventoryApplied={refresh} />);
+    const form = await open(); fill(form);
+    const button = form.getByRole('button', { name: '확인한 구매량을 재고에 반영' }); button.focus(); fireEvent.click(button);
+    await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+    view.rerender(<ShoppingNotesPanel scope="user:alice" onInventoryApplied={refresh} />);
+    view.rerender(<ShoppingNotesPanel scope="guest" onInventoryApplied={refresh} />);
+    const currentFocus = document.activeElement;
+    await act(async () => gate.resolve());
+    expect(document.activeElement).toBe(currentFocus);
+    expect(screen.getByRole('heading', { name: '장보기 메모', exact: true })).not.toHaveFocus();
+    expect(await getAllIngredients('guest')).toHaveLength(1);
+    expect(await getAllIngredients('user:alice')).toEqual([]);
+  });
+
+  it('preserves focus moved to another task before the receipt acknowledgement', async () => {
+    const gate = delayReceiptAcknowledgement();
+    render(<><button>다른 작업</button><ShoppingNotesPanel scope="guest" /></>);
+    const form = await open(); fill(form);
+    const save = form.getByRole('button', { name: '확인한 구매량을 재고에 반영' }); save.focus(); fireEvent.click(save);
+    await act(async () => { await gate.committed.promise; });
+    const outside = screen.getByRole('button', { name: '다른 작업' }); outside.focus();
+    await act(async () => { gate.acknowledgement.resolve(); });
+    await screen.findByText('입고 당시 500g · 현재 남은 양은 냉장고에서 확인해 주세요.');
+    expect(outside).toHaveFocus(); expect(await getAllIngredients()).toHaveLength(1);
+  });
+
+  it.each([false, true])('restores receipt focus after success, including parent inventory reset=%s', async reset => {
+    function ReceiptParent() {
+      const [revision, setRevision] = useState(0);
+      return <ShoppingNotesPanel scope="guest" resetKey={revision} onInventoryApplied={async () => {
+        if (reset) setRevision(value => value + 1);
+      }} />;
+    }
+    render(<StrictMode><ReceiptParent /></StrictMode>);
+    const form = await open(); fill(form);
+    const button = form.getByRole('button', { name: '확인한 구매량을 재고에 반영' });
+    button.focus(); fireEvent.click(button);
+    await waitFor(() => expect(screen.getByRole('heading', { name: '장보기 메모', exact: true })).toHaveFocus());
+    expect((await getInventoryQuantitySnapshot()).inventory[0].amount).toBe(500);
+    expect(await getAllIngredients()).toHaveLength(1);
+  });
+
   it('preserves a committed receipt acknowledgement across midnight without reviving its old form', async () => {
     const gate = delayReceiptAcknowledgement();
     const view = render(<StrictMode><InventoryParent today="2026-09-16" /></StrictMode>);

@@ -3,6 +3,7 @@ import {
   applyPurchaseReceipt, getShoppingWorkspace, recordPurchaseNote, removeManualShoppingItem, saveManualShoppingItem,
 } from '../features/shopping/shoppingRepository';
 import PurchaseReceiptForm from './PurchaseReceiptForm';
+import useSavedFormFocus from './useSavedFormFocus';
 
 const SOURCE_LABELS = { plan: '식단', manual: '직접 입력', repurchase: '재구매' };
 const INPUT = 'input min-w-0 w-full';
@@ -80,7 +81,7 @@ function PurchaseForm({ sources, disabled, onSave }) {
   );
 }
 
-function ShoppingNotesSession({ scope, today, disabled, onInventoryApplied }) {
+function ShoppingNotesSession({ scope, today, disabled, onInventoryApplied, savedFocus, headingRef }) {
   const dayContext = useRef({ today });
   if (dayContext.current.today !== today) dayContext.current = { today };
   const renderedDay = dayContext.current;
@@ -104,6 +105,7 @@ function ShoppingNotesSession({ scope, today, disabled, onInventoryApplied }) {
 
   async function execute(kind = 'read', payload) {
     if (disabled || operationRef.current) return;
+    const focusIntent = kind !== 'read' ? savedFocus.begin() : null;
     const operation = {};
     const generation = generationRef.current;
     operationRef.current = operation;
@@ -118,16 +120,18 @@ function ShoppingNotesSession({ scope, today, disabled, onInventoryApplied }) {
         await applyPurchaseReceipt({ scope, ...payload });
         // Focus/day changes invalidate the form, not an acknowledged inventory write.
         // Account/reset changes still unmount this session and discard its callback.
-        if (mountedRef.current && operationRef.current === operation) await onInventoryApplied?.();
+        if (mountedRef.current && operationRef.current === operation) await onInventoryApplied?.(focusIntent);
       }
       if (!current()) return;
       const snapshot = await getShoppingWorkspace(scope, todayString());
       if (!current()) return;
       if (snapshot.scope !== scope || !Array.isArray(snapshot.manualItems) || !Array.isArray(snapshot.purchaseNotes)
         || !Array.isArray(snapshot.receipts) || !Array.isArray(snapshot.sources)) throw new Error('장보기 계정을 확인할 수 없습니다.');
+      savedFocus.complete(focusIntent);
       setState((previous) => ({ day: renderedDay, status: 'ready', snapshot, busy: true, error: '', revision: previous.revision + 1,
         notice: kind === 'manual' ? '수동 항목을 저장했어요.' : kind === 'remove' ? '수동 항목을 제거했어요.' : kind === 'purchase' ? '구매 메모를 저장했어요.' : kind === 'receipt' ? '구매를 재고에 반영했어요.' : '' }));
     } catch {
+      savedFocus.cancel(focusIntent);
       if (current()) setState((previous) => ({ ...previous, status: 'error', notice: '', error: kind === 'read'
         ? '장보기 메모를 읽지 못했어요. 장보기 메모 새로고침으로 다시 확인해 주세요.'
         : '저장 결과를 확인하지 못했어요. 같은 입력으로 다시 저장하거나 장보기 메모 새로고침으로 기록을 확인해 주세요.' }));
@@ -142,7 +146,7 @@ function ShoppingNotesSession({ scope, today, disabled, onInventoryApplied }) {
   return (
     <section aria-label="장보기 메모" aria-busy={state.busy} className="min-w-0 rounded-lg border border-brand-100 bg-white p-4 sm:p-5">
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-base font-semibold text-slate-900">장보기 메모</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-base font-semibold text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700">장보기 메모</h2>
         <button className="btn-secondary w-full sm:w-auto" type="button" disabled={disabled || state.busy} onClick={() => execute()}>{state.status === 'idle' ? '장보기 메모 열기' : '장보기 메모 새로고침'}</button>
       </div>
       <p className="mt-3 text-sm leading-6 muted">식단·직접 입력·재구매의 출처를 나눠 기록해요. 이름이 같아도 서로 다른 장보기 의도일 수 있어 합치지 않아요.</p>
@@ -195,14 +199,17 @@ function ShoppingNotesSession({ scope, today, disabled, onInventoryApplied }) {
 }
 
 export default function ShoppingNotesPanel({ scope, resetKey = '', today = todayString(), disabled = false, onInventoryApplied }) {
+  const { containerRef, headingRef, begin, complete, cancel } = useSavedFormFocus(scope);
   const [receiptNotice, setReceiptNotice] = useState(null);
-  async function refreshAfterReceipt() {
+  async function refreshAfterReceipt(focusIntent) {
     setReceiptNotice({ scope, text: '입고 기록을 저장했어요. 장보기 메모를 다시 열면 기록을 확인할 수 있어요.' });
     try { await onInventoryApplied?.(); }
     catch { setReceiptNotice({ scope, text: '입고는 저장됐지만 목록을 갱신하지 못했어요. 화면을 새로고침해 주세요.' }); }
+    complete(focusIntent);
   }
-  return <>
+  return <div ref={containerRef}>
     {receiptNotice?.scope === scope ? <p role="status" className="text-sm leading-6 text-brand-700">{receiptNotice.text}</p> : null}
-    <ShoppingNotesSession key={JSON.stringify([scope, resetKey, disabled])} scope={scope} today={today} disabled={disabled} onInventoryApplied={refreshAfterReceipt} />
-  </>;
+    <ShoppingNotesSession key={JSON.stringify([scope, resetKey, disabled])} scope={scope} today={today} disabled={disabled}
+      onInventoryApplied={refreshAfterReceipt} headingRef={headingRef} savedFocus={{ begin, complete, cancel }} />
+  </div>;
 }

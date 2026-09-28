@@ -69,7 +69,7 @@ function LoginPage() {
       ) : null}
 
       {visibleError ? (
-        <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{visibleError}</div>
+        <div role="alert" className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{visibleError}</div>
       ) : null}
 
       <form className="card max-w-xl space-y-4" onSubmit={handleSubmit}>
@@ -80,12 +80,12 @@ function LoginPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
             {'\uC774\uBA54\uC77C'}
-            <input required name="email" type="email" value={form.email} onChange={handleChange} />
+            <input required autoComplete="username" spellCheck={false} name="email" type="email" value={form.email} onChange={handleChange} />
           </label>
 
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
             {'\uBE44\uBC00\uBC88\uD638'}
-            <input required name="password" type="password" value={form.password} onChange={handleChange} />
+            <input required autoComplete="current-password" name="password" type="password" value={form.password} onChange={handleChange} />
           </label>
         </div>
 

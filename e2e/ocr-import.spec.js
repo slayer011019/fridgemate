@@ -218,7 +218,7 @@ test('OCR replacement rolls back both stores on abort and retries without losing
   const save = page.getByRole('button', { name: '선택 항목 저장', exact: true });
   await save.click();
   await expect(save).toBeEnabled();
-  await expect(page.getByRole('status')).toContainText(/저장하지 못|취소|실패/);
+  await expect(page.getByRole('status', { name: '가져오기 결과' })).toContainText(/저장하지 못|취소|실패/);
   expect(await page.evaluate(() => window.__ocrLateAbortObserved)).toBe(true);
   await expect(page.getByRole('textbox', { name: '수량', exact: true })).toHaveValue('2팩');
   await expect(page.getByRole('checkbox', { name: /기존 1개 항목/ })).toBeChecked();
@@ -270,7 +270,7 @@ test('OCR replacement rejects changed inventory and lets the user refresh and re
   const changed = { ...old, memo: '다른 탭에서 수정한 메모' };
   await writeOtherTabStock(page, changed);
   await page.getByRole('button', { name: '선택 항목 저장', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText(/바뀌|변경|다시/);
+  await expect(page.getByRole('status', { name: '가져오기 결과' })).toContainText(/바뀌|변경|다시/);
   expect(await readBrowserIngredients(page, 'guest')).toEqual([changed]);
   expect(await readPlanningStores(page)).toEqual({ plans: [], quantities: [], events: [] });
   await expect(page.getByRole('textbox', { name: '이름', exact: true })).toHaveValue('두부');
@@ -397,7 +397,7 @@ test('OCR import preserves a damaged learning map while saving reviewed inventor
   await page.getByRole('textbox', { name: '수량', exact: true }).fill('1모');
   await page.getByRole('button', { name: '선택 항목 저장' }).click();
 
-  const notice = page.getByRole('status').filter({ hasText: '보정 학습' });
+  const notice = page.getByRole('status', { name: '가져오기 결과' }).filter({ hasText: '보정 학습' });
   await expect(notice).toContainText('1개 재료를 냉장고에 저장했어요.');
   await expect(notice).toContainText('보정 학습은 저장하지 못했어요.');
   expect(await page.evaluate(() => localStorage.getItem('fridgemate-import-corrections:v2:guest'))).toBe('null');
@@ -431,7 +431,7 @@ test('OCR import retains manual edits in inventory when learning storage exceeds
   await page.getByRole('textbox', { name: '수량', exact: true }).fill('3모');
   await page.getByRole('button', { name: '선택 항목 저장' }).click();
 
-  const notice = page.getByRole('status').filter({ hasText: '보정 학습' });
+  const notice = page.getByRole('status', { name: '가져오기 결과' }).filter({ hasText: '보정 학습' });
   await expect(notice).toContainText('1개 재료를 냉장고에 저장했어요.');
   await expect(notice).toContainText('보정 학습은 저장하지 못했어요.');
   await expect(page.getByText('private fixture quota detail')).toHaveCount(0);

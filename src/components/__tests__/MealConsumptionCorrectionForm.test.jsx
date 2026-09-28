@@ -6,8 +6,8 @@ import { createInventoryQuantityReview, projectInventoryQuantity } from '../../f
 const NOW = '2026-09-21T09:00:00.000Z';
 const consumption = { id: 'latest', kind: 'consumption', lines: [{ inventoryId: 'chicken', name: '닭고기',
   ingredientKey: 'food:닭고기', amount: 150, unit: 'g', preparationState: 'raw' }] };
-function batch() {
-  const ingredient = { id: 'chicken', name: '닭고기', quantity: '150g', consumed: false, updatedAt: NOW };
+function batch(id = 'chicken') {
+  const ingredient = { id, name: '닭고기', quantity: '150g', consumed: false, updatedAt: NOW };
   return projectInventoryQuantity(ingredient, createInventoryQuantityReview({ ingredient, scope: 'guest', revision: 3, now: NOW,
     values: { name: '닭고기', amount: 150, unit: 'g', preparationState: 'raw' } }), 'guest');
 }
@@ -18,6 +18,30 @@ function form(props = {}) { return <MealConsumptionCorrectionForm title="닭고�
 afterEach(cleanup);
 
 describe('actual consumption correction form', () => {
+  it('identifies and focuses the invalid second same-name stock without losing entered amounts', async () => {
+    const onCorrect = vi.fn(); render(form({ inventory: [batch(), batch('second')], onCorrect }));
+    const second = screen.getByLabelText('닭고기 (2번 재고) 정정할 사용량 (g)');
+    fireEvent.change(second, { target: { value: '151' } }); confirm(); save();
+    const error = await screen.findByRole('alert');
+    expect.soft(error).toHaveTextContent('2번 재고');
+    expect.soft(second).toHaveFocus();
+    expect.soft(second).toHaveAttribute('aria-invalid', 'true');
+    expect.soft(second).toHaveAccessibleDescription(expect.stringContaining(error.textContent));
+    expect(input()).not.toHaveAttribute('aria-invalid', 'true');
+    expect(input()).toHaveValue(150); expect(second).toHaveValue(151); expect(onCorrect).not.toHaveBeenCalled();
+    fireEvent.change(second, { target: { value: '50' } });
+    expect(second).not.toHaveAttribute('aria-invalid', 'true'); expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('focuses and describes the missing explicit correction confirmation', async () => {
+    render(form()); save();
+    const error = await screen.findByRole('alert');
+    const checkbox = screen.getByLabelText('정정할 실제 사용량을 모두 확인했어요');
+    expect.soft(checkbox).toHaveFocus();
+    expect.soft(checkbox).toHaveAttribute('aria-invalid', 'true');
+    expect.soft(checkbox).toHaveAccessibleDescription(error.textContent);
+  });
+
   it('shows recorded usage, previews only, and requires a fresh confirmation after edits', async () => {
     const onCorrect = vi.fn().mockResolvedValue(true); render(form({ onCorrect }));
     expect(input()).toHaveValue(150);

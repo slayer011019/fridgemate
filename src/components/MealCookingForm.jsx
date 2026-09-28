@@ -7,22 +7,34 @@ const number = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 6 });
 export default function MealCookingForm({ slot, inventory, disabled = false, externalError = '', onRecord, onClose }) {
   const id = useId();
   const pending = useRef(false);
+  const amountInputs = useRef(new Map());
+  const confirmationInput = useRef(null);
   const [model] = useState(() => createMealCookingFormModel(slot, inventory));
   const [amounts, setAmounts] = useState(() => Object.fromEntries(model.rows.map(row => [row.ingredientId, row.initialAmount])));
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [errorField, setErrorField] = useState(null);
   const stale = model.fingerprint !== mealCookingFormFingerprint(slot, inventory);
   const blocked = disabled || busy || stale;
+  const invalidField = stale || externalError ? null : errorField;
 
   async function submit(unknown = false) {
     if (blocked || pending.current) return;
     setError('');
+    setErrorField(null);
     let payload;
     try {
       payload = unknown ? { usageMode: 'unknown', completeUsageConfirmed: false, usages: [] }
         : createMealCookingPayload(model, amounts, confirmed);
-    } catch (failure) { setError(failure.message); return; }
+    } catch (failure) {
+      const index = model.rows.findIndex(row => row.ingredientId === failure.ingredientId);
+      setError(index < 0 ? failure.message : `${index + 1}번 재고 · ${failure.message}`);
+      setErrorField({ confirmation: failure.field === 'confirmation', ingredientId: failure.ingredientId });
+      if (failure.field === 'confirmation') confirmationInput.current?.focus();
+      else amountInputs.current.get(failure.ingredientId)?.focus();
+      return;
+    }
     pending.current = true;
     setBusy(true);
     try {
@@ -58,16 +70,19 @@ export default function MealCookingForm({ slot, inventory, disabled = false, ext
       {model.rows.map((row, index) => <div key={row.ingredientId} className="min-w-0 border-b border-brand-100 pb-4">
         <label htmlFor={`${id}-amount-${index}`} className="mb-1 block break-words text-sm font-medium">{row.name} ({index + 1}번 재고) 실제 사용량 ({row.unit})</label>
         <p id={`${id}-stock-${index}`} className="mb-2 text-xs leading-5 muted">확인된 남은 양 {number.format(row.availableAmount)}{row.unit} · {PREPARATIONS[row.preparationState]} · {row.storageType || '보관 장소 미확인'} · 기한 {row.expiryDate || '미확인'}</p>
-        <input id={`${id}-amount-${index}`} aria-describedby={`${id}-stock-${index}`} className="input min-w-0 w-full sm:max-w-xs"
+        <input id={`${id}-amount-${index}`} ref={node => { if (node) amountInputs.current.set(row.ingredientId, node); else amountInputs.current.delete(row.ingredientId); }}
+          aria-invalid={invalidField?.ingredientId === row.ingredientId || undefined}
+          aria-describedby={`${id}-stock-${index}${invalidField?.ingredientId === row.ingredientId ? ` ${id}-error` : ''}`} className="input min-w-0 w-full sm:max-w-xs"
           type="number" inputMode="decimal" min="0" step="any" value={amounts[row.ingredientId]}
-          onChange={event => { const value = event.target.value; setAmounts(current => ({ ...current, [row.ingredientId]: value })); setConfirmed(false); setError(''); }} />
+          onChange={event => { const value = event.target.value; setAmounts(current => ({ ...current, [row.ingredientId]: value })); setConfirmed(false); setError(''); setErrorField(null); }} />
       </div>)}
       {!model.rows.length ? <p className="text-sm leading-6 muted">사용량을 입력할 확인된 재고가 없어요. 냉장고에서 남은 수량을 확인하거나, 아래에서 사용량 없이 조리만 기록할 수 있어요.</p> : null}
       {model.unavailableCount ? <p className="text-xs leading-5 text-amber-900">수량 미확인·소비 완료 등 입력할 수 없는 재고 {model.unavailableCount}개는 실제 사용량 목록에서 제외했어요.</p> : null}
       <p className="text-xs leading-5 muted">확인한 양과 기한은 식품 안전 보장이 아니에요. 보관 상태도 직접 확인해 주세요.</p>
       <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm leading-6">
-        <input type="checkbox" className="m-0 mt-0.5 h-5 w-5 shrink-0 p-0 accent-brand-700 shadow-none" checked={confirmed}
-          onChange={event => { setConfirmed(event.target.checked); setError(''); }} />실제로 쓴 재고를 모두 확인했어요
+        <input ref={confirmationInput} type="checkbox" className="m-0 mt-0.5 h-5 w-5 shrink-0 p-0 accent-brand-700 shadow-none" checked={confirmed}
+          aria-invalid={invalidField?.confirmation || undefined} aria-describedby={invalidField?.confirmation ? `${id}-error` : undefined}
+          onChange={event => { setConfirmed(event.target.checked); setError(''); setErrorField(null); }} />실제로 쓴 재고를 모두 확인했어요
       </label>
       <button type="submit" className="btn-primary min-h-11 w-full sm:w-auto" disabled={blocked || !model.rows.length}>실제 사용량으로 조리 기록</button>
     </fieldset>
@@ -75,7 +90,7 @@ export default function MealCookingForm({ slot, inventory, disabled = false, ext
       <p className="text-sm leading-6 text-amber-900">사용량을 모르면 조리 사실만 기록할 수 있어요. 관련 재고는 미반영·확인 필요 상태가 되어 이후 식단에도 남은 양을 다시 확인해야 해요.</p>
       <button type="button" className="btn-secondary min-h-11 w-full sm:w-auto" disabled={blocked} onClick={() => void submit(true)}>사용량 없이 조리만 기록</button>
     </section>
-    {stale || externalError || error ? <p role="alert" className="text-sm leading-6 text-red-800">{stale ? '재고나 식단이 바뀌었어요. 닫고 다시 열어 확인해주세요.' : externalError || error}</p> : null}
+    {stale || externalError || error ? <p id={`${id}-error`} role="alert" className="text-sm leading-6 text-red-800">{stale ? '재고나 식단이 바뀌었어요. 닫고 다시 열어 확인해주세요.' : externalError || error}</p> : null}
     {busy ? <p role="status" className="text-sm text-brand-700">조리 기록을 저장하고 있어요.</p> : null}
     <p className="text-xs leading-5 muted">조리 기록과 사용량 확인은 이 기기에 저장돼요. 서버 백업이나 다른 기기와의 동기화는 아니에요.</p>
   </form>;

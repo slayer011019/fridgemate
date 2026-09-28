@@ -9,13 +9,17 @@ export default function MealConsumptionCorrectionForm({ title, consumption, inve
   const id = useId();
   const heading = useRef(null);
   const pending = useRef(false);
+  const amountInputs = useRef(new Map());
+  const confirmationInput = useRef(null);
   const [model] = useState(() => createMealConsumptionCorrectionModel(consumption, inventory));
   const [amounts, setAmounts] = useState(() => Object.fromEntries(model.rows.map(row => [row.ingredientId, row.initialAmount])));
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [errorField, setErrorField] = useState(null);
   const stale = model.fingerprint !== mealConsumptionCorrectionFingerprint(consumption, inventory);
   const blocked = disabled || busy || stale || Boolean(model.blockedReason);
+  const invalidField = stale || model.blockedReason || externalError ? null : errorField;
   let preview = []; let previewError = '';
   try { preview = getMealConsumptionCorrectionPreview(model, amounts); } catch (failure) { previewError = failure.message; }
   const message = stale ? '재고나 사용량 기록이 바뀌었어요. 닫고 다시 열어 확인해주세요.' : model.blockedReason || externalError || error;
@@ -26,8 +30,16 @@ export default function MealConsumptionCorrectionForm({ title, consumption, inve
     if (blocked || pending.current) return;
     let payload;
     setError('');
+    setErrorField(null);
     try { payload = createMealConsumptionCorrectionPayload(model, amounts, confirmed); }
-    catch (failure) { setError(failure.message); return; }
+    catch (failure) {
+      const index = model.rows.findIndex(row => row.ingredientId === failure.ingredientId);
+      setError(index < 0 ? failure.message : `${index + 1}번 재고 · ${failure.message}`);
+      setErrorField({ confirmation: failure.field === 'confirmation', ingredientId: failure.ingredientId });
+      if (failure.field === 'confirmation') confirmationInput.current?.focus();
+      else amountInputs.current.get(failure.ingredientId)?.focus();
+      return;
+    }
     pending.current = true; setBusy(true);
     try {
       if (await onCorrect(payload) === false) setError('저장 결과를 확인하지 못했어요. 입력은 유지했으니 안내를 확인한 뒤 다시 시도해 주세요.');
@@ -54,9 +66,11 @@ export default function MealConsumptionCorrectionForm({ title, consumption, inve
       {model.rows.map((row, index) => <div key={row.ingredientId} className="min-w-0 border-b border-brand-100 pb-4">
         <label htmlFor={`${id}-amount-${index}`} className="mb-1 block break-words text-sm font-medium">{row.name} ({index + 1}번 재고) 정정할 사용량 ({row.unit})</label>
         <p id={`${id}-stock-${index}`} className="mb-2 text-xs leading-5 muted">현재 {number.format(row.currentAmount)}{row.unit} · 기존 사용량 {number.format(row.oldAmount)}{row.unit} · {PREPARATIONS[row.preparationState]} · {row.storageType || '보관 장소 미확인'} · 기한 {row.expiryDate || '미확인'}</p>
-        <input id={`${id}-amount-${index}`} aria-describedby={`${id}-stock-${index}`} className="input min-w-0 w-full sm:max-w-xs"
+        <input id={`${id}-amount-${index}`} ref={node => { if (node) amountInputs.current.set(row.ingredientId, node); else amountInputs.current.delete(row.ingredientId); }}
+          aria-invalid={invalidField?.ingredientId === row.ingredientId || undefined}
+          aria-describedby={`${id}-stock-${index}${invalidField?.ingredientId === row.ingredientId ? ` ${id}-error` : ''}`} className="input min-w-0 w-full sm:max-w-xs"
           type="number" inputMode="decimal" min="0" step="any" value={amounts[row.ingredientId]}
-          onChange={event => { const value = event.target.value; setAmounts(current => ({ ...current, [row.ingredientId]: value })); setConfirmed(false); setError(''); }} />
+          onChange={event => { const value = event.target.value; setAmounts(current => ({ ...current, [row.ingredientId]: value })); setConfirmed(false); setError(''); setErrorField(null); }} />
       </div>)}
       {model.unavailableCount ? <p className="text-xs leading-5 text-amber-900">수량 미확인·소비 완료 등 입력할 수 없는 재고 {model.unavailableCount}개는 새 사용량 목록에서 제외했어요.</p> : null}
     </fieldset>
@@ -68,11 +82,12 @@ export default function MealConsumptionCorrectionForm({ title, consumption, inve
       </li>)}</ul>}
     </section>
     <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm leading-6">
-      <input type="checkbox" className="m-0 mt-0.5 h-5 w-5 shrink-0 p-0 accent-brand-700 shadow-none" disabled={blocked} checked={confirmed}
-        onChange={event => { setConfirmed(event.target.checked); setError(''); }} />정정할 실제 사용량을 모두 확인했어요
+      <input ref={confirmationInput} type="checkbox" className="m-0 mt-0.5 h-5 w-5 shrink-0 p-0 accent-brand-700 shadow-none" disabled={blocked} checked={confirmed}
+        aria-invalid={invalidField?.confirmation || undefined} aria-describedby={invalidField?.confirmation ? `${id}-error` : undefined}
+        onChange={event => { setConfirmed(event.target.checked); setError(''); setErrorField(null); }} />정정할 실제 사용량을 모두 확인했어요
     </label>
     <button type="submit" className="btn-primary min-h-11 w-full sm:w-auto" disabled={blocked}>정정한 사용량으로 재고 반영</button>
-    {message ? <p role="alert" className="text-sm leading-6 text-red-800">{message}</p> : null}
+    {message ? <p id={`${id}-error`} role="alert" className="text-sm leading-6 text-red-800">{message}</p> : null}
     {busy ? <p role="status" className="text-sm text-brand-700">실제 사용량을 정정하고 있어요.</p> : null}
     <p className="text-xs leading-5 muted">이 기기·현재 계정에만 저장하며 서버 백업이나 다른 기기와의 동기화는 아니에요. 수량 확인은 식품 안전 보장이 아니므로 보관 상태도 직접 확인해 주세요.</p>
   </form>;

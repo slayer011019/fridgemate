@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { isOcrEnabled, isPublicSignupEnabled } from '../utils/backendConfig';
 
@@ -74,12 +74,13 @@ function Header() {
               const isActive = item.match(location.pathname);
 
               return (
-                <NavLink
+                <Link
                   key={item.to}
                   to={item.to}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium ${
                     isActive
-                      ? 'bg-green-600 text-white shadow-sm'
+                      ? 'bg-green-700 text-white shadow-sm'
                       : 'text-stone-600 hover:bg-green-50 hover:text-green-700'
                   }`}
                 >
@@ -87,7 +88,7 @@ function Header() {
                     {item.icon}
                   </span>
                   <span>{item.shortLabel || item.label}</span>
-                </NavLink>
+                </Link>
               );
             })}
           </nav>

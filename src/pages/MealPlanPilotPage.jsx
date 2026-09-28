@@ -172,9 +172,14 @@ function PilotSession({ scope }) {
 
   const disabled = loading || working;
   const active = capture?.status === 'active';
+  const captureAnnouncement = loading || !capture ? '' : active
+    ? `파일럿 ${capture.captureState === 'collecting' ? '기록 수집 중' : '기록 일시 중지'}. 누락 구간 ${capture.gapCount}개, 처리 확인 중 ${capture.pendingCount}개.`
+    : capture.status === 'withdrawn' ? '파일럿 참여 철회 상태예요.'
+      : capture.status === 'expired' ? '파일럿 보관 기간이 끝났어요.' : '파일럿에 참여하지 않고 있어요.';
 
   return (
     <div className="section-shell mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-10">
+      <p role="status" className="sr-only" aria-label="파일럿 상태 알림" aria-live="polite" aria-atomic="true">{captureAnnouncement}</p>
       <PageHeader title="식단 파일럿 참여" description="식단 기능을 개선하기 위한 별도의 선택이에요. 참여하지 않아도 재고·식단·조리 기능은 그대로 사용할 수 있어요." />
       <section className="card space-y-4" aria-label="파일럿 기록 안내">
         <h2 className="text-lg font-semibold">이 기기에만 보관하고, 직접 내려받아요</h2>
@@ -194,7 +199,7 @@ function PilotSession({ scope }) {
           <button ref={recheckButton} type="button" className="btn-secondary min-h-11" disabled={disabled} onClick={refresh}>파일럿 상태 다시 확인</button>
         </div>
         {loading ? <p className="text-sm muted">파일럿 상태를 확인하고 있어요.</p> : null}
-        {message ? <p role="status" className="rounded-lg bg-brand-50 p-3 text-sm leading-6 text-brand-700">{message}</p> : null}
+        {message ? <p role="status" aria-label="파일럿 작업 결과" className="rounded-lg bg-brand-50 p-3 text-sm leading-6 text-brand-700">{message}</p> : null}
         {error ? <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900">{error}</p> : null}
 
         {active ? (

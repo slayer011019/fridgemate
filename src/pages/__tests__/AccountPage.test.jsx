@@ -44,6 +44,37 @@ vi.mock('../../components/PreferenceSettingsPanel.jsx', () => ({ default: () => 
 
 afterEach(cleanup);
 
+describe('account asynchronous feedback', () => {
+  afterEach(() => { authState.error = ''; ingredientsState.syncError = ''; ingredientsState.syncStatus = 'dirty'; });
+
+  it('announces authentication and synchronization failures without moving focus', () => {
+    const view = render(<AccountPage />);
+    const action = screen.getByRole('button', { name: '서버에 백업하기' });
+    action.focus();
+    authState.error = '세션 복구가 필요합니다.';
+    view.rerender(<AccountPage />);
+    expect(screen.getByRole('alert')).toHaveTextContent('세션 복구가 필요합니다.');
+    authState.error = '';
+    ingredientsState.syncError = '동기화하지 못했어요. 다시 시도해 주세요.';
+    view.rerender(<AccountPage />);
+    expect(screen.getByRole('alert')).toHaveTextContent('동기화하지 못했어요');
+    expect(action).toHaveFocus();
+  });
+
+  it('announces synchronization progress and success from a persistent live region', () => {
+    const view = render(<AccountPage />);
+    const status = screen.getByRole('status', { name: '재료 동기화 상태' });
+    expect(status).toBeEmptyDOMElement();
+    ingredientsState.syncStatus = 'syncing';
+    view.rerender(<AccountPage />);
+    expect(status).toHaveTextContent('동기화 중');
+    ingredientsState.syncStatus = 'synced';
+    view.rerender(<AccountPage />);
+    expect(screen.getByRole('status', { name: '재료 동기화 상태' })).toBe(status);
+    expect(status).toHaveTextContent('로컬 변경사항을 서버와 병합했습니다.');
+  });
+});
+
 describe('AccountPage shared-device logout', () => {
   beforeEach(() => {
     vi.clearAllMocks();

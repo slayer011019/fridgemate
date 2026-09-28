@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { exportUserData } from '../api/authApi';
 
 function AccountPrivacyPanel({ deleteAccount }) {
@@ -7,9 +7,14 @@ function AccountPrivacyPanel({ deleteAccount }) {
   const [exportPassword, setExportPassword] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
 
   const handleDataExport = async (event) => {
     event.preventDefault();
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
     setPrivacyError('');
     setPrivacyStatus('내 데이터를 준비하고 있습니다...');
 
@@ -29,16 +34,22 @@ function AccountPrivacyPanel({ deleteAccount }) {
     } catch (nextError) {
       setPrivacyStatus('');
       setPrivacyError(nextError.message || '내 데이터를 내려받지 못했습니다.');
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
     }
   };
 
   const handleAccountDeletion = async (event) => {
     event.preventDefault();
+    if (pendingRef.current) return;
 
     if (!window.confirm('계정과 서버에 저장된 데이터를 영구 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) {
       return;
     }
 
+    pendingRef.current = true;
+    setPending(true);
     setPrivacyError('');
     setPrivacyStatus('계정과 데이터를 삭제하고 있습니다...');
 
@@ -47,6 +58,9 @@ function AccountPrivacyPanel({ deleteAccount }) {
     } catch (nextError) {
       setPrivacyStatus('');
       setPrivacyError(nextError.message || '계정을 삭제하지 못했습니다.');
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
     }
   };
 
@@ -62,13 +76,11 @@ function AccountPrivacyPanel({ deleteAccount }) {
         <p className="mt-2 text-sm leading-6 muted">주간 식단은 이 기기에만 저장되며 서버 백업과 내 데이터 내려받기에는 포함되지 않습니다.</p>
       </div>
 
-      {privacyStatus ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+        <div role="status" aria-live="polite" aria-atomic="true" className={privacyStatus ? 'rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900' : 'sr-only'}>
           {privacyStatus}
         </div>
-      ) : null}
       {privacyError ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{privacyError}</div>
+        <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{privacyError}</div>
       ) : null}
 
       <form className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4" onSubmit={handleDataExport}>
@@ -78,6 +90,7 @@ function AccountPrivacyPanel({ deleteAccount }) {
           </label>
           <input
             autoComplete="current-password"
+            disabled={pending}
             className="input mt-2 w-full"
             id="account-export-password"
             maxLength={128}
@@ -87,7 +100,7 @@ function AccountPrivacyPanel({ deleteAccount }) {
             value={exportPassword}
           />
         </div>
-        <button className="btn-secondary" type="submit">
+        <button className="btn-secondary" type="submit" disabled={pending}>
           내 데이터 내려받기
         </button>
       </form>
@@ -96,6 +109,7 @@ function AccountPrivacyPanel({ deleteAccount }) {
         <button
           className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
           onClick={() => setShowDeleteForm((current) => !current)}
+          disabled={pending}
           type="button"
         >
           계정 삭제
@@ -110,6 +124,7 @@ function AccountPrivacyPanel({ deleteAccount }) {
             </label>
             <input
               autoComplete="current-password"
+              disabled={pending}
               className="input mt-2 w-full"
               id="account-delete-password"
               maxLength={128}
@@ -123,7 +138,7 @@ function AccountPrivacyPanel({ deleteAccount }) {
             서버의 계정 및 연결 데이터와 이 기기에 남은 해당 계정의 재료 캐시·주간 식단을 삭제합니다. 삭제 후 복구할 수
             없습니다.
           </p>
-          <button className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800" type="submit">
+          <button className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-60" type="submit" disabled={pending}>
             영구 삭제 확인
           </button>
         </form>

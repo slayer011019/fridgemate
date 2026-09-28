@@ -65,6 +65,25 @@ afterEach(async () => {
 });
 
 describe('explicit browser-local pilot settings', () => {
+  it('announces capture changes and external withdrawal without taking keyboard focus', async () => {
+    await grant('guest');
+    render(<><button>다른 작업 계속</button><App /></>);
+    await ready();
+    const announcement = screen.getByRole('status', { name: '파일럿 상태 알림' });
+    expect(announcement).toHaveAttribute('aria-live', 'polite');
+    expect(announcement).toHaveTextContent('기록 일시 중지');
+    fireEvent.click(screen.getByRole('button', { name: '앞으로 기록 재개' }));
+    await ready();
+    expect(screen.getByRole('status', { name: '파일럿 상태 알림' })).toBe(announcement);
+    expect(announcement).toHaveTextContent('기록 수집 중');
+    const other = screen.getByRole('button', { name: '다른 작업 계속' });
+    other.focus();
+    await act(async () => consent.withdrawMealPlanPilotConsent('guest'));
+    await waitFor(() => expect(announcement).toHaveTextContent('참여 철회'));
+    expect(other).toHaveFocus();
+    expect(downloads).toEqual([]);
+  });
+
   it('keeps pilot consent off and unchecked independently from ordinary analytics consent', async () => {
     localStorage.setItem('fridgemate-analytics-consent', 'granted');
     render(<App />);
@@ -121,7 +140,7 @@ describe('explicit browser-local pilot settings', () => {
       dataset: { subjects: [expect.objectContaining({ kind: 'account', firstGenerationKnown: false })] } });
     expect(text).not.toContain(ACCOUNT);
     expect(document.body.textContent).not.toContain(exported.dataset.subjects[0].id);
-    expect(screen.getByRole('status')).toHaveTextContent(/다운로드.*요청/);
+    expect(screen.getByRole('status', { name: '파일럿 작업 결과' })).toHaveTextContent(/다운로드.*요청/);
   });
 
   it('preserves business data when withdrawal is cancelled or confirmed and keeps other scopes untouched', async () => {

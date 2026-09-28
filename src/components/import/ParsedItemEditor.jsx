@@ -46,13 +46,13 @@ function ParsedItemEditor({ items, disabled = false, importDisabled = false, rep
       </div>
 
       <div className="space-y-2.5">
-        {items.map((item) => (
-          <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:p-3">
+        {items.map((item, index) => (
+          <article key={item.id} aria-label={`후보 ${index + 1}: ${item.name || '이름 미확인'}`} className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:p-3">
             <div className="grid gap-2.5 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
               <div className="space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2.5">
                   <label className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-slate-800">
-                    <input type="checkbox" checked={item.selected} onChange={() => onToggleItem(item.id)} />
+                    <input type="checkbox" aria-label={`이 항목 가져오기: 후보 ${index + 1} ${item.name || '이름 미확인'}`} checked={item.selected} onChange={() => onToggleItem(item.id)} />
                     <span className="whitespace-nowrap">{'\uC774 \uD56D\uBAA9 \uAC00\uC838\uC624\uAE30'}</span>
                   </label>
                   <div className="flex flex-wrap gap-1.5">
@@ -75,6 +75,7 @@ function ParsedItemEditor({ items, disabled = false, importDisabled = false, rep
                   <label className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
                     <input
                       type="checkbox"
+                      aria-label={`기존 ${item.duplicateExistingItems.length}개 항목 삭제 후 가져오기: 후보 ${index + 1} ${item.name || '이름 미확인'}`}
                       className="mt-0.5 w-auto shrink-0"
                       disabled={replacementDisabled}
                       checked={Boolean(item.replaceExisting)}

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import useSavedFormFocus from './useSavedFormFocus';
 import {
   getInventoryQuantitySnapshot, revokeInventoryQuantity, saveInventoryQuantity,
 } from '../features/mealPlans/inventoryQuantityRepository';
@@ -76,6 +77,7 @@ function QuantityForm({ item, raw, disabled, onSave, onRevoke }) {
 }
 
 function QuantityReviewSession({ scope, disabled }) {
+  const savedFocus = useSavedFormFocus(scope);
   const [state, setState] = useState({ status: 'idle', snapshot: null, busy: false, notice: '', error: '' });
   const mountedRef = useRef(false);
   const operationRef = useRef(null);
@@ -100,6 +102,7 @@ function QuantityReviewSession({ scope, disabled }) {
 
   async function execute(item, values, revoke = false) {
     if (disabled || operationRef.current) return;
+    const focusIntent = item ? savedFocus.begin() : null;
     const operation = {};
     const generation = generationRef.current;
     operationRef.current = operation;
@@ -120,9 +123,11 @@ function QuantityReviewSession({ scope, disabled }) {
       if (snapshot.scope !== scope || !Array.isArray(snapshot.ingredients) || !Array.isArray(snapshot.inventory)) {
         throw new Error('수량 목록의 계정을 확인할 수 없습니다.');
       }
+      savedFocus.complete(focusIntent);
       setState({ status: 'ready', snapshot, busy: true, error: '',
         notice: item ? (revoke ? '수량 확인을 취소했어요.' : '확인한 수량을 저장했어요.') : '' });
     } catch {
+      savedFocus.cancel(focusIntent);
       if (current()) setState((previous) => ({ ...previous, status: 'error', notice: '',
         error: item ? '수량 저장 결과를 확인하지 못했어요. 수량 목록 새로고침 후 다시 확인해 주세요.'
           : '수량 목록을 읽지 못했어요. 수량 목록 새로고침 후 다시 확인해 주세요.' }));
@@ -138,9 +143,9 @@ function QuantityReviewSession({ scope, disabled }) {
   const inventory = (state.snapshot?.inventory || []).filter((item) => rawById.has(item.id) && !item.consumed && !item.deletedAt);
 
   return (
-    <section aria-label="남은 수량 확인" aria-busy={state.busy} className="rounded-lg border border-brand-100 bg-white p-4 sm:p-5">
+    <section ref={savedFocus.containerRef} aria-label="남은 수량 확인" aria-busy={state.busy} className="rounded-lg border border-brand-100 bg-white p-4 sm:p-5">
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-base font-semibold text-slate-900">남은 수량 확인</h2>
+        <h2 ref={savedFocus.headingRef} tabIndex={-1} className="text-base font-semibold text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700">남은 수량 확인</h2>
         <button type="button" className="btn-secondary w-full sm:w-auto" disabled={disabled || state.busy} onClick={() => execute()}>
           {state.status === 'idle' ? '수량 확인 목록 열기' : '수량 목록 새로고침'}
         </button>

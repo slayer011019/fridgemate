@@ -71,7 +71,7 @@ function SignupPage() {
         </div>
       ) : null}
 
-      {error ? <div className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
+      {error ? <div role="alert" className="card border border-rose-200 bg-rose-50 text-sm text-rose-700">{error}</div> : null}
 
       {publicSignupEnabled ? <form className="card max-w-xl space-y-4" onSubmit={handleSubmit}>
         <div className="flex flex-wrap gap-2">
@@ -81,12 +81,12 @@ function SignupPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
             {'\uC774\uBA54\uC77C'}
-            <input required name="email" type="email" value={form.email} onChange={handleChange} />
+            <input required autoComplete="username" spellCheck={false} name="email" type="email" value={form.email} onChange={handleChange} />
           </label>
 
           <label className="space-y-1.5 text-sm font-medium text-slate-700 md:col-span-2">
             {'\uBE44\uBC00\uBC88\uD638'}
-            <input required minLength={8} maxLength={128} name="password" type="password" value={form.password} onChange={handleChange} />
+            <input required autoComplete="new-password" minLength={8} maxLength={128} name="password" type="password" value={form.password} onChange={handleChange} />
             <span className="block text-xs font-normal text-slate-500">
               {'8\uC790 \uC774\uC0C1, \uD2B9\uC218\uBB38\uC790 \uD3EC\uD568, \uC774\uBA54\uC77C \uC77C\uBD80\uB098 \uC26C\uC6B4 \uD328\uD134\uC744 \uD53C\uD55C \uBE44\uBC00\uBC88\uD638\uB97C \uC0AC\uC6A9\uD574\uC8FC\uC138\uC694.'}
             </span>

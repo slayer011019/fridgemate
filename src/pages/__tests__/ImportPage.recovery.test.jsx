@@ -89,7 +89,7 @@ describe('explicit local OCR correction recovery', () => {
     expect(screen.queryByRole('region', { name: '이 기기의 보정 기록' })).not.toBeInTheDocument();
     await review();
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(/보정.*저장하지 못/);
+    expect(await screen.findByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/보정.*저장하지 못/);
     expect(screen.queryByRole('button', { name: '보정 기록 초기화' })).not.toBeInTheDocument();
     expect(await database.getAllIngredients(ACCOUNT)).toHaveLength(1);
     expect(localStorage.getItem(key(ACCOUNT))).toBe('{}');
@@ -108,7 +108,7 @@ describe('explicit local OCR correction recovery', () => {
     expect(localStorage.getItem(key(ACCOUNT))).toBe(DAMAGED);
     await review();
     fireEvent.change(screen.getByRole('textbox', { name: '수량' }), { target: { value: '3모' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ }));
     openConfirmation();
     expect(panel()).toHaveTextContent(/되돌릴 수 없/);
     expect(panel()).toHaveTextContent(/서버.*삭제하지 않/);
@@ -123,8 +123,8 @@ describe('explicit local OCR correction recovery', () => {
     expect(await database.getAllIngredients(ACCOUNT)).toStrictEqual(inventoryBefore);
     expect(await getMealPlan('2026-10-05', ACCOUNT)).toStrictEqual(planBefore);
     expect(screen.getByRole('textbox', { name: '수량' })).toHaveValue('3모');
-    expect(screen.getByRole('checkbox', { name: '이 항목 가져오기' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: '기존 1개 항목 삭제 후 가져오기' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /^이 항목 가져오기:/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /^기존 1개 항목 삭제 후 가져오기:/ })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
     await screen.findByRole('heading', { name: '저장된 냉장고' });
     expect(localStorage.getItem(key(ACCOUNT))).toContain('두부');
@@ -277,7 +277,7 @@ describe('explicit local OCR correction recovery', () => {
     await review();
     localStorage.setItem(key(ACCOUNT), DAMAGED);
     fireEvent.click(screen.getByRole('button', { name: '선택 항목 저장' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(/보정.*저장하지 못/);
+    expect(await screen.findByRole('status', { name: '가져오기 결과' })).toHaveTextContent(/보정.*저장하지 못/);
     expect(panel()).toHaveTextContent(/손상/);
     const saved = await database.getAllIngredients(ACCOUNT);
     fireEvent.click(openConfirmation());

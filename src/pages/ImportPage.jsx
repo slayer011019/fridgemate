@@ -414,7 +414,7 @@ function ImportSession({ isAuthenticated, storageScope }) {
           <span className="badge bg-slate-100 text-slate-700">{`\uD15C\uD50C\uB9BF ${parseResult.template?.id || 'unknown'}`}</span>
           <span className="badge bg-white text-slate-500">{`source ${parseResult.sourceType || 'unknown'} ${Math.round((parseResult.sourceConfidence || 0) * 100)}%`}</span>
           {importMessage ? (
-            <span role="status" className="rounded-2xl border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm font-medium text-brand-700 xl:justify-self-end">
+            <span role="status" aria-label="가져오기 결과" className="rounded-2xl border border-brand-100/80 bg-brand-50/70 px-3 py-2 text-sm font-medium text-brand-700 xl:justify-self-end">
               {importMessage}
             </span>
           ) : null}

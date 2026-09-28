@@ -21,6 +21,34 @@ const save = () => fireEvent.click(screen.getByRole('button', { name: '실제 �
 afterEach(cleanup);
 
 describe('MealCookingForm actual-use confirmation', () => {
+  it('identifies and focuses only the invalid same-name inventory row and connects its error', async () => {
+    const onRecord = vi.fn();
+    render(<MealCookingForm slot={meal()} inventory={[batch('one'), batch('two')]} onRecord={onRecord} onClose={() => {}} />);
+    const second = screen.getByLabelText('닭고기 (2번 재고) 실제 사용량 (g)');
+    fireEvent.change(amount(), { target: { value: '100' } });
+    fireEvent.change(second, { target: { value: '301' } }); confirm(); save();
+    const error = await screen.findByRole('alert');
+    expect.soft(error).toHaveTextContent('2번 재고');
+    expect.soft(second).toHaveFocus();
+    expect.soft(second).toHaveAttribute('aria-invalid', 'true');
+    expect.soft(second).toHaveAccessibleDescription(expect.stringContaining(error.textContent));
+    expect(amount()).not.toHaveAttribute('aria-invalid', 'true');
+    expect(second).toHaveValue(301); expect(onRecord).not.toHaveBeenCalled();
+    fireEvent.change(second, { target: { value: '50' } });
+    expect(second).not.toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('focuses and describes the explicit usage confirmation when it is missing', async () => {
+    render(<MealCookingForm slot={meal()} inventory={[batch()]} onRecord={vi.fn()} onClose={() => {}} />);
+    save();
+    const error = await screen.findByRole('alert');
+    const checkbox = screen.getByLabelText('실제로 쓴 재고를 모두 확인했어요');
+    expect.soft(checkbox).toHaveFocus();
+    expect.soft(checkbox).toHaveAttribute('aria-invalid', 'true');
+    expect.soft(checkbox).toHaveAccessibleDescription(error.textContent);
+  });
+
   it('shows proposed amounts but only records after explicit actual-use confirmation', async () => {
     const inventory = [batch()]; const onRecord = vi.fn().mockResolvedValue(true);
     render(<MealCookingForm slot={meal()} inventory={inventory} onRecord={onRecord} onClose={() => {}} />);

@@ -43,22 +43,24 @@ export function createMealConsumptionCorrectionModel(consumption, inventory) {
 export function getMealConsumptionCorrectionPreview(model, amounts) {
   if (model.blockedReason) throw new Error(model.blockedReason);
   return model.rows.map(row => {
-    const value = amounts[row.ingredientId];
-    const amount = value === undefined || value.trim() === '' ? 0 : Number(value);
-    validateInventoryQuantityValues({ name: row.name, amount, unit: row.unit, preparationState: row.preparationState });
-    const available = ticks(row.currentAmount, row.unit) + ticks(row.oldAmount, row.unit);
-    if (!Number.isSafeInteger(available)) throw new Error('정정 후 재고량을 안전하게 계산할 수 없어요. 남은 양을 다시 확인해 주세요.');
-    const remaining = available - ticks(amount, row.unit);
-    if (remaining < 0) throw new Error(`${row.name}: 정정할 사용량이 현재 재고와 기존 사용량을 합친 양보다 많아요.`);
-    const remainingAmount = remaining / 1000 / UNITS[row.unit][1];
-    validateInventoryQuantityValues({ name: row.name, amount: remainingAmount, unit: row.unit, preparationState: row.preparationState });
-    return { ...row, amount, remainingAmount };
+    try {
+      const value = amounts[row.ingredientId];
+      const amount = value === undefined || value.trim() === '' ? 0 : Number(value);
+      validateInventoryQuantityValues({ name: row.name, amount, unit: row.unit, preparationState: row.preparationState });
+      const available = ticks(row.currentAmount, row.unit) + ticks(row.oldAmount, row.unit);
+      if (!Number.isSafeInteger(available)) throw new Error('정정 후 재고량을 안전하게 계산할 수 없어요. 남은 양을 다시 확인해 주세요.');
+      const remaining = available - ticks(amount, row.unit);
+      if (remaining < 0) throw new Error(`${row.name}: 정정할 사용량이 현재 재고와 기존 사용량을 합친 양보다 많아요.`);
+      const remainingAmount = remaining / 1000 / UNITS[row.unit][1];
+      validateInventoryQuantityValues({ name: row.name, amount: remainingAmount, unit: row.unit, preparationState: row.preparationState });
+      return { ...row, amount, remainingAmount };
+    } catch (error) { throw Object.assign(error, { ingredientId: row.ingredientId }); }
   });
 }
 
 export function createMealConsumptionCorrectionPayload(model, amounts, completeUsageConfirmed) {
   if (model.blockedReason) throw new Error(model.blockedReason);
-  if (completeUsageConfirmed !== true) throw new Error('정정할 실제 사용량을 모두 확인한 뒤 체크해 주세요.');
+  if (completeUsageConfirmed !== true) throw Object.assign(new Error('정정할 실제 사용량을 모두 확인한 뒤 체크해 주세요.'), { field: 'confirmation' });
   const preview = getMealConsumptionCorrectionPreview(model, amounts);
   return { expectedConsumptionId: model.expectedConsumptionId, completeUsageConfirmed: true,
     inventory: model.previousLines.map(line => check(model.rows.find(row => row.ingredientId === line.inventoryId))),

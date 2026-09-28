@@ -58,6 +58,18 @@ describe('MealPlanChangePanel user approval and stale results', () => {
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+  it.each([true, false])('announces a completed comparison (canApply=%s) without moving focus', async canApply => {
+    const gate = deferred(); previewMealPlanChange.mockReturnValueOnce(gate.promise);
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText('옮길 날짜'), { target: { value: '2026-09-23' } });
+    fireEvent.click(screen.getByRole('button', { name: '변경안 미리보기' }));
+    const close = screen.getByRole('button', { name: '변경 창 닫기' }); close.focus();
+    await act(async () => gate.resolve({ ...preview(), canApply }));
+    const panel = within(screen.getByRole('region', { name: '식단 변경 미리보기' }));
+    expect(panel.getByRole('status')).toHaveTextContent(canApply ? '변경안이 준비됐어요' : '적용할 변경안이 없어요');
+    expect(close).toHaveFocus(); expect(confirmMealPlanChange).not.toHaveBeenCalled();
+  });
+
   it('qualifies computed shortages when ownership is unknown without changing amounts or accessible list names', async () => {
     const now = `${WEEK}T09:00:00.000Z`;
     const plan = generateMealPlan({ weekStart: WEEK, now,
