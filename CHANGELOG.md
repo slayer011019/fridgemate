@@ -9,6 +9,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ### Added
 
+- Preserved the 204 pending files in 17 ordered, hash-verified functional commits and retained main's AdSense/exercise documents. Fresh precommit checks passed 2,989 unit/integration tests, 107 browser tests, 48 overlapping built-preview tests, lint and build; recorded release gates separately in `docs/RELEASE_CLOSEOUT_2026-09-29.md` without claiming remote CI, deployment or real-user pilot completion.
+
 - Recorded six real query/commit/rollback checks of the current root Prisma adapter in two fresh, private-socket PostgreSQL 16 fixtures. Preserved the initial sandbox failure and the fifth original SQL migration's missing-pgvector failure; this is not full schema, RLS, Prisma migration-engine, auth or deployment validation. No application/dependency changes; see `docs/PRD_V3_LOCAL_POSTGRES_2026-09-29.md`.
 
 - Connected the public About page to guest weekly planning and recipe browsing, and aligned the header, footer and home/About metadata around 오늘뭐먹지 (FridgeMate), weekly dinners, shopping and actual cooking. Preserved the existing preferred site name/alternate names, private-route noindex, data policies and source recipe markup. Added real HTML/client-preview consistency and guest introduction/privacy browser coverage. Public HTTP/search observations are separate from deployment, ranking or conversion claims; see `docs/PRD_V3_PUBLIC_INTRO_2026-09-28.md`.
