@@ -69,7 +69,7 @@ test('a blocked consent read does not break the app or enable analytics', async 
 
   await gotoAndWait(page, '/');
 
-  await expect(page.getByRole('heading', { name: '남은 재료로 오늘 메뉴를 골라보세요' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '이번 주 저녁부터 정해볼까요?' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: /서비스 개선을 위한 이용 분석/u })).toBeVisible();
   await page.getByRole('button', { name: '분석 허용' }).click();
   await expect(page.getByRole('alert')).toContainText('현재 탭에서는 분석을 중지');

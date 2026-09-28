@@ -109,7 +109,7 @@ test('AT-18 past confirmed hold survives a skip draft until explicit confirmatio
   await overdue.screenshot({ path: testInfo.outputPath('overdue-notice-mobile.png') });
   const shopping = page.getByRole('region', { name: '식단 장보기 미리보기', exact: true });
   await shopping.getByRole('button', { name: '식단 장보기 확인', exact: true }).click();
-  await expect(shopping.getByRole('list', { name: '확인된 부족분', exact: true })).toContainText('100g');
+  await expect(shopping.getByRole('list', { name: '등록된 재고 기준 추가 필요량', exact: true })).toContainText('100g');
   const notes = page.getByRole('region', { name: '장보기 메모', exact: true });
   await notes.getByRole('button', { name: '장보기 메모 열기', exact: true }).click();
   await expect(notes.getByRole('region', { name: '보류 중인 지난 끼니', exact: true })).toContainText(WEEK);
@@ -123,7 +123,7 @@ test('AT-18 past confirmed hold survives a skip draft until explicit confirmatio
   await expect(confirm).toBeEnabled();
   await expect(overdue.getByRole('button', { name: `${WEEK} 식단 확인`, exact: true })).toBeVisible();
   await shopping.getByRole('button', { name: '식단 장보기 확인', exact: true }).click();
-  await expect(shopping.getByRole('list', { name: '확인된 부족분', exact: true })).toContainText('100g');
+  await expect(shopping.getByRole('list', { name: '등록된 재고 기준 추가 필요량', exact: true })).toContainText('100g');
   const drafted = await readState(page);
   expect(drafted.mealPlans.find(plan => plan.weekStart === WEEK).confirmed).toEqual(before.mealPlans.find(plan => plan.weekStart === WEEK).confirmed);
   expectUnchangedNonPlans(drafted, before);

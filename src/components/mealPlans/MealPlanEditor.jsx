@@ -21,6 +21,9 @@ function MealSlot({ slot, dayIndex, ingredients, pantryItems, disabled, overdue,
   const summary = getSlotSummary(slot, ingredients, pantryItems);
   const planned = slot.status === 'planned';
   const cooked = slot.status === 'cooked';
+  const reason = planned && !slot.notice && summary.availableIngredients.length > 0 && summary.expiringIngredients.length === 0
+    ? `등록·보유 확인된 ${summary.availableIngredients.slice(0, 2).join('·')} 재료명으로 고른 메뉴예요. 필요한 분량은 확인해 주세요.${summary.unverifiedExpiryIngredients?.length ? ' 기한 미확인 재료는 조리일까지 사용할 수 있는지 확인해 주세요.' : ''}`
+    : summary.reason || slot.reason;
 
   return (
     <article className={`meal-plan-day ${planned || cooked ? '' : 'meal-plan-day-muted'}`} aria-label={`${slot.date} 저녁 식단`}>
@@ -42,20 +45,21 @@ function MealSlot({ slot, dayIndex, ingredients, pantryItems, disabled, overdue,
         {(planned || cooked) && (
           <>
             <p className="mt-1 text-sm leading-6 muted">{slot.components.map((component) => component.title).join(' + ')}</p>
-            <p className="mt-2 text-sm leading-6 text-brand-700">{summary.reason || slot.reason}</p>
+            <p className="mt-2 text-sm leading-6 text-brand-700">{reason}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="포함된 식품군">
               {summary.foodGroups.map((group) => <span key={group.id} className="meal-plan-group">{group.label}</span>)}
             </div>
             <p className="mt-2 text-xs leading-5 muted">{summary.compositionHint}</p>
             <details className="meal-plan-ingredients mt-3">
               <summary className="cursor-pointer text-sm font-medium text-slate-700">
-                {cooked ? '조리 당시 메뉴와 원문 재료' : `재료 확인 · ${summary.missingIngredients.length ? `미보유 ${summary.missingIngredients.length}가지` : summary.unverifiedExpiryIngredients?.length ? '기한 확인 필요' : '재료명 일치'} · 수량 확인 필요`}
+                {cooked ? '조리 당시 메뉴와 원문 재료' : `재료 확인 · ${summary.missingIngredients.length ? `구매 또는 보유 확인 필요 ${summary.missingIngredients.length}가지` : summary.unverifiedExpiryIngredients?.length ? '기한 확인 필요' : '재료명 일치'} · 수량 확인 필요`}
               </summary>
               <div className="mt-3 space-y-2 text-sm leading-6">
-                {summary.availableIngredients.length > 0 && <p><span className="font-semibold">보유 재료명: </span>{summary.availableIngredients.join(', ')}</p>}
-                {summary.missingIngredients.length > 0 && <p><span className="font-semibold">구매·보유 확인: </span>{summary.missingIngredients.join(', ')}</p>}
+                {summary.availableIngredients.length > 0 && <p><span className="font-semibold">등록·보유 확인된 재료명: </span>{summary.availableIngredients.join(', ')}</p>}
+                {summary.missingIngredients.length > 0 && <p><span className="font-semibold">구매 또는 보유 확인 필요: </span>{summary.missingIngredients.join(', ')}</p>}
                 {summary.expiringIngredients.length > 0 && <p><span className="font-semibold">식사일에 기한이 가까운 재료: </span>{summary.expiringIngredients.join(', ')}</p>}
                 {summary.unverifiedExpiryIngredients?.length > 0 && <p><span className="font-semibold">기한 확인: </span>{summary.unverifiedExpiryIngredients.join(', ')}</p>}
+                {planned ? <p className="text-xs leading-5 muted">등록·보유 확인된 재료명만 비교한 결과예요. 실제 보유량과 필요한 분량은 별도로 확인해 주세요.</p> : null}
                 <MealQuantityDetails slot={slot} />
               </div>
             </details>
@@ -204,7 +208,7 @@ export default function MealPlanEditor({ plan, confirmedPlan, hasDraft, weekStar
         </fieldset>
         </details>
         <div className="mt-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-sm text-xs leading-5 muted">{plan ? '고정한 메뉴는 유지해요. 조건을 바꾸면 고정 메뉴도 직접 확인해 주세요.' : '재료가 없어도 초안을 만들 수 있어요. 필요한 재료를 함께 안내해 드려요.'}</p>
+          <p className="max-w-sm text-xs leading-5 muted">{plan ? '고정한 메뉴는 유지해요. 조건을 바꾸면 고정 메뉴도 직접 확인해 주세요.' : '재료를 등록하지 않아도 초안을 만들 수 있어요. 필요한 재료는 구매 또는 보유 여부를 확인해 주세요.'}</p>
           <button className="btn-primary w-full shrink-0 sm:w-auto" type="submit" disabled={busy}>{saving ? '저장 중…' : plan ? '고정하지 않은 메뉴 다시 추천' : '한 주 식단 만들기'}</button>
         </div>
       </form>

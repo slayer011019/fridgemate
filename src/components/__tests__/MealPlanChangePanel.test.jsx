@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MealPlanChangePanel from '../MealPlanChangePanel';
 import { previewMealPlanChange, confirmMealPlanChange } from '../../features/mealPlans/mealPlanChangesRepository';
+import { allocateMealPlanInventory } from '../../features/mealPlans/mealPlanAllocation';
+import { generateMealPlan, moveMealPlanSlot } from '../../features/mealPlans/mealPlanDomain';
 
 // The repository is the persistence boundary. Actual storage and allocation are
 // exercised by the page integration tests; these tests defer its responses to
@@ -55,6 +57,39 @@ describe('MealPlanChangePanel user approval and stale results', () => {
     confirmMealPlanChange.mockResolvedValue({ records: [], weekStarts: [WEEK] });
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+  it('qualifies computed shortages when ownership is unknown without changing amounts or accessible list names', async () => {
+    const now = `${WEEK}T09:00:00.000Z`;
+    const plan = generateMealPlan({ weekStart: WEEK, now,
+      preferences: { servings: 1, excludedIngredients: [], dinnerDays: [0] } });
+    const component = plan.slots[0].components[0];
+    // Test-only measured menu; no production recipe review is implied.
+    plan.slots[0].components = [{ ...component, servings: 1, servingsStatus: 'verified',
+      source: { kind: 'test-fixture', id: 'fixture:recipe', name: '테스트 전용' }, recipeVersion: 'fixture-v1',
+      ingredients: [{ ...component.ingredients[0], id: 'fixture:chicken', rawName: '닭고기',
+        ingredientKey: 'food:닭고기', preparationState: 'raw', amount: 200, unit: 'g',
+        quantityStatus: 'verified', quantityEvidence: 'fixture:200g', optional: false, selected: true }],
+    }];
+    const moved = moveMealPlanSlot({ sourcePlan: plan, sourceSlotId: SLOT,
+      targetSlotId: '2026-09-23:dinner', mode: 'move', today: WEEK, now });
+    const inventory = [];
+    const comparison = { ...preview(), changes: moved.changes, plans: moved.plans,
+      beforeAllocation: allocateMealPlanInventory({ scope: 'guest', confirmedPlans: [plan], inventory, today: WEEK }),
+      afterAllocation: allocateMealPlanInventory({ scope: 'guest', confirmedPlans: moved.plans, inventory, today: WEEK }) };
+    const before = structuredClone(comparison);
+    previewMealPlanChange.mockResolvedValue(comparison);
+    render(<Harness />);
+    await showPreview();
+
+    for (const label of ['변경 전 전체 장보기', '변경 후 전체 장보기']) {
+      expect(screen.getByRole('list', { name: `${label} 부족분` })).toHaveTextContent('닭고기 200g');
+      expect.soft(screen.getByRole('region', { name: label })).toHaveTextContent('등록된 재고 기준 추가 필요량');
+    }
+    expect.soft(screen.queryByText(/미등록 재료는.*구매 또는 보유 확인 필요/)).toBeInTheDocument();
+    expect(comparison).toStrictEqual(before);
+    expect(inventory).toEqual([]);
+    expect(confirmMealPlanChange).not.toHaveBeenCalled();
+  });
 
   it('drops yesterday’s comparison and swap choice when the local day changes', async () => {
     const view = render(<Harness />);

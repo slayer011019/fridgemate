@@ -30,7 +30,7 @@ function ShoppingComparison({ label, allocation }) {
   return <section aria-label={label} className="min-w-0 space-y-2">
     <h3 className="font-semibold text-slate-900">{label}</h3>
     {needsReview.length ? <p className="text-sm text-amber-900">확인 필요 항목이 있어 전체 구매량은 확정할 수 없어요.</p>
-      : <p className="text-sm text-slate-700">{shortages.length ? '확인된 부족분' : '확인된 수량에서 부족분이 없어요.'}</p>}
+      : <p className="text-sm text-slate-700">{shortages.length ? '등록된 재고 기준 추가 필요량' : '확인된 수량에서 부족분이 없어요.'}</p>}
     {shortages.length ? <ul aria-label={`${label} 부족분`} className="space-y-1 text-sm leading-6">
       {shortages.map((item, index) => <li key={index} className="break-words">{item.label} <span className="font-semibold tabular-nums">{item.amount}{item.unit}</span></li>)}
     </ul> : null}
@@ -152,6 +152,7 @@ function ChangeSession({ scope, weekStart, slotId, kind, today, pantryItems, onC
     </div>
     <p className="mt-2 text-sm leading-6 muted">{kind === 'move' ? '날짜를 옮길 메뉴와 그날의 필요 재료를 확인해 주세요.' : '오늘 이후의 남은 메뉴를 다시 제안해요. 조리한 날·외식·고정 메뉴·지난 날짜는 유지해요.'}</p>
     <p className="mt-1 text-xs leading-5 muted">모든 주의 확정 식단에서 필요량·재료 기한·장보기를 다시 계산해요. 실제 재고와 직접 적은 장보기 메모·입고 이력은 바꾸지 않아요.</p>
+    <p className="mt-1 text-xs leading-5 muted">미등록 재료는 실제 미보유가 아니라 구매 또는 보유 확인 필요 상태예요. 아래 수량은 등록된 재고를 기준으로 계산해요.</p>
     <p className="mt-1 text-xs leading-5 muted">저장된 초안이 없는 확정본만 변경해요. 미리보기는 저장하지 않으며, 확정하면 관련 주를 함께 이 기기·현재 계정에만 저장해요.</p>
     <form onSubmit={read} className="mt-4 space-y-3">
       {kind === 'move' ? <fieldset disabled={Boolean(state.busy)} className="grid min-w-0 gap-3 sm:grid-cols-2">

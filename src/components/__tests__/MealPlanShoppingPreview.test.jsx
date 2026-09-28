@@ -76,11 +76,43 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('MealPlanShoppingPreview', () => {
+  it('labels a registered-inventory calculation without declaring an unregistered ingredient physically absent', async () => {
+    await saveConfirmed(fixturePlan());
+    render(page());
+    fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
+    const list = await screen.findByRole('list', { name: '등록된 재고 기준 추가 필요량' });
+    expect(list).toHaveTextContent('닭고기');
+    expect(list).toHaveTextContent('200g');
+    expect(screen.getByText(/미등록 재료는.*구매 또는 보유 확인 필요/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '확인된 부족분' })).not.toBeInTheDocument();
+    expect(await getAllIngredients('guest')).toEqual([]);
+  });
+
+  it('keeps unknown package quantities separate from a verified zero stock balance', async () => {
+    await saveConfirmed(fixturePlan());
+    await saveIngredients([fixtureStock({ quantity: '2팩' })]);
+    const before = await getAllIngredients('guest');
+    render(page());
+    fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
+    await screen.findByRole('heading', { name: '확인이 필요한 재료' });
+    expect(expand('확인이 필요한 재료')).toHaveTextContent('보유 재료의 수량 확인이 필요해요.');
+    expect(screen.queryByRole('heading', { name: '등록된 재고 기준 추가 필요량' })).not.toBeInTheDocument();
+    expect(screen.queryByText('0g')).not.toBeInTheDocument();
+    expect(await getAllIngredients('guest')).toStrictEqual(before);
+
+    await confirmStock(0);
+    fireEvent.click(screen.getByRole('button', { name: '다시 계산' }));
+    const list = await screen.findByRole('list', { name: '등록된 재고 기준 추가 필요량' });
+    expect(list).toHaveTextContent('200g');
+    expect(screen.queryByRole('heading', { name: '확인이 필요한 재료' })).not.toBeInTheDocument();
+    expect(await getAllIngredients('guest')).toStrictEqual(before);
+  });
+
   it('offers an explicit read-only check before presenting any shopping result', () => {
     const read = vi.spyOn(repository, 'getMealPlanningSnapshot');
     render(page());
     expect(screen.queryByRole('button', { name: '식단 장보기 확인' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '확인된 부족분' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '등록된 재고 기준 추가 필요량' })).not.toBeInTheDocument();
     expect(read).not.toHaveBeenCalled();
   });
 
@@ -95,7 +127,7 @@ describe('MealPlanShoppingPreview', () => {
     const before = await getAllIngredients('guest');
     render(page());
     fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
-    const list = await screen.findByRole('list', { name: '확인된 부족분' });
+    const list = await screen.findByRole('list', { name: '등록된 재고 기준 추가 필요량' });
     expect(within(list).getByText('닭고기')).toBeInTheDocument();
     expect(within(list).getByText('100g')).toBeInTheDocument();
     expect(within(list).getByText(/2026-09-21/)).toBeInTheDocument();
@@ -115,7 +147,7 @@ describe('MealPlanShoppingPreview', () => {
     render(page());
     fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
     expect(await screen.findByText('오늘 이후 확정된 식단이 없어요.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '확인된 부족분' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '등록된 재고 기준 추가 필요량' })).not.toBeInTheDocument();
   });
 
   it('shows current unreviewed recipe rows as checks, never a zero or complete purchase total', async () => {
@@ -129,7 +161,7 @@ describe('MealPlanShoppingPreview', () => {
     expect(within(list).getAllByRole('listitem').length).toBeGreaterThan(0);
     expect(list).toHaveTextContent(plan.slots[0].components[0].ingredients.find((line) => line.selected).rawName);
     expect(screen.getByText(/전체 구매량은 계산되지 않았어요/)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '확인된 부족분' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '등록된 재고 기준 추가 필요량' })).not.toBeInTheDocument();
     expect(screen.queryByText(/조리 가능|부족분은 없어요|0g/)).not.toBeInTheDocument();
   });
 
@@ -140,7 +172,7 @@ describe('MealPlanShoppingPreview', () => {
     fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
     await screen.findByRole('heading', { name: '확인이 필요한 재료' });
     expect(expand('확인이 필요한 재료')).toHaveTextContent('닭고기');
-    expect(screen.queryByRole('heading', { name: '확인된 부족분' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '등록된 재고 기준 추가 필요량' })).not.toBeInTheDocument();
     expect(screen.queryByText(/부족분은 없어요/)).not.toBeInTheDocument();
   });
 
@@ -152,7 +184,7 @@ describe('MealPlanShoppingPreview', () => {
     await saveConfirmed(plan);
     render(page());
     fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
-    const shortages = await screen.findByRole('list', { name: '확인된 부족분' });
+    const shortages = await screen.findByRole('list', { name: '등록된 재고 기준 추가 필요량' });
     expect(shortages).toHaveTextContent('닭고기');
     expect(shortages).not.toHaveTextContent('파슬리');
     expect(expand('선택 재료')).toHaveTextContent('파슬리');

@@ -29,6 +29,49 @@ async function readStoredWeek(page) {
   }), weekStart);
 }
 
+test('FR-00 a guest starts from home and makes a chosen-days plan without registering inventory', async ({ page }, testInfo) => {
+  await page.clock.setFixedTime(new Date('2026-09-14T08:00:00.000Z'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await seedBrowserState(page);
+  await gotoAndWait(page, '/');
+  const start = page.getByRole('link', { name: '이번 주 식단 만들기', exact: true });
+  await expect(start).toBeVisible();
+  await expect(page.getByRole('link', { name: '재료 추가', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '남은 재료로 무엇을 만들까요?' })).toBeVisible();
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const header = page.locator('main section').filter({ has: page.getByRole('heading', { level: 1 }) }).first();
+  await header.screenshot({ path: testInfo.outputPath('first-plan-home-mobile.png') });
+  await start.focus(); await expect(start).toBeFocused(); await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/meal-plan$/);
+  await page.getByLabel('식사 인원').selectOption('2');
+  await page.getByLabel('피하고 싶은 재료').fill('새우');
+  for (const day of ['화', '수', '금', '토', '일']) await page.getByLabel(`${day}요일 저녁`, { exact: true }).uncheck();
+  await page.getByRole('button', { name: '한 주 식단 만들기', exact: true }).click();
+  await waitForSave(page);
+  const draft = await readStoredWeek(page);
+  expect(draft.confirmed).toBeNull();
+  expect(draft.draft.preferences).toEqual({ servings: 2, excludedIngredients: ['새우'], dinnerDays: [0, 3] });
+  expect(draft.draft.slots.map(slot => slot.status)).toEqual(['planned', 'skipped', 'skipped', 'planned', 'skipped', 'skipped', 'skipped']);
+  const monday = page.getByRole('article', { name: '2026-09-14 저녁 식단' });
+  await expect(monday.locator('summary')).toContainText('구매 또는 보유 확인 필요');
+  await monday.locator('summary').click();
+  await expect(monday).not.toContainText('미보유');
+  await monday.screenshot({ path: testInfo.outputPath('unregistered-plan-mobile.png') });
+  await page.getByRole('button', { name: '이 식단 확정', exact: true }).click();
+  await expect(page.getByText('식단을 확정했어요.', { exact: true })).toBeVisible();
+  expect((await readStoredWeek(page)).confirmed.preferences.servings).toBe(2);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([]);
+  expect(await page.evaluate(() => localStorage.getItem('fridgemate-auth-session'))).toBeNull();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.reload();
+  await expect(monday.getByRole('heading', { level: 3 })).toHaveText(draft.draft.slots[0].title);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /^noindex(?:,|$)/);
+  expect(await readBrowserIngredients(page, 'guest')).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test('weekly dinners can be replaced, locked and reloaded without changing inventory', async ({ page }, testInfo) => {
   const ingredients = [
     createIngredient('rice', { name: '밥', quantity: '2공기', expiryDate: '2026-09-21' }),
@@ -229,7 +272,7 @@ test('shopping preview uses the confirmed plan while an edited draft leaves inve
   const reviewItems = preview.getByRole('list', { name: '확인이 필요한 재료', exact: true }).getByRole('listitem');
   await preview.locator('summary').filter({ hasText: '확인이 필요한 재료' }).click();
   await expect(reviewItems.first()).toBeVisible();
-  await expect(preview.getByRole('list', { name: '확인된 부족분', exact: true }).getByRole('listitem')).toHaveCount(0);
+  await expect(preview.getByRole('list', { name: '등록된 재고 기준 추가 필요량', exact: true }).getByRole('listitem')).toHaveCount(0);
   const confirmedReview = await reviewItems.allTextContents();
   const confirmedPlan = (await readStoredWeek(page)).confirmed;
   expect(await readBrowserIngredients(page, 'guest')).toEqual(inventoryBefore);
@@ -414,7 +457,7 @@ test('source-reviewed dinner scales and allocates user-confirmed stock through s
   await expect(page.getByText('확정됨', { exact: true })).toBeVisible();
   const preview = page.getByRole('region', { name: '식단 장보기 미리보기' });
   await preview.getByRole('button', { name: '식단 장보기 확인', exact: true }).click();
-  const shortages = preview.getByRole('list', { name: '확인된 부족분', exact: true });
+  const shortages = preview.getByRole('list', { name: '등록된 재고 기준 추가 필요량', exact: true });
   await expect(shortages.getByRole('listitem')).toHaveCount(1);
   await expect(shortages.getByText('밥', { exact: true })).toBeVisible();
   await expect(shortages.getByText('60g', { exact: true })).toBeVisible();
@@ -486,7 +529,7 @@ for (const candidate of [
     await expect(page.getByText('확정됨', { exact: true })).toBeVisible();
     const preview = page.getByRole('region', { name: '식단 장보기 미리보기' });
     await preview.getByRole('button', { name: '식단 장보기 확인', exact: true }).click();
-    const shortages = preview.getByRole('list', { name: '확인된 부족분', exact: true });
+    const shortages = preview.getByRole('list', { name: '등록된 재고 기준 추가 필요량', exact: true });
     await expect(shortages.getByRole('listitem')).toHaveCount(candidate.rows);
     await expect(shortages.getByRole('listitem').filter({ hasText: candidate.ingredient }).getByText(candidate.amount, { exact: true })).toBeVisible();
     await preview.locator('summary').filter({ hasText: '확인이 필요한 재료' }).click();

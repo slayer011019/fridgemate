@@ -48,7 +48,7 @@ test('actual received amount refreshes shortages and remains after the dinner is
   await expect(preview.getByRole('button', { name: '식단 장보기 확인', exact: true })).toBeVisible();
   await expect(preview.getByText('360g', { exact: true })).toHaveCount(0);
   await preview.getByRole('button', { name: '식단 장보기 확인', exact: true }).click();
-  await expect(preview.getByRole('list', { name: '확인된 부족분', exact: true }).getByText('밥', { exact: true })).toHaveCount(0);
+  await expect(preview.getByRole('list', { name: '등록된 재고 기준 추가 필요량', exact: true }).getByText('밥', { exact: true })).toHaveCount(0);
   const stock = await readBrowserIngredients(page, 'guest');
   expect(stock).toHaveLength(1);
   expect(stock[0]).toMatchObject({ name: '밥', quantity: '500g 한 팩', consumed: false });

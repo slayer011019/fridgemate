@@ -41,7 +41,7 @@ test('blocked local and session storage getters keep public pages and guest Inde
     }
   });
   await gotoAndWait(page, '/');
-  await expect(page.getByRole('heading', { name: '남은 재료로 오늘 메뉴를 골라보세요' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '이번 주 저녁부터 정해볼까요?' })).toBeVisible();
 
   await gotoAndWait(page, '/ingredients/new');
   await page.getByLabel('이름').fill('우유');
