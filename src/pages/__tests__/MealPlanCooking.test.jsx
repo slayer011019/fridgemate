@@ -65,6 +65,7 @@ describe('weekly cooking through actual local storage', () => {
   it('suggests planned 200g but stores actual 150g once and refreshes the completed meal and shopping', async () => {
     const view = render(page());
     const form = await openMonday();
+    const cooking = within(screen.getByRole('region', { name: '조리와 재고 기록' }));
     const amount = form.getByRole('spinbutton', { name: /실제 사용량/ });
     expect(amount).toHaveValue(200);
     fireEvent.change(amount, { target: { value: '150' } });
@@ -72,7 +73,8 @@ describe('weekly cooking through actual local storage', () => {
     const save = form.getByRole('button', { name: '실제 사용량으로 조리 기록' });
     save.focus();
     fireEvent.click(save); fireEvent.click(save);
-    await screen.findByText('조리와 실제 사용량을 저장했어요.');
+    const saved = await cooking.findByText('조리와 실제 사용량을 저장했어요.');
+    expect(screen.getByText('조리와 실제 사용량을 저장했어요.')).toBe(saved);
     await noticeReady();
     expect(screen.getByRole('heading', { name: '조리와 재고 기록' })).toHaveFocus();
     expect((await getAllIngredients())[0]).toMatchObject({ quantity: '150g', memo: '보존 메모' });

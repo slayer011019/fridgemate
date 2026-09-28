@@ -73,7 +73,10 @@ describe('overdue confirmed meals through page controls and real IndexedDB', () 
     await seedPlan('2026-09-07', { confirmed: false });
     const before = await getMealCookingWorkspace('guest');
     render(page());
-    await screen.findByRole('button', { name: `${OLDER} 식단 확인` });
+    // Retry only the notice while real IndexedDB work is pending; the editor's
+    // unrelated mutations should not repeatedly scan/serialize the whole page.
+    const olderWeek = await overdue().findByRole('button', { name: `${OLDER} 식단 확인` });
+    expect(screen.getByRole('button', { name: `${OLDER} 식단 확인` })).toBe(olderWeek);
     expect(overdue().getByRole('button', { name: `${PAST} 식단 확인` })).toBeEnabled();
     expect(overdue().queryByRole('button', { name: '2026-09-07 식단 확인' })).not.toBeInTheDocument();
     expect(overdue().getAllByText(/조리 여부 확인 필요/)).not.toHaveLength(0);
@@ -130,10 +133,12 @@ describe('overdue confirmed meals through page controls and real IndexedDB', () 
     const past = await openPast();
     fireEvent.click(past.getByRole('button', { name: '만들어 먹었어요' }));
     const form = within(await screen.findByRole('form', { name: `조리 사용량 · ${PAST} 닭고기 한 끼` }));
+    const cooking = within(screen.getByRole('region', { name: '조리와 재고 기록' }));
     fireEvent.change(form.getByRole('spinbutton', { name: /실제 사용량/ }), { target: { value: '150' } });
     fireEvent.click(form.getByLabelText('실제로 쓴 재고를 모두 확인했어요'));
     fireEvent.click(form.getByRole('button', { name: '실제 사용량으로 조리 기록' }));
-    await screen.findByText('조리와 실제 사용량을 저장했어요.');
+    const saved = await cooking.findByText('조리와 실제 사용량을 저장했어요.');
+    expect(screen.getByText('조리와 실제 사용량을 저장했어요.')).toBe(saved);
     await noticeReady();
     await waitFor(() => expect(overdue().queryByRole('button', { name: `${PAST} 식단 확인` })).not.toBeInTheDocument());
     expect((await getAllIngredients())[0]).toMatchObject({ quantity: '150g', memo: '보존할 재고 메모' });
