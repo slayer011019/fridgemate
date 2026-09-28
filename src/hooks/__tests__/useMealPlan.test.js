@@ -266,7 +266,7 @@ describe('useMealPlan', () => {
     act(() => { pending = result.current.confirmPlan(); });
     expect(result.current.saving).toBe(true);
     expect(result.current.confirmedPlan).toBeNull();
-    expect(repository.confirmMealPlan).toHaveBeenCalledWith('2026-09-14', 'guest', 4);
+    await waitFor(() => expect(repository.confirmMealPlan).toHaveBeenCalledWith('2026-09-14', 'guest', 4));
     await act(async () => {
       confirmation.resolve(record(null, draft, 5));
       expect(await pending).toEqual(draft);
@@ -310,7 +310,7 @@ describe('useMealPlan', () => {
       expect(await result.current.confirmPlan()).toBeNull();
       expect(await result.current.savePlan(plan('guest', 2))).toBeNull();
     });
-    expect(repository.confirmMealPlan).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(repository.confirmMealPlan).toHaveBeenCalledTimes(1));
     expect(repository.saveMealPlan).not.toHaveBeenCalled();
     await act(async () => { confirmation.resolve(record(null, draft, 2)); await pending; });
     await act(async () => { expect(await result.current.confirmPlan()).toBeNull(); });

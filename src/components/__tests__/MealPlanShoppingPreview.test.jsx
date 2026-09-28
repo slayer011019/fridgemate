@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import FDBFactory from 'fake-indexeddb/lib/FDBFactory';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +7,12 @@ import * as repository from '../../features/mealPlans/mealPlanRepository';
 import { generateMealPlan } from '../../features/mealPlans/mealPlanDomain';
 import { clearAccountLocalData, getAllIngredients, saveIngredients } from '../../db/indexedDB';
 import { getInventoryQuantitySnapshot, saveInventoryQuantity } from '../../features/mealPlans/inventoryQuantityRepository';
+
+const pilot = vi.hoisted(() => ({ begin: vi.fn(), finish: vi.fn() }));
+vi.mock('../../features/mealPlans/mealPlanPilotCollector', () => ({
+  beginMealPlanPilotOperation: (...args) => pilot.begin(...args),
+  finishMealPlanPilotOperation: (...args) => pilot.finish(...args),
+}));
 
 const TODAY = '2026-09-14';
 const NOW = new Date(2026, 8, 14, 0, 30);
@@ -67,6 +73,9 @@ beforeAll(() => {
   Object.defineProperty(window, 'indexedDB', { configurable: true, value: new FDBFactory() });
 });
 beforeEach(async () => {
+  vi.clearAllMocks();
+  pilot.begin.mockResolvedValue(Object.freeze({}));
+  pilot.finish.mockResolvedValue({ status: 'recorded' });
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
   for (const scope of ['guest', 'user:alice']) {
@@ -76,6 +85,30 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('MealPlanShoppingPreview', () => {
+  it('records only explicit completed calculations and preserves the displayed result when pilot storage fails', async () => {
+    await saveConfirmed(fixturePlan());
+    render(page());
+    expect(pilot.begin).not.toHaveBeenCalled();
+    pilot.finish.mockRejectedValue(new Error('optional pilot failure'));
+    fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
+    expect(await screen.findByRole('list', { name: '등록된 재고 기준 추가 필요량' })).toHaveTextContent('200g');
+    expect(pilot.finish.mock.calls.flatMap(call => call[1])).toEqual([expect.objectContaining({ name: 'shopping_list_recalculated', status: 'success' })]);
+    expect(await getAllIngredients()).toEqual([]);
+  });
+
+  it('does not turn a discarded read after focus into a failed calculation', async () => {
+    const pending = deferred();
+    vi.spyOn(repository, 'getMealPlanningSnapshot').mockReturnValueOnce(pending.promise);
+    render(page());
+    fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.focus(window);
+    await act(async () => { pending.reject(new Error('stale snapshot failure')); });
+    expect(screen.getByText(/다른 화면의 변경을 반영하려면/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(pilot.finish.mock.calls.flatMap(call => call[1])).toEqual([expect.objectContaining({ name: 'shopping_list_recalculated', status: 'cancelled' })]);
+  });
+
   it('labels a registered-inventory calculation without declaring an unregistered ingredient physically absent', async () => {
     await saveConfirmed(fixturePlan());
     render(page());
@@ -210,6 +243,7 @@ describe('MealPlanShoppingPreview', () => {
     vi.spyOn(repository, 'getMealPlanningSnapshot').mockReturnValueOnce(pending.promise);
     const view = render(page());
     fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
+    await waitFor(() => expect(repository.getMealPlanningSnapshot).toHaveBeenCalledTimes(1));
     view.rerender(page('user:alice'));
     await act(async () => { pending.resolve({ scope: 'guest', ingredients: [], inventory: [], confirmedPlans: [], quantityReviews: [] }); });
     expect(screen.queryByText('오늘 이후 확정된 식단이 없어요.')).not.toBeInTheDocument();
@@ -223,6 +257,7 @@ describe('MealPlanShoppingPreview', () => {
     vi.spyOn(repository, 'getMealPlanningSnapshot').mockReturnValueOnce(pending.promise);
     const view = render(page());
     fireEvent.click(screen.getByRole('button', { name: '식단 장보기 확인' }));
+    await waitFor(() => expect(repository.getMealPlanningSnapshot).toHaveBeenCalledTimes(1));
     view.unmount();
     render(page('user:alice'));
     await act(async () => { pending.reject(new Error('이전 계정 오류')); });

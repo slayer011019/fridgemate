@@ -18,10 +18,10 @@ function instant(value) {
 
 function expired(row, scope, now) {
   if (row === undefined) return false;
-  if (!row || row.id !== 'session' || row.schemaVersion !== 1 || row.scope !== scope
+  if (!row || row.id !== 'session' || ![1, 2].includes(row.schemaVersion) || row.scope !== scope
     || typeof row.version !== 'string' || !/^[a-f0-9]{32}$/.test(row.version)) throw new Error();
   if (['expired', 'withdrawn'].includes(row.status)) {
-    if (Object.keys(row).length !== 5) throw new Error();
+    if (row.schemaVersion !== 1 || Object.keys(row).length !== 5) throw new Error();
     return false;
   }
   if (row.status !== 'active') throw new Error();

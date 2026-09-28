@@ -5,6 +5,7 @@ import { assertInventoryQuantityReview, invalidateInventoryQuantityReview, proje
 import { prepareConsumption, prepareConsumptionReversal } from './inventoryConsumptionDomain';
 import { assertMealCookingEvent, assertMealCookingHistory, getMealCookingState, isMealCookingEventId } from './mealCookingEvents';
 import { assertReceipt } from '../shopping/shoppingRepository';
+import { createMealPlanPilotOperation, mealCookingPilotEvents, runMealPlanPilotAction } from './mealPlanPilotActions';
 
 const INVALID = '조리 기록 요청을 확인해주세요.';
 const CONFLICT = '식단이나 사용량이 바뀌었어요. 다시 불러온 뒤 확인해주세요.';
@@ -279,8 +280,7 @@ function correctConsumption(request, data, stores, now) {
   return { record, event };
 }
 
-async function perform(input, action) {
-  const request = requestValues(input, action);
+async function performTransaction(request, action) {
   let failure;
   try {
     return await runMealCookingTransaction('readwrite', (stores, transaction) => {
@@ -305,6 +305,17 @@ async function perform(input, action) {
       return output;
     }, request.scope);
   } catch (error) { throw failure || error; }
+}
+
+function perform(input, action) {
+  // Keep command validation/copy synchronous, before optional observation awaits.
+  let request;
+  try { request = requestValues(input, action); } catch (error) { return Promise.reject(error); }
+  const name = { cooking: 'meal_cooked_recorded', 'cooking-reversal': 'meal_cooked_reversed',
+    'consumption-reversal': 'consumption_reversed', 'consumption-correction': 'consumption_applied' }[action];
+  return runMealPlanPilotAction({ scope: request.scope,
+    ...createMealPlanPilotOperation(name, { planKey: `week:${request.weekStart}`, slotKey: request.slotId }) },
+  () => performTransaction(request, action), mealCookingPilotEvents);
 }
 
 export const recordMealCooking = input => perform(input, 'cooking');

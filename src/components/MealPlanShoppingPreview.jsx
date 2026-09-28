@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMealPlanningSnapshot } from '../features/mealPlans/mealPlanRepository';
 import { allocateMealPlanInventory } from '../features/mealPlans/mealPlanAllocation';
+import { createMealPlanPilotOperation, runMealPlanPilotAction } from '../features/mealPlans/mealPlanPilotActions';
 
 const PREPARATION_LABELS = { raw: '조리 전', cooked: '조리 후', 'as-sold': '구매 상태' };
 const REVIEW_REASONS = {
@@ -54,15 +55,24 @@ function PreviewSession({ scope, disabled }) {
     requestRef.current = request;
     setState({ status: 'loading', result: null, checkedAt: null });
     try {
-      const snapshot = await getMealPlanningSnapshot(scope);
-      if (!mountedRef.current || requestRef.current !== request) return;
-      if (snapshot.scope !== scope) throw new Error('Planning scope changed.');
-      const checkedAt = new Date();
-      const result = allocateMealPlanInventory({
-        scope, confirmedPlans: snapshot.confirmedPlans,
-        inventory: snapshot.inventory, today: localDate(checkedAt),
-      });
-      setState({ status: 'ready', result, checkedAt });
+      const pilot = createMealPlanPilotOperation('shopping_list_recalculated');
+      const isCurrent = () => mountedRef.current && requestRef.current === request;
+      const calculated = await runMealPlanPilotAction({ scope, ...pilot, isCurrent }, async () => {
+        let snapshot;
+        try { snapshot = await getMealPlanningSnapshot(scope); }
+        catch (error) { if (!isCurrent()) return null; throw error; }
+        if (!isCurrent()) return null;
+        if (snapshot.scope !== scope) throw new Error('Planning scope changed.');
+        const checkedAt = new Date();
+        const result = allocateMealPlanInventory({
+          scope, confirmedPlans: snapshot.confirmedPlans,
+          inventory: snapshot.inventory, today: localDate(checkedAt),
+        });
+        return { result, checkedAt };
+      }, value => [{ name: 'shopping_list_recalculated', status: value ? 'success' : 'cancelled',
+        sourceKey: `shopping_list_recalculated:${pilot.operationKey}`, operationKey: pilot.operationKey,
+        occurredAt: value?.checkedAt.toISOString() ?? new Date().toISOString() }]);
+      if (calculated && isCurrent()) setState({ status: 'ready', ...calculated });
     } catch {
       if (mountedRef.current && requestRef.current === request) {
         setState({ status: 'error', result: null, checkedAt: null });

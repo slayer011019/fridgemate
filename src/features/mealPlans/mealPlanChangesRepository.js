@@ -5,6 +5,7 @@ import { allocateMealPlanInventory } from './mealPlanAllocation';
 import { assertInventoryQuantityReview, projectInventoryQuantity } from './inventoryQuantityDomain';
 import { assertMealCookingEvent, assertMealCookingHistory, getMealCookingState, isMealCookingEventId } from './mealCookingEvents';
 import { assertReceipt } from '../shopping/shoppingRepository';
+import { createMealPlanPilotOperation, runMealPlanPilotAction } from './mealPlanPilotActions';
 
 const INVALID = '식단 변경 요청을 확인해주세요.';
 const CONFLICT = '식단·재고 또는 날짜가 바뀌었어요. 변경 내용을 다시 확인해주세요.';
@@ -199,7 +200,9 @@ export async function confirmMealPlanChange(input) {
   const request = requestValues(preview?.request);
   if (preview.scope !== request.scope || !isDate(preview.today) || !text(preview.createdAt)
     || !Number.isFinite(Date.parse(preview.createdAt)) || new Date(preview.createdAt).toISOString() !== preview.createdAt) throw new Error(INVALID);
-  return withSnapshot(request.scope, 'readwrite', (data, stores) => {
+  return runMealPlanPilotAction({ scope: request.scope,
+    ...createMealPlanPilotOperation('meal_slot_changed', { planKey: `week:${request.weekStart}` }) },
+  () => withSnapshot(request.scope, 'readwrite', (data, stores) => {
     const today = localDate();
     if (preview.token !== data.token || preview.today !== today) throw new Error(CONFLICT);
     const checked = buildProposal(request, data, today, preview.createdAt);
@@ -207,5 +210,16 @@ export async function confirmMealPlanChange(input) {
     const records = approvedRecords(checked, data);
     for (const record of records) stores.mealPlans.put(record);
     return { records, weekStarts: records.map(record => record.weekStart) };
+  }), result => {
+    // Record approval ACK time, not the older read-only proposal timestamp.
+    const occurredAt = new Date().toISOString();
+    const operationKey = `plan-change:${result.records.map(record => `${record.id}@${record.revision}`).join('|')}`;
+    return preview.changes.map(change => {
+      const week = getWeekStart(change.date);
+      const record = result.records.find(item => item.weekStart === week);
+      return { name: 'meal_slot_changed', status: 'success',
+        sourceKey: `meal_slot_changed:${record.id}@${record.revision}:${change.after.id}`,
+        operationKey, occurredAt, planKey: record.id, slotKey: change.after.id };
+    });
   });
 }

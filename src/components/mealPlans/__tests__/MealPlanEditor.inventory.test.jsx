@@ -28,6 +28,7 @@ function Editor({ initialPlan = null, ingredients = [] }) {
   return <MemoryRouter><MealPlanEditor plan={plan} confirmedPlan={null} hasDraft={Boolean(plan)}
     weekStart={WEEK} storageScope="guest" saving={false} today={WEEK} ingredients={ingredients}
     inventoryLoading={false} inventoryError="" pantryItems={[]} overdueConflicts={[]}
+    generatePlan={async create => { const next = create(); setPlan(next); return next; }}
     savePlan={async next => { setPlan(next); return next; }} /></MemoryRouter>;
 }
 

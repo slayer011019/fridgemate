@@ -95,7 +95,12 @@ function validateEvent(event, subjects, exportedAt) {
   const subject = subjects.get(event.subjectId);
   check(subject && occurredAt <= exportedAt && event.weekKey === weekAt(occurredAt));
   check(event.occurredAt >= subject.observedFrom && event.occurredAt <= subject.observedThrough
-    && !subject.gaps.some(gap => event.occurredAt >= gap.from && event.occurredAt < gap.through));
+    // A missing interval means incomplete observation, not that every result is
+    // absent. Keep independently committed results/reversals while covers()
+    // continues to exclude this interval from evidence of non-use. Opt-out and
+    // reset intervals still prohibit collection altogether.
+    && !subject.gaps.some(gap => gap.reason !== 'missing'
+      && event.occurredAt >= gap.from && event.occurredAt < gap.through));
   for (const [key, prefix] of [['planId', 'plan'], ['slotId', 'slot'], ['reversesEventId', 'evt']]) {
     if (Object.hasOwn(event, key)) pseudonym(event[key], prefix);
   }

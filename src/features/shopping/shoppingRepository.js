@@ -4,6 +4,7 @@ import { allocateMealPlanInventory } from '../mealPlans/mealPlanAllocation';
 import { createInventoryQuantityReview, invalidateInventoryQuantityReview, validateInventoryQuantityValues } from '../mealPlans/inventoryQuantityDomain';
 import { assertMealCookingEvent, isMealCookingEventId } from '../mealPlans/mealCookingEvents';
 import { ingredientCategories, storageTypes } from '../ingredients/ingredientFields';
+import { createMealPlanPilotOperation, runMealPlanPilotAction } from '../mealPlans/mealPlanPilotActions';
 
 const INVALID = '장보기 자료를 확인할 수 없습니다. 기존 기록은 지우지 않았어요.';
 const CONFLICT = '다른 화면에서 장보기 항목이 바뀌었어요. 목록을 다시 불러와 주세요.';
@@ -214,6 +215,7 @@ export async function applyPurchaseReceipt(input) {
   const values = receiptValues(input.values); // Copy and validate before the first await.
   const id = `receipt:${operationId}`;
   const ingredientId = `receipt-${operationId}`;
+  return runMealPlanPilotAction({ scope, ...createMealPlanPilotOperation('inventory_purchase_applied') }, async () => {
   let failure;
   try {
     return await runInventoryReceiptTransaction('readwrite', (stores, transaction) => {
@@ -262,6 +264,8 @@ export async function applyPurchaseReceipt(input) {
       return output;
     }, scope);
   } catch (error) { throw failure || error; }
+  }, receipt => [{ name: 'inventory_purchase_applied', status: 'success',
+    sourceKey: `inventory_purchase_applied:${receipt.id}`, operationKey: receipt.operationId, occurredAt: receipt.createdAt }]);
 }
 
 function planShopping(snapshot, today) {

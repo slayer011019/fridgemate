@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MealPlanPage from '../MealPlanPage';
 import { generateMealPlan } from '../../features/mealPlans/mealPlanDomain';
 
+const pilot = vi.hoisted(() => ({ begin: vi.fn(), finish: vi.fn() }));
+vi.mock('../../features/mealPlans/mealPlanPilotCollector', () => ({
+  beginMealPlanPilotOperation: (...args) => pilot.begin(...args),
+  finishMealPlanPilotOperation: (...args) => pilot.finish(...args),
+}));
+
 const authState = { storageScope: 'guest', loading: false };
 const repository = { getMealPlan: vi.fn(), saveMealPlan: vi.fn(), confirmMealPlan: vi.fn() };
 const WEEK = '2026-09-14';
@@ -77,6 +83,8 @@ describe('MealPlanPage storage integration', () => {
     vi.clearAllMocks();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(NOW));
+    pilot.begin.mockResolvedValue(Object.freeze({}));
+    pilot.finish.mockResolvedValue({ status: 'recorded' });
     records.clear();
     authState.storageScope = 'guest';
     authState.loading = false;
@@ -86,6 +94,17 @@ describe('MealPlanPage storage integration', () => {
     repository.confirmMealPlan.mockImplementation(async (...args) => confirmDraft(...args));
   });
   afterEach(() => { cleanup(); vi.useRealTimers(); });
+
+  it('connects the explicit generation click to a started observation and its saved result, not initial render', async () => {
+    render(page());
+    const button = await screen.findByRole('button', { name: '한 주 식단 만들기' });
+    expect(pilot.begin).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    await screen.findByRole('region', { name: '한 주 저녁 식단표' });
+    expect(pilot.begin.mock.calls[0]?.[0].startEvent).toMatchObject({ name: 'meal_plan_generation_started', status: 'started' });
+    expect(pilot.finish.mock.calls.flatMap(call => call[1])).toEqual([expect.objectContaining({ name: 'meal_plan_generated', status: 'success', plannedSlotCount: 7 })]);
+    expect(records.get(recordKey(WEEK, 'guest')).confirmed).toBeNull();
+  });
 
   it('keeps a saved draft unconfirmed until the user explicitly confirms it', async () => {
     render(page());
@@ -124,7 +143,7 @@ describe('MealPlanPage storage integration', () => {
     expect(button).toBeDisabled();
     expect(screen.getByRole('button', { name: '다음 주' })).toBeDisabled();
     expect(screen.queryByText('확정됨', { exact: true })).not.toBeInTheDocument();
-    expect(repository.confirmMealPlan).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(repository.confirmMealPlan).toHaveBeenCalledTimes(1));
     expect(repository.confirmMealPlan).toHaveBeenCalledWith(WEEK, 'guest', 1);
     await act(async () => { confirmation.resolve(confirmDraft(WEEK, 'guest', 1)); });
     expect(await screen.findByText('확정됨', { exact: true })).toBeInTheDocument();
@@ -291,6 +310,7 @@ describe('MealPlanPage storage integration', () => {
     await screen.findByRole('button', { name: '한 주 식단 만들기' });
     fireEvent.change(screen.getByLabelText('피하고 싶은 재료'), { target: { value: '게스트 취향' } });
     fireEvent.click(screen.getByRole('button', { name: '한 주 식단 만들기' }));
+    await waitFor(() => expect(repository.saveMealPlan).toHaveBeenCalledTimes(1));
     const guestDraft = repository.saveMealPlan.mock.calls[0][0];
     authState.storageScope = 'user:alice';
     view.rerender(page());

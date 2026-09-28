@@ -130,6 +130,16 @@ describe('private meal plan pilot startup retention', () => {
     ]);
   });
 
+  it('expires a v2 capture session and its alias/operation material without touching business stores', async () => {
+    const dbName = await seed('guest', active('guest', { schemaVersion: 2,
+      capture: { privateAlias: 'must expire', pending: ['private operation'] } }));
+    const before = await snapshot(dbName);
+    expect(await purge()).toEqual({ supported: true, checkedScopes: 1, expiredScopes: 1, failedScopes: 0 });
+    const after = await snapshot(dbName);
+    expect(after.stores.mealPlanPilot).toEqual([{ id: 'session', schemaVersion: 1, scope: 'guest', status: 'expired', version: expect.any(String) }]);
+    BUSINESS.forEach(storeName => expect(after.stores[storeName]).toEqual(before.stores[storeName]));
+  });
+
   it('does not upgrade a v6 database or create pilot data for it', async () => {
     const dbName = await seed('guest', null, { version: 6 });
     const before = await snapshot(dbName);
@@ -146,7 +156,7 @@ describe('private meal plan pilot startup retention', () => {
   });
 
   it.each([
-    { schemaVersion: 2 }, { scope: 'user:other' }, { version: 'not-private-safe' }, { status: 'unknown' },
+    { schemaVersion: 3 }, { scope: 'user:other' }, { version: 'not-private-safe' }, { status: 'unknown' },
     { startedAt: '1999-09-21T00:00:00.000Z', expiresAt: '1999-10-26T00:00:00.000Z' },
     { startedAt: '2026-09-21T00:00:00Z' }, { startedAt: '2026-02-30T00:00:00.000Z' },
     { expiresAt: '2026-10-25T00:00:00.000Z' },
@@ -162,6 +172,13 @@ describe('private meal plan pilot startup retention', () => {
     const before = await snapshot(dbName);
     expect((await purge()).expiredScopes).toBe(0);
     expect(await snapshot(dbName)).toStrictEqual(before);
+  });
+
+  it('rejects a v2 closed marker instead of treating it as an accepted deletion barrier', async () => {
+    const dbName = await seed('guest', { id: 'session', schemaVersion: 2, scope: 'guest', status: 'withdrawn', version: 'b'.repeat(32) });
+    const before = await snapshot(dbName);
+    expect(await purge()).toEqual({ supported: true, checkedScopes: 1, expiredScopes: 0, failedScopes: 1 });
+    expect(await snapshot(dbName)).toEqual(before);
   });
 
   it('rolls back clearing and the tombstone if the final write aborts, without reflecting raw errors', async () => {

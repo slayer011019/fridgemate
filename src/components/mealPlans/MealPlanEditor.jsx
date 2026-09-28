@@ -100,7 +100,7 @@ function ConfirmedPlanSummary({ plan }) {
   );
 }
 
-export default function MealPlanEditor({ plan, confirmedPlan, hasDraft, weekStart, storageScope, saving, savePlan, confirmPlan, restoreOverdueDraft, overdueConflicts, today, ingredients, inventoryLoading, inventoryError, pantryItems, editingDisabled, onOpenCooking, onOpenChange }) {
+export default function MealPlanEditor({ plan, confirmedPlan, hasDraft, weekStart, storageScope, saving, savePlan, generatePlan, confirmPlan, restoreOverdueDraft, overdueConflicts, today, ingredients, inventoryLoading, inventoryError, pantryItems, editingDisabled, onOpenCooking, onOpenChange }) {
   const confirmationHeadingRef = useRef(null);
   const [preferences, setPreferences] = useState(() => plan?.preferences || DEFAULT_PREFERENCES);
   const [excludedText, setExcludedText] = useState(() => preferences.excludedIngredients.join(', '));
@@ -115,9 +115,9 @@ export default function MealPlanEditor({ plan, confirmedPlan, hasDraft, weekStar
   const canChange = Boolean(confirmedPlan) && !hasDraft;
   const hasRemaining = plan?.slots.some(slot => slot.date >= today && !slot.locked && ['planned', 'empty'].includes(slot.status));
 
-  async function persist(nextPlan, successMessage) {
+  async function persist(nextPlan, successMessage, save = savePlan) {
     setNotice('');
-    const savedPlan = await savePlan(nextPlan);
+    const savedPlan = await save(nextPlan);
     if (savedPlan) {
       setPreferences(savedPlan.preferences);
       setExcludedText(savedPlan.preferences.excludedIngredients.join(', '));
@@ -129,14 +129,14 @@ export default function MealPlanEditor({ plan, confirmedPlan, hasDraft, weekStar
   async function handleGenerate(event) {
     event.preventDefault();
     if (busy) return;
-    const nextPlan = generateMealPlan({
+    const createPlan = () => generateMealPlan({
       weekStart,
       scope: storageScope,
       preferences: currentPreferences,
       ...options,
       previousPlan: plan
     });
-    const savedPlan = await persist(nextPlan, '이 기기에 저장됨 · 재료와 분량을 확인해 주세요.');
+    const savedPlan = await persist(createPlan, '이 기기에 저장됨 · 재료와 분량을 확인해 주세요.', generatePlan);
     if (savedPlan) setSettingsOpen(false);
   }
 

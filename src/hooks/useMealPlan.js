@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { confirmMealPlan, getMealPlan, restoreOverdueMealPlanDraft, saveMealPlan } from '../features/mealPlans/mealPlanRepository';
 import { useAuth } from './useAuth';
+import { createMealPlanPilotOperation, runMealPlanPilotAction } from '../features/mealPlans/mealPlanPilotActions';
 
 function emptyState(key) {
   return { key, record: null, loading: true, saving: false, ready: false, error: '' };
@@ -67,7 +68,7 @@ export function useMealPlan(weekStart) {
       || stateRef.current !== state
       || refreshRef.current === context
       || saveRef.current?.context === context) return null;
-    if (action !== 'draft' && !state.record?.draft) return null;
+    if (!['draft', 'generate'].includes(action) && !state.record?.draft) return null;
     if (action === 'draft' && (nextPlan?.scope !== storageScope || nextPlan?.weekStart !== weekStart)) {
       setState((previous) => ({ ...previous, error: '현재 계정과 선택한 주의 식단인지 확인해주세요.' }));
       return null;
@@ -80,11 +81,41 @@ export function useMealPlan(weekStart) {
 
     try {
       const expectedRevision = state.record?.revision ?? 0;
-      const record = action === 'confirm'
-        ? await confirmMealPlan(weekStart, storageScope, expectedRevision)
-        : action === 'restore-overdue'
-          ? await restoreOverdueMealPlanDraft(weekStart, storageScope, expectedRevision)
-          : await saveMealPlan(nextPlan, storageScope, expectedRevision);
+      const previousPlan = state.record?.draft ?? state.record?.confirmed;
+      const copiedPlan = action === 'draft' ? structuredClone(nextPlan) : null;
+      const changedSlots = copiedPlan?.slots.filter(slot => {
+        const before = previousPlan?.slots.find(item => item.id === slot.id);
+        return before && JSON.stringify(before) !== JSON.stringify(slot);
+      }) ?? [];
+      const write = () => {
+        if (action === 'confirm') return confirmMealPlan(weekStart, storageScope, expectedRevision);
+        if (action === 'restore-overdue') return restoreOverdueMealPlanDraft(weekStart, storageScope, expectedRevision);
+        const generated = action === 'generate' ? nextPlan() : copiedPlan;
+        if (generated?.scope !== storageScope || generated?.weekStart !== weekStart) {
+          throw new Error('현재 계정과 선택한 주의 식단인지 확인해주세요.');
+        }
+        return saveMealPlan(generated, storageScope, expectedRevision);
+      };
+      const name = action === 'generate' ? 'meal_plan_generated'
+        : action === 'confirm' ? 'meal_plan_confirmed' : 'meal_slot_changed';
+      const pilot = createMealPlanPilotOperation(name, { planKey: `week:${weekStart}` });
+      const observe = action === 'generate' || action === 'confirm' || changedSlots.length > 0;
+      const record = observe ? await runMealPlanPilotAction({ scope: storageScope, ...pilot,
+        isCurrent: () => mountedRef.current && contextRef.current === context && saveRef.current === operation,
+        ...(action === 'generate' ? { startEvent: { name: 'meal_plan_generation_started', status: 'started',
+          sourceKey: `meal_plan_generation_started:${pilot.operationKey}`, operationKey: pilot.operationKey,
+          occurredAt: new Date().toISOString(), planKey: `week:${weekStart}` } } : {}),
+      }, write, saved => {
+        const committedPlan = action === 'confirm' ? saved.confirmed : saved.draft;
+        const common = { name, status: 'success', occurredAt: saved.updatedAt, planKey: saved.id,
+          operationKey: action === 'generate' ? pilot.operationKey : `${name}:${saved.id}@${saved.revision}` };
+        if (action === 'generate' || action === 'confirm') return [{ ...common,
+          sourceKey: `${name}:${saved.id}@${saved.revision}`,
+          plannedSlotCount: committedPlan.slots.filter(slot => slot.status === 'planned').length,
+          engineVersion: committedPlan.engineVersion }];
+        return changedSlots.map(slot => ({ ...common, sourceKey: `${name}:${saved.id}@${saved.revision}:${slot.id}`, slotKey: slot.id }));
+      }) : await write();
+      if (!record) return null;
       if (mountedRef.current && contextRef.current === context && saveRef.current === operation) {
         setState({ key, record, loading: false, saving: false, ready: true, error: '' });
         return action === 'confirm' ? record.confirmed : record.draft;
@@ -105,6 +136,7 @@ export function useMealPlan(weekStart) {
   }, [authLoading, key, renderedContext, state, storageScope, weekStart]);
 
   const savePlan = useCallback((nextPlan) => persist('draft', nextPlan), [persist]);
+  const generatePlan = useCallback((createPlan) => persist('generate', createPlan), [persist]);
   const confirmPlan = useCallback(() => persist('confirm'), [persist]);
   const restoreOverdueDraft = useCallback(() => persist('restore-overdue'), [persist]);
 
@@ -125,6 +157,6 @@ export function useMealPlan(weekStart) {
   return {
     ...visibleState, plan: record?.draft ?? record?.confirmed ?? null,
     confirmedPlan: record?.confirmed ?? null, hasDraft: Boolean(record?.draft),
-    recordRevision: record?.revision ?? 0, savePlan, confirmPlan, restoreOverdueDraft, retryLoad, storageScope,
+    recordRevision: record?.revision ?? 0, savePlan, generatePlan, confirmPlan, restoreOverdueDraft, retryLoad, storageScope,
   };
 }

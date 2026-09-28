@@ -33,6 +33,52 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('explicit local pilot consent', () => {
+  it.each(['get', 'grant'])('bounds a stalled %s open and prevents writes when its database arrives late', async operation => {
+    const m = await api();
+    const before = await grant(m);
+    const database = await new Promise(resolve => {
+      const request = window.indexedDB.open('fridgemate-db__guest');
+      request.onsuccess = () => resolve(request.result);
+    });
+    vi.resetModules();
+    const next = await api();
+    const request = { result: database };
+    const open = vi.spyOn(window.indexedDB, 'open').mockReturnValue(request);
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    const pending = (operation === 'get' ? next.getMealPlanPilotConsent() : grant(next)).then(
+      value => ({ value }), error => ({ message: error.message }));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await pending).toEqual({ message: '파일럿 설정을 확인하거나 저장하지 못했어요. 새로 확인한 뒤 다시 시도해주세요.' });
+    request.onsuccess();
+    open.mockRestore();
+    expect(await next.getMealPlanPilotConsent()).toEqual(before);
+    database.close();
+  });
+
+  it('does not grant consent for a stale UI account generation', async () => {
+    const m = await api();
+    await expect(m.grantMealPlanPilotConsent({ scope: 'guest', expectedVersion: null, accepted: true,
+      policyVersion: POLICY }, { isCurrent: () => false })).rejects.toThrow();
+    expect(await raw()).toEqual([]);
+  });
+
+  it('requires the current version for guarded withdrawal while preserving the legacy cleanup call', async () => {
+    const m = await api();
+    const state = await grant(m);
+    await expect(m.withdrawMealPlanPilotConsent('guest', { expectedVersion: 'b'.repeat(32), isCurrent: () => true })).rejects.toThrow();
+    expect((await m.getMealPlanPilotConsent()).version).toBe(state.version);
+    await expect(m.withdrawMealPlanPilotConsent('guest', { expectedVersion: state.version, isCurrent: () => false })).rejects.toThrow();
+    expect((await m.getMealPlanPilotConsent()).status).toBe('active');
+    expect((await m.withdrawMealPlanPilotConsent('guest')).status).toBe('withdrawn');
+  });
+
+  it('does not export into a stale UI account generation', async () => {
+    const m = await api();
+    const state = await grant(m);
+    await expect(m.prepareMealPlanPilotExport({ scope: 'guest', expectedVersion: state.version }, { isCurrent: () => false })).rejects.toThrow();
+    expect((await m.getMealPlanPilotConsent()).status).toBe('active');
+  });
+
   it('starts off without identifiers or a stored consent row, even with existing GA consent', async () => {
     const m = await api();
     window.localStorage.setItem('fridgemate-analytics-consent', 'granted');
@@ -118,9 +164,23 @@ describe('explicit local pilot consent', () => {
     await expect(grant(m)).rejects.toThrow();
     expect(await raw()).toEqual([]);
   });
+
+  it('does not reflect private provider details when access to IndexedDB is blocked during consent checks', async () => {
+    const m = await api();
+    const factory = window.indexedDB;
+    Object.defineProperty(window, 'indexedDB', { configurable: true, get() { throw new Error('PRIVATE PROVIDER DETAIL'); } });
+    await expect(grant(m)).rejects.toThrow('파일럿 설정을 확인하거나 저장하지 못했어요. 새로 확인한 뒤 다시 시도해주세요.');
+    Object.defineProperty(window, 'indexedDB', { configurable: true, value: factory });
+    expect(await raw()).toEqual([]);
+  });
 });
 
 describe('withdrawal and session-wide expiry', () => {
+  it('does not accept v2 closed markers as a valid legacy deletion barrier', async () => {
+    const m = await api();
+    await seed({ id: 'session', schemaVersion: 2, scope: 'guest', status: 'withdrawn', version: 'a'.repeat(32) });
+    await expect(m.getMealPlanPilotConsent()).rejects.toThrow();
+  });
   it('withdraws identifiers and events together while retaining only a new opaque stale-write barrier', async () => {
     const m = await api();
     const before = await grant(m);

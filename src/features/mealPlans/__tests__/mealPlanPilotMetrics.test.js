@@ -128,6 +128,38 @@ describe('pilot dataset privacy and structural boundaries', () => {
       gaps: [{ from: start, through: '2026-09-07T09:00:00.000Z', reason: 'missing' }] })]);
     expect(validate(input).events).toHaveLength(1);
   });
+
+  it('preserves a confirmed event during partial collection without claiming full observation', () => {
+    const input = dataset([generation(1)], [subject(1, { gaps: [{
+      from: '2026-09-07T08:00:00.000Z', through: '2026-09-11T09:00:00.000Z', reason: 'missing',
+    }] })]);
+    expect(validate(input).events).toEqual([generation(1)]);
+    expect(report(input).activation.guest).toMatchObject({ eligible: 1, activated: 0, missingObservation: 1 });
+  });
+
+  it('does not turn one known next-week cooking during a missing interval into observed inactivity', () => {
+    const input = dataset([cook(1), cook(2), cook(3, '2026-09-14T09:00:00.000Z', '2026-09-14')],
+      [subject(1, { gaps: [{ from: '2026-09-14T08:00:00.000Z', through: '2026-09-16T09:00:00.000Z', reason: 'missing' }] })]);
+    const result = report(input);
+    expect(week(result, '2026-09-14').guest).toEqual({ activeSubjects: 0, activeSlots: 1 });
+    expect(result.retention[0].guest).toEqual({ eligible: 1, retainedObserved: 0,
+      observedInactive: 0, missingObservation: 1, rate: 0 });
+  });
+
+  it('honors a confirmed reversal even when another operation was not observed during that interval', () => {
+    const original = cook(1);
+    const input = dataset([original, reverse(2, original)], [subject(1, { gaps: [{
+      from: '2026-09-21T08:00:00.000Z', through: '2026-09-22T09:00:00.000Z', reason: 'missing',
+    }] })]);
+    expect(week(report(input), '2026-09-07').guest).toEqual({ activeSubjects: 0, activeSlots: 0 });
+  });
+
+  it.each(['opt-out', 'reset'])('still refuses events during a %s interval', reason => {
+    const input = dataset([cook(1)], [subject(1, { gaps: [{
+      from: '2026-09-07T08:00:00.000Z', through: '2026-09-08T09:00:00.000Z', reason,
+    }] })]);
+    expect(() => validate(input)).toThrow();
+  });
 });
 
 describe('committed outcome links and cancellation semantics', () => {
